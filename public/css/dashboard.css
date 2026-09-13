@@ -2151,19 +2151,26 @@ body.theme-light .modal-tiktok-card {
     radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
     radial-gradient(ellipse at center, rgba(124, 58, 237, 0.04) 0%, transparent 70%);
   background-size: 24px 24px, 100% 100%;
+  cursor: grab;
+  user-select: none;
+}
+.live-canvas-area:active {
+  cursor: grabbing;
 }
 
 .live-topbar {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: 14px;
+  left: 14px;
+  right: calc(360px + 20px);
   z-index: 20;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  background: rgba(15, 15, 24, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 8px 16px;
+  background: rgba(13, 13, 20, 0.92);
+  backdrop-filter: blur(14px);
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -2187,14 +2194,7 @@ body.theme-light .modal-tiktok-card {
   height: 8px;
   border-radius: 50%;
   background: #ef4444;
-  box-shadow: 0 0 8px #ef4444;
-  animation: liveDotBlink 1.4s infinite;
-}
-
-@keyframes liveDotBlink {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.85); }
-  100% { opacity: 1; transform: scale(1); }
+  box-shadow: 0 0 6px #ef4444;
 }
 
 /* Badge de Leads Ativos no Node */
@@ -2224,15 +2224,10 @@ body.theme-light .modal-tiktok-card {
   box-shadow: none;
 }
 
-/* Pulso de Chegada do Lead no Node de Destino */
+/* Pulso de Chegada do Lead no Node de Destino - Desativado para evitar piscar */
 .node-pulse-arrival {
-  animation: nodeArrivalPulse 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-@keyframes nodeArrivalPulse {
-  0% { transform: scale(1); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); }
-  40% { transform: scale(1.04); box-shadow: 0 0 30px rgba(16, 185, 129, 0.65), 0 0 10px rgba(255, 255, 255, 0.8); }
-  100% { transform: scale(1); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); }
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Badge de Origem no Nó Inicial */

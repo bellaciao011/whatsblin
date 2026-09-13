@@ -612,6 +612,29 @@ function initSalesChart(salesByDay) {
 let liveFlowAnimationFrame = null;
 let liveFlowPollingInterval = null;
 let liveParticles = [];
+let currentLiveFlowId = localStorage.getItem('wh_live_flow_id') || 'fluxo-espiao-foto';
+let liveZoomState = {
+  scale: 1.0,
+  panX: 40,
+  panY: 60,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  initialPanX: 0,
+  initialPanY: 0,
+  flowWidth: 3200,
+  flowHeight: 1100,
+  minX: 0,
+  minY: 0
+};
+
+async function changeLiveFlow(newFlowId) {
+  currentLiveFlowId = newFlowId;
+  localStorage.setItem('wh_live_flow_id', newFlowId);
+  if (liveFlowAnimationFrame) cancelAnimationFrame(liveFlowAnimationFrame);
+  if (liveFlowPollingInterval) clearInterval(liveFlowPollingInterval);
+  await renderLiveFlow();
+}
 
 async function renderLiveFlow() {
   const container = document.getElementById('view-container');
@@ -626,11 +649,13 @@ async function renderLiveFlow() {
       fetch('/api/traffic/live-flow').then(r => r.json()).catch(() => ({ activeNodes: {}, platformRates: {}, recentEvents: [] }))
     ]);
 
-    const activeFlow = flows.find(f => f.id === 'fluxo-espiao-foto') || flows[0];
+    const activeFlow = flows.find(f => f.id === currentLiveFlowId) || flows.find(f => f.id === 'fluxo-espiao-foto') || flows[0];
     if (!activeFlow) {
       container.innerHTML = '<div class="card">Nenhum fluxo encontrado para visualização ao vivo.</div>';
       return;
     }
+    currentLiveFlowId = activeFlow.id;
+    localStorage.setItem('wh_live_flow_id', currentLiveFlowId);
 
     const nodes = activeFlow.nodes || [];
     const activeNodes = liveData.activeNodes || {};
@@ -641,35 +666,57 @@ async function renderLiveFlow() {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     nodes.forEach(n => {
       if (n.x < minX) minX = n.x;
-      if (n.x + 220 > maxX) maxX = n.x + 220;
+      if (n.x + 240 > maxX) maxX = n.x + 240;
       if (n.y < minY) minY = n.y;
-      if (n.y + 120 > maxY) maxY = n.y + 120;
+      if (n.y + 140 > maxY) maxY = n.y + 140;
     });
 
-    const flowWidth = (maxX - minX) + 140 || 3200;
-    const flowHeight = (maxY - minY) + 180 || 1100;
+    const flowWidth = Math.max(2600, (maxX - minX) + 240);
+    const flowHeight = Math.max(1000, (maxY - minY) + 240);
+    liveZoomState.flowWidth = flowWidth;
+    liveZoomState.flowHeight = flowHeight;
+    liveZoomState.minX = minX;
+    liveZoomState.minY = minY;
 
     const html = `
       <div class="live-flow-container">
-        <!-- Top Bar com Status de Transmissão e Contadores Globais -->
+        <!-- Top Bar com Status de Transmissão, Seletor de Funil e Controles de Zoom -->
         <div class="live-topbar">
-          <span class="live-badge-indicator">
-            <span class="live-dot-pulse"></span>
-            <span>TRANSMISSÃO AO VIVO</span>
-          </span>
-          <div style="font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px;">
-            <span>${activeFlow.name}</span>
-            <span style="color: var(--text-muted);">•</span>
-            <span style="color: #34d399; font-weight: 600;">🟢 <span id="live-total-leads">${liveData.totalActiveLeads || 0}</span> leads no funil agora</span>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span class="live-badge-indicator">
+              <span class="live-dot-pulse"></span>
+              <span>TRANSMISSÃO AO VIVO</span>
+            </span>
+
+            <!-- Seletor de Funil -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label for="live-flow-select" style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Funil:</label>
+              <select id="live-flow-select" class="form-select" style="background: rgba(18, 18, 28, 0.95); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px; cursor: pointer; min-width: 270px;" onchange="changeLiveFlow(this.value)">
+                ${flows.map(f => `<option value="${f.id}" ${f.id === activeFlow.id ? 'selected' : ''}>${f.name}</option>`).join('')}
+              </select>
+            </div>
+
+            <!-- Contador de Leads Ativos -->
+            <span style="color: #34d399; font-weight: 600; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+              🟢 <span id="live-total-leads">${liveData.totalActiveLeads || 0}</span> leads no funil agora
+            </span>
           </div>
-          <div style="display: flex; gap: 6px; margin-left: 14px;">
-            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="fitLiveFlowView()">🔍 Ajustar à Tela</button>
-            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="window.location.hash='#flow-canvas?id=${activeFlow.id}'">✏️ Editar Fluxo</button>
+
+          <!-- Controles de Zoom e Ações -->
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 3px; background: rgba(18, 18, 28, 0.9); padding: 2px 6px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 12px; font-weight: 700; height: 26px; min-width: 26px; display: flex; align-items: center; justify-content: center;" onclick="zoomLiveFlow(0.15)" title="Aproximar (+)">➕</button>
+              <span id="live-zoom-level" style="font-size: 11px; font-weight: 700; min-width: 44px; text-align: center; color: #cbd5e1;">100%</span>
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 12px; font-weight: 700; height: 26px; min-width: 26px; display: flex; align-items: center; justify-content: center;" onclick="zoomLiveFlow(-0.15)" title="Afastar (-)">➖</button>
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px; height: 26px;" onclick="fitLiveFlowView()" title="Ajustar automaticamente à tela">🔍 Ajustar</button>
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px; height: 26px;" onclick="resetLiveFlowZoom(1.0)" title="Zoom 100%">🎯 100%</button>
+            </div>
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px; height: 28px;" onclick="window.location.hash='#flow-canvas?id=${activeFlow.id}'">✏️ Editar Fluxo</button>
           </div>
         </div>
 
-        <!-- Área do Canvas com Diagrama Vivo -->
-        <div class="live-canvas-area" id="live-canvas-area">
+        <!-- Área do Canvas com Diagrama Vivo e Zoom/Pan -->
+        <div class="live-canvas-area" id="live-canvas-area" title="Role para zoom • Arraste para mover o funil">
           <div id="live-canvas-world" style="position: absolute; left: 0; top: 0; width: ${flowWidth}px; height: ${flowHeight}px; transform-origin: 0 0;">
             <!-- SVG das Conexões e Partículas de Luz -->
             <svg id="live-svg" style="position: absolute; left: 0; top: 0; width: ${flowWidth}px; height: ${flowHeight}px; pointer-events: none; overflow: visible;">
@@ -692,7 +739,7 @@ async function renderLiveFlow() {
                 const count = activeNodes[n.id] || 0;
                 const isStart = n.id === 'node-start';
                 return `
-                  <div class="flow-node" id="live-${n.id}" style="position: absolute; left: ${n.x}px; top: ${n.y}px; transition: box-shadow 0.2s, transform 0.2s; pointer-events: auto;">
+                  <div class="flow-node" id="live-${n.id}" style="position: absolute; left: ${n.x}px; top: ${n.y}px; transition: transform 0.2s; pointer-events: auto;">
                     <!-- Contador em Tempo Real -->
                     <div class="live-node-counter ${count > 0 ? '' : 'zero'}" id="counter-${n.id}">
                       ${count > 0 ? `🟢 ${count} lead${count > 1 ? 's' : ''} agora` : '⚪ 0 leads'}
@@ -763,13 +810,16 @@ async function renderLiveFlow() {
     // 1. Desenha as conexões Bézier no SVG
     drawLiveConnections(activeFlow);
 
-    // 2. Ajusta zoom e enquadramento automático
+    // 2. Ajusta enquadramento inicial
     fitLiveFlowView(flowWidth, flowHeight, minX, minY);
 
-    // 3. Inicializa o motor de partículas luminosas em requestAnimationFrame
+    // 3. Inicializa o motor de partículas luminosas em velocidade calma
     initLiveParticleEngine(activeFlow, liveData.edgeFlows || {});
 
-    // 4. Inicia polling de 2.5s para atualizar contadores e terminal em tempo real
+    // 4. Inicializa interatividade de Zoom e Arraste (Pan)
+    initLiveCanvasInteraction();
+
+    // 5. Inicia polling de 2.5s para atualizar contadores e terminal em tempo real
     liveFlowPollingInterval = setInterval(() => {
       if (state.currentView !== 'fluxo-ao-vivo') {
         clearInterval(liveFlowPollingInterval);
@@ -782,6 +832,135 @@ async function renderLiveFlow() {
   } catch (err) {
     container.innerHTML = `<div class="card">Erro ao renderizar Fluxo ao Vivo: ${err.message}</div>`;
   }
+}
+
+/**
+ * Aplica a escala e deslocamento no elemento do Canvas
+ */
+function applyLiveCanvasTransform() {
+  const world = document.getElementById('live-canvas-world');
+  const zoomLevelEl = document.getElementById('live-zoom-level');
+  if (world) {
+    world.style.transform = `translate(${liveZoomState.panX}px, ${liveZoomState.panY}px) scale(${liveZoomState.scale})`;
+  }
+  if (zoomLevelEl) {
+    zoomLevelEl.textContent = `${Math.round(liveZoomState.scale * 100)}%`;
+  }
+}
+
+/**
+ * Zoom in / Zoom out com suporte a ponto de pivô (mouse ou centro)
+ */
+function zoomLiveFlow(delta, clientX = null, clientY = null) {
+  const canvasArea = document.getElementById('live-canvas-area');
+  const world = document.getElementById('live-canvas-world');
+  if (!canvasArea || !world) return;
+
+  const oldScale = liveZoomState.scale;
+  let newScale = oldScale + delta;
+  newScale = Math.max(0.2, Math.min(2.5, Math.round(newScale * 100) / 100));
+  if (Math.abs(newScale - oldScale) < 0.001) return;
+
+  const rect = canvasArea.getBoundingClientRect();
+  const pivotX = (clientX !== null) ? (clientX - rect.left) : (rect.width / 2);
+  const pivotY = (clientY !== null) ? (clientY - rect.top) : (rect.height / 2);
+
+  liveZoomState.panX = pivotX - (pivotX - liveZoomState.panX) * (newScale / oldScale);
+  liveZoomState.panY = pivotY - (pivotY - liveZoomState.panY) * (newScale / oldScale);
+  liveZoomState.scale = newScale;
+
+  world.style.transition = 'transform 0.06s ease-out';
+  applyLiveCanvasTransform();
+}
+
+/**
+ * Reseta o zoom para 100% ou escala padrão
+ */
+function resetLiveFlowZoom(targetScale = 1.0) {
+  const canvasArea = document.getElementById('live-canvas-area');
+  const world = document.getElementById('live-canvas-world');
+  if (!canvasArea || !world) return;
+
+  liveZoomState.scale = targetScale;
+  liveZoomState.panX = 60;
+  liveZoomState.panY = 80;
+  world.style.transition = 'transform 0.2s ease-out';
+  applyLiveCanvasTransform();
+}
+
+/**
+ * Ajusta o zoom e enquadramento para caber confortavelmente na tela
+ */
+function fitLiveFlowView(flowW, flowH, minX, minY) {
+  const canvasArea = document.getElementById('live-canvas-area');
+  const world = document.getElementById('live-canvas-world');
+  if (!canvasArea || !world) return;
+
+  if (flowW) liveZoomState.flowWidth = flowW;
+  if (flowH) liveZoomState.flowHeight = flowH;
+  if (minX !== undefined) liveZoomState.minX = minX;
+  if (minY !== undefined) liveZoomState.minY = minY;
+
+  const areaW = canvasArea.clientWidth || 900;
+  const areaH = canvasArea.clientHeight || 600;
+  const w = liveZoomState.flowWidth || 3000;
+  const h = liveZoomState.flowHeight || 1000;
+
+  const scaleX = (areaW - 80) / w;
+  const scaleY = (areaH - 80) / h;
+  const scale = Math.max(0.28, Math.min(1.0, Math.min(scaleX, scaleY)));
+
+  liveZoomState.scale = Math.round(scale * 100) / 100;
+  liveZoomState.panX = Math.max(20, (areaW - w * liveZoomState.scale) / 2);
+  liveZoomState.panY = Math.max(40, (areaH - h * liveZoomState.scale) / 2);
+
+  world.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+  applyLiveCanvasTransform();
+}
+
+/**
+ * Inicializa interatividade de mouse: zoom com scroll da roda e pan com clique-arraste
+ */
+function initLiveCanvasInteraction() {
+  const canvasArea = document.getElementById('live-canvas-area');
+  const world = document.getElementById('live-canvas-world');
+  if (!canvasArea || !world) return;
+
+  // Zoom via roda do mouse
+  canvasArea.onwheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.12 : -0.12;
+    zoomLiveFlow(delta, e.clientX, e.clientY);
+  };
+
+  // Pan via clique e arraste
+  canvasArea.onmousedown = (e) => {
+    if (e.target.closest('button, select, input, a, .node-actions')) return;
+    liveZoomState.isDragging = true;
+    liveZoomState.dragStartX = e.clientX;
+    liveZoomState.dragStartY = e.clientY;
+    liveZoomState.initialPanX = liveZoomState.panX;
+    liveZoomState.initialPanY = liveZoomState.panY;
+    canvasArea.style.cursor = 'grabbing';
+    world.style.transition = 'none';
+
+    const onMouseMove = (moveEv) => {
+      if (!liveZoomState.isDragging) return;
+      liveZoomState.panX = liveZoomState.initialPanX + (moveEv.clientX - liveZoomState.dragStartX);
+      liveZoomState.panY = liveZoomState.initialPanY + (moveEv.clientY - liveZoomState.dragStartY);
+      applyLiveCanvasTransform();
+    };
+
+    const onMouseUp = () => {
+      liveZoomState.isDragging = false;
+      canvasArea.style.cursor = 'grab';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 }
 
 /**
@@ -832,31 +1011,8 @@ function drawLiveConnections(flow) {
 }
 
 /**
- * Ajusta o zoom e posição para que todo o fluxo caiba confortavelmente na tela
- */
-function fitLiveFlowView(flowW, flowH, minX = 0, minY = 0) {
-  const canvasArea = document.getElementById('live-canvas-area');
-  const world = document.getElementById('live-canvas-world');
-  if (!canvasArea || !world) return;
-
-  const areaW = canvasArea.clientWidth || 900;
-  const areaH = canvasArea.clientHeight || 600;
-
-  const w = flowW || (world.offsetWidth || 3000);
-  const h = flowH || (world.offsetHeight || 1000);
-
-  const scaleX = (areaW - 80) / w;
-  const scaleY = (areaH - 80) / h;
-  const scale = Math.max(0.22, Math.min(1.0, Math.min(scaleX, scaleY)));
-
-  const panX = Math.max(20, (areaW - w * scale) / 2);
-  const panY = Math.max(30, (areaH - h * scale) / 2);
-
-  world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-}
-
-/**
  * Motor de Partículas de Luz em Curvas Bézier SVG com requestAnimationFrame (60 FPS)
+ * Partículas movimentando-se suavemente e de forma lenta
  */
 function initLiveParticleEngine(flow, edgeFlows = {}) {
   const particlesLayer = document.getElementById('live-particles-layer');
@@ -892,7 +1048,8 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
         pathEl: pathEl,
         element: circle,
         progress: initialProgress % 1.0,
-        speed: 0.0035 + (Math.random() * 0.002),
+        // Velocidade suave e calma (4x a 5x mais devagar)
+        speed: 0.0007 + (Math.random() * 0.0003),
         platform: platform
       });
     }
@@ -909,11 +1066,9 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
 
       p.progress += p.speed;
 
-      // Ao atingir o final da curva (chegada no nó de destino)
+      // Ao atingir o final da curva, reinicia suavemente sem piscar os nós
       if (p.progress >= 1.0) {
         p.progress = 0;
-        // Dispara o pulso de destaque no nó de destino
-        triggerNodeArrivalPulse(p.toNodeId);
       }
 
       const dist = p.progress * totalLen;
@@ -930,20 +1085,10 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
 }
 
 /**
- * Dispara pulso de 250ms no nó ao ser atingido por uma partícula de lead
+ * Função de pulso mantida para compatibilidade, porém sem piscar
  */
 function triggerNodeArrivalPulse(nodeId) {
-  const nodeEl = document.getElementById(`live-${nodeId}`);
-  if (!nodeEl) return;
-
-  nodeEl.classList.remove('node-pulse-arrival');
-  // Força reflow para reiniciar animação
-  void nodeEl.offsetWidth;
-  nodeEl.classList.add('node-pulse-arrival');
-
-  setTimeout(() => {
-    nodeEl.classList.remove('node-pulse-arrival');
-  }, 300);
+  // Desativado conforme solicitado para evitar que os pontos fiquem piscando
 }
 
 /**
