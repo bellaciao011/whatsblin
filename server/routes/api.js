@@ -90,7 +90,7 @@ router.get('/instances', (req, res) => {
 
 router.post('/instances', (req, res) => {
   const instances = db.getInstances();
-  const { name, phoneNumber, phoneNumberId, wabaId, accessToken } = req.body;
+  const { name, phoneNumber, phoneNumberId, wabaId, accessToken, assignedFlowId } = req.body;
 
   const newInst = {
     id: req.body.id || `inst_${Date.now()}`,
@@ -99,6 +99,7 @@ router.post('/instances', (req, res) => {
     phoneNumberId: phoneNumberId || '',
     wabaId: wabaId || '',
     accessToken: accessToken || '',
+    assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
     status: accessToken && phoneNumberId ? 'connected' : 'disconnected',
     totalSent: 0,
     totalReceived: 0,
@@ -107,13 +108,29 @@ router.post('/instances', (req, res) => {
 
   const existingIdx = instances.findIndex(i => i.id === newInst.id);
   if (existingIdx >= 0) {
-    instances[existingIdx] = { ...instances[existingIdx], ...newInst };
+    instances[existingIdx] = {
+      ...instances[existingIdx],
+      ...newInst,
+      assignedFlowId: assignedFlowId !== undefined ? assignedFlowId : (instances[existingIdx].assignedFlowId || 'fluxo-espiao-foto')
+    };
   } else {
     instances.push(newInst);
   }
 
   db.saveInstances(instances);
-  res.json({ success: true, instance: newInst });
+  res.json({ success: true, instance: existingIdx >= 0 ? instances[existingIdx] : newInst });
+});
+
+router.patch('/instances/:id/flow', (req, res) => {
+  const { flowId } = req.body;
+  const instances = db.getInstances();
+  const inst = instances.find(i => i.id === req.params.id);
+  if (!inst) return res.status(404).json({ error: 'Instância / Chip não encontrado' });
+  
+  inst.assignedFlowId = flowId || 'fluxo-espiao-foto';
+  db.saveInstances(instances);
+  console.log(`[Instances] Chip ${inst.name} (${inst.id}) vinculado com sucesso ao fluxo: ${inst.assignedFlowId}`);
+  res.json({ success: true, instance: inst });
 });
 
 router.delete('/instances/:id', (req, res) => {
@@ -434,7 +451,7 @@ router.get('/facebook/status', (req, res) => {
  */
 router.post('/whatsapp/embedded-signup', async (req, res) => {
   try {
-    const { code, accessToken, wabaId, phoneNumberId, name, coexistence, redirectUri } = req.body;
+    const { code, accessToken, wabaId, phoneNumberId, name, coexistence, redirectUri, assignedFlowId } = req.body;
     let finalToken = accessToken;
 
     if (code) {
@@ -491,6 +508,7 @@ router.post('/whatsapp/embedded-signup', async (req, res) => {
       phoneNumberId: targetPhoneId || '',
       wabaId: targetWabaId || '',
       accessToken: finalToken,
+      assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
       type: 'official',
       coexistence: Boolean(coexistence),
       status: 'connected',
@@ -502,7 +520,11 @@ router.post('/whatsapp/embedded-signup', async (req, res) => {
     // Atualiza se já existir ou adiciona
     const existingIdx = instances.findIndex(i => i.phoneNumberId && i.phoneNumberId === targetPhoneId);
     if (existingIdx >= 0) {
-      instances[existingIdx] = { ...instances[existingIdx], ...newInstance, id: instances[existingIdx].id };
+      instances[existingIdx] = {
+        ...instances[existingIdx],
+        ...newInstance,
+        assignedFlowId: assignedFlowId || instances[existingIdx].assignedFlowId || 'fluxo-espiao-foto'
+      };
     } else {
       instances.push(newInstance);
     }

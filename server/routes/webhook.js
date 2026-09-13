@@ -90,13 +90,16 @@ router.get('/', (req, res) => {
         const redirectUri = window.location.origin + '/webhook';
         let pendingName = '';
         let pendingCoexistence = true;
+        let pendingFlowId = 'fluxo-espiao-foto';
         try {
           if (window.opener && window.opener._pendingConnectionName) {
             pendingName = window.opener._pendingConnectionName;
             pendingCoexistence = window.opener._pendingCoexistence;
+            pendingFlowId = window.opener._pendingFlowId || 'fluxo-espiao-foto';
           } else if (sessionStorage.getItem('pending_connection_name')) {
             pendingName = sessionStorage.getItem('pending_connection_name');
             pendingCoexistence = sessionStorage.getItem('pending_coexistence') === 'true';
+            pendingFlowId = sessionStorage.getItem('pending_flow_id') || 'fluxo-espiao-foto';
           }
         } catch(e) {}
 
@@ -104,7 +107,7 @@ router.get('/', (req, res) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ accessToken, code, redirectUri, name: pendingName, coexistence: pendingCoexistence })
+          body: JSON.stringify({ accessToken, code, redirectUri, name: pendingName, coexistence: pendingCoexistence, assignedFlowId: pendingFlowId })
         });
 
         const data = await res.json();

@@ -52,14 +52,17 @@ const FlowBuilder = {
    * TELA 1: LISTA DE FLUXOS (SCREENSHOT 2)
    */
   async renderList(container) {
-    const flows = await fetch('/api/flows').then(r => r.json());
+    const [flows, instances] = await Promise.all([
+      fetch('/api/flows').then(r => r.json()).catch(() => []),
+      fetch('/api/instances').then(r => r.json()).catch(() => [])
+    ]);
 
     container.innerHTML = `
       <div>
         <div class="flows-header-bar">
           <div>
-            <h2 style="font-size: 22px; font-weight: 700; font-family: 'Outfit', sans-serif;">Fluxos</h2>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Automações e fluxos visuais de atendimento no WhatsApp</p>
+            <h2 style="font-size: 22px; font-weight: 700; font-family: 'Outfit', sans-serif;">Fluxos & Funis</h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Automações e fluxos visuais multilíngues conectados aos chips de WhatsApp</p>
           </div>
           <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" onclick="FlowBuilder.createFlow()">+ Novo fluxo</button>
@@ -73,7 +76,7 @@ const FlowBuilder = {
         </div>
 
         <div class="flows-tabs">
-          <button class="flows-tab-btn active" onclick="FlowBuilder.filterTab('todos', this)">Todos</button>
+          <button class="flows-tab-btn active" onclick="FlowBuilder.filterTab('todos', this)">Todos (${flows.length})</button>
           <button class="flows-tab-btn" onclick="FlowBuilder.filterTab('ativo', this)">Ativos</button>
           <button class="flows-tab-btn" onclick="FlowBuilder.filterTab('pausado', this)">Pausados</button>
         </div>
@@ -83,29 +86,50 @@ const FlowBuilder = {
             <thead>
               <tr>
                 <th style="width: 40px;"></th>
-                <th>Nome</th>
+                <th>Nome & Idioma</th>
                 <th>Status</th>
+                <th>Chip Vinculado</th>
                 <th>Blocos</th>
                 <th>Atualizado</th>
                 <th style="text-align: right;">Ações</th>
               </tr>
             </thead>
             <tbody id="flows-table-body">
-              ${flows.map(f => `
-                <tr onclick="FlowBuilder.openCanvas('${f.id}')">
+              ${flows.map(f => {
+                const langFlag = f.language === 'es' ? '🇪🇸' : (f.language === 'en' ? '🇺🇸' : '🇧🇷');
+                const langLabel = f.language === 'es' ? 'Español' : (f.language === 'en' ? 'English' : 'Português');
+                const boundChips = instances.filter(i => (i.assignedFlowId || 'fluxo-espiao-foto') === f.id);
+                return `
+                <tr onclick="FlowBuilder.openCanvas('${f.id}')" style="cursor: pointer;">
                   <td style="color: var(--text-muted); font-size: 18px;">⋮⋮</td>
                   <td>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <span style="color: ${f.status === 'ativo' ? 'var(--wa-green)' : 'var(--text-muted)'}; font-size: 10px;">●</span>
-                      <strong style="color: #fff; font-size: 14px;">${f.name}</strong>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <span style="font-size: 20px;">${langFlag}</span>
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <strong style="color: #fff; font-size: 14.5px;">${f.name}</strong>
+                          <span style="font-size: 10.5px; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.08); color: #cbd5e1; font-weight: 600;">${langLabel}</span>
+                        </div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">${f.description || 'Funil oficial com escala de upsells e quebra de objeções'}</div>
+                      </div>
                     </div>
                   </td>
                   <td>
-                    <span class="btn" style="padding: 3px 8px; font-size: 11px; background: ${f.status === 'ativo' ? 'rgba(37, 211, 102, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${f.status === 'ativo' ? 'var(--wa-green)' : 'var(--text-muted)'};">
+                    <span class="btn" style="padding: 3px 8px; font-size: 11px; font-weight: 600; background: ${f.status === 'ativo' ? 'rgba(37, 211, 102, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${f.status === 'ativo' ? 'var(--wa-green)' : 'var(--text-muted)'};">
                       ● ${f.status.toUpperCase()}
                     </span>
                   </td>
-                  <td style="color: #c7d2fe; font-size: 13px;">
+                  <td>
+                    ${boundChips.length > 0
+                      ? boundChips.map(c => `
+                        <span style="display: inline-flex; align-items: center; gap: 5px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #93c5fd; padding: 3px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 600; margin-right: 4px;">
+                          📱 ${c.name}
+                        </span>
+                      `).join('')
+                      : `<span style="color: var(--text-muted); font-size: 11px; font-style: italic;">Nenhum chip conectado</span>`
+                    }
+                  </td>
+                  <td style="color: #c7d2fe; font-size: 13px; font-weight: 600;">
                     ⚡ ${f.nodes ? f.nodes.length : f.blocksCount || 0}
                   </td>
                   <td style="color: var(--text-muted); font-size: 12px;">
@@ -117,7 +141,8 @@ const FlowBuilder = {
                     <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" title="Excluir fluxo permanentemente" onclick="FlowBuilder.deleteFlow('${f.id}')">🗑️</button>
                   </td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -133,11 +158,17 @@ const FlowBuilder = {
   },
 
   async renderCanvas(container, flowId) {
-    const flow = await fetch(`/api/flows/${flowId}`).then(r => r.json());
+    const [flow, instances] = await Promise.all([
+      fetch(`/api/flows/${flowId}`).then(r => r.json()),
+      fetch('/api/instances').then(r => r.json()).catch(() => [])
+    ]);
     this.currentFlow = flow;
     this.panX = 0;
     this.panY = 0;
     this.canvasScale = 1;
+
+    const langFlag = flow.language === 'es' ? '🇪🇸' : (flow.language === 'en' ? '🇺🇸' : '🇧🇷');
+    const boundChips = (instances || []).filter(i => (i.assignedFlowId || 'fluxo-espiao-foto') === flow.id);
 
     container.innerHTML = `
       <div class="canvas-root" id="canvas-root">
@@ -152,11 +183,23 @@ const FlowBuilder = {
               <span>▶️</span>
               <span>Simular</span>
             </button>
-            <span style="color: #fff; font-weight: 700; font-size: 15px; margin-left: 12px;">
-              ${flow.name}
-            </span>
-            <span style="font-size: 12px; color: #a78bfa; background: rgba(167, 139, 250, 0.15); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(167, 139, 250, 0.3);">
-              💡 Dica: Arraste da bolinha roxa de um bloco para a bolinha azul de outro para conectar manualmente!
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: 12px;">
+              <span style="font-size: 20px;">${langFlag}</span>
+              <span style="color: #fff; font-weight: 700; font-size: 15px;">
+                ${flow.name}
+              </span>
+              ${boundChips.length > 0 ? `
+                <span style="font-size: 11px; color: #60a5fa; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 3px 8px; border-radius: 6px; font-weight: 600;">
+                  📱 Chip(s): ${boundChips.map(c => c.name).join(', ')}
+                </span>
+              ` : `
+                <span style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px;">
+                  Nenhum chip conectado
+                </span>
+              `}
+            </div>
+            <span style="font-size: 12px; color: #a78bfa; background: rgba(167, 139, 250, 0.15); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(167, 139, 250, 0.3); margin-left: 8px;">
+              💡 Arraste da bolinha roxa de um bloco para a bolinha azul de outro para conectar!
             </span>
           </div>
 

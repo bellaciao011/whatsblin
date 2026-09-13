@@ -750,20 +750,40 @@ async function renderInstances() {
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 10px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; margin-top: 10px;">
         ${instances.map(i => `
-          <div class="card" style="margin: 0; background: rgba(255,255,255,0.02);">
+          <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
             <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
               <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="brand-icon" style="width: 32px; height: 32px; font-size: 16px;">📱</div>
+                <div class="brand-icon" style="width: 34px; height: 34px; font-size: 17px;">📱</div>
                 <div>
                   <div style="font-weight: 700; font-size: 15px;">${i.name}</div>
                   <div style="font-size: 12px; color: var(--text-muted);">${i.phoneNumber}</div>
                 </div>
               </div>
-              <span class="btn" style="padding: 2px 8px; font-size: 11px; background: ${i.status === 'connected' ? 'rgba(37, 211, 102, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--red)'};">
+              <span class="btn" style="padding: 3px 9px; font-size: 11px; font-weight: 600; border-radius: 6px; background: ${i.status === 'connected' ? 'rgba(37, 211, 102, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--red)'};">
                 ${i.status === 'connected' ? '● Conectado' : '○ Desconectado'}
               </span>
+            </div>
+
+            <!-- Vínculo Estrito de Fluxo (Multilíngue) -->
+            <div style="margin-bottom: 14px; padding: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="font-size: 11.5px; font-weight: 700; color: #93c5fd; display: flex; align-items: center; gap: 5px;">
+                  <span>🎯 Fluxo de Mensagens:</span>
+                </label>
+                <span style="font-size: 10.5px; color: #34d399; font-weight: 600; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">
+                  🔒 Ativo & Vinculado
+                </span>
+              </div>
+              <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
+                <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-foto' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
+                <option value="fluxo-espiao-es" ${i.assignedFlowId === 'fluxo-espiao-es' ? 'selected' : ''}>🇪🇸 Funil Oficial (Español)</option>
+                <option value="fluxo-espiao-en" ${i.assignedFlowId === 'fluxo-espiao-en' ? 'selected' : ''}>🇺🇸 Funil Oficial (English)</option>
+              </select>
+              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
+                As conversas deste número acionam <strong>exclusivamente</strong> este fluxo para evitar qualquer mistura.
+              </div>
             </div>
             
             <div style="font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); margin-bottom: 16px;">
@@ -783,6 +803,26 @@ async function renderInstances() {
   `;
   document.getElementById('view-container').innerHTML = html;
 }
+
+window.updateChipFlow = async function(instanceId, flowId) {
+  try {
+    const res = await fetch(`/api/instances/${instanceId}/flow`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flowId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Chip vinculado com sucesso ao fluxo selecionado!`, 'success');
+      const inst = state.instances?.find(i => i.id === instanceId);
+      if (inst) inst.assignedFlowId = flowId;
+    } else {
+      showToast(`Erro ao vincular fluxo: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Erro ao atualizar vínculo do fluxo: ${err.message}`, 'error');
+  }
+};
 
 /* =========================================================================
    VIEW 3: LIVE CHAT (INBOX)
@@ -1491,15 +1531,18 @@ function handleRegisterWithMeta() {
   }
 
   const coexistence = document.getElementById('conn-coexistence')?.checked ?? true;
+  const flowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
   const appId = state.facebook?.appId || '1388636936143540';
   const configId = state.facebook?.configId || '2204676673432561';
 
   // Guarda dados da conexão para associar após o retorno da Meta
   window._pendingConnectionName = name;
   window._pendingCoexistence = coexistence;
+  window._pendingFlowId = flowId;
   try {
     sessionStorage.setItem('pending_connection_name', name);
     sessionStorage.setItem('pending_coexistence', coexistence ? 'true' : 'false');
+    sessionStorage.setItem('pending_flow_id', flowId);
   } catch(e) {}
 
   const redirectUri = encodeURIComponent(`${window.location.origin}/webhook`);
@@ -1564,11 +1607,12 @@ async function saveNewChip(e) {
   const phoneNumberId = document.getElementById('chip-phone-id').value;
   const wabaId = document.getElementById('chip-waba-id').value;
   const accessToken = document.getElementById('chip-token').value;
+  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
 
   await fetch('/api/instances', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, phoneNumber, phoneNumberId, wabaId, accessToken })
+    body: JSON.stringify({ name, phoneNumber, phoneNumberId, wabaId, accessToken, assignedFlowId })
   });
 
   closeAddChipModal();
