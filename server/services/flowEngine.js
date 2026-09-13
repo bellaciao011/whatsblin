@@ -41,15 +41,19 @@ async function lookupProfilePicture(targetPhone) {
 }
 
 /**
- * Substitui variáveis dinâmicas no texto da mensagem
+ * Substitui variáveis dinâmicas no texto da mensagem ou em campos de configuração
  */
 function interpolateVariables(text, variables) {
   if (!text) return '';
   return text
     .replace(/\{primeiro_nome\}/gi, variables.firstName || 'Amigo(a)')
-    .replace(/\{nome\}/gi, variables.name || 'Amigo(a)')
+    .replace(/\{nome\}/gi, variables.name || variables.firstName || 'Amigo(a)')
     .replace(/\{telefone\}/gi, variables.phone || '')
+    .replace(/\{phone_number\}/gi, variables.phone || '')
     .replace(/\{alvo\}/gi, variables.alvo || '')
+    .replace(/\{email\}/gi, variables.email || 'contato@cliente.com')
+    .replace(/\{comprovante\.valor\}/gi, variables.valor_atual || variables.valor_pago || '49.90')
+    .replace(/\{page_id\}/gi, variables.pageId || '')
     .replace(/\{checkoutUrl\}/gi, variables.checkoutUrl || 'https://pay.kirvano.com/checkout-49')
     .replace(/\{checkoutUrl100\}/gi, variables.checkoutUrl100 || 'https://pay.kirvano.com/checkout-100')
     .replace(/\{checkoutUrl200\}/gi, variables.checkoutUrl200 || 'https://pay.kirvano.com/checkout-200')
@@ -58,6 +62,86 @@ function interpolateVariables(text, variables) {
     .replace(/\{valor_atual\}/gi, variables.valor_atual || '49,90')
     .replace(/\{proximo_valor\}/gi, variables.proximo_valor || '100')
     .replace(/\{valor_pago\}/gi, variables.valor_pago || '0');
+}
+
+/**
+ * Executa nó do tipo Pixel CAPI disparando evento para a Meta
+ */
+async function executePixelNode(pixelNode, chatData) {
+  const data = pixelNode.data || {};
+  const pixels = db.getPixels();
+  let pixel = pixels.find(p => p.id === data.pixelId || p.pixelId === data.pixelId);
+  if (!pixel && pixels.length > 0) pixel = pixels[0];
+
+  const eventName = data.eventType || data.eventName || 'Purchase';
+  const rawVal = interpolateVariables(data.itemValue || data.value || '{valor_atual}', chatData.variables);
+  const numVal = parseFloat(String(rawVal).replace(',', '.')) || 49.90;
+  const pageId = interpolateVariables(data.pageId || pixel?.pageId || '', chatData.variables);
+  const currency = data.currency || 'BRL';
+
+  console.log(`[FlowEngine] 🎯 Disparando nó de Pixel: ${eventName} (Valor: ${numVal} ${currency})`);
+
+  if (pixel) {
+    return await metaService.sendPixelConversion(
+      pixel.pixelId,
+      pixel.accessToken,
+      eventName,
+      chatData.leadPhone,
+      {
+        value: numVal,
+        currency,
+        pageId,
+        pixelName: pixel.name,
+        testEventCode: pixel.testEventCode
+      }
+    );
+  } else {
+    console.warn('[FlowEngine] Nenhum pixel cadastrado para disparar nó.');
+    return { success: false, error: 'Nenhum pixel cadastrado' };
+  }
+}
+
+/**
+ * Executa nó do tipo Integração (Webhook / HTTP Request)
+ */
+async function executeIntegrationNode(integrationNode, chatData) {
+  const data = integrationNode.data || {};
+  const method = (data.method || 'GET').toUpperCase();
+  const rawUrl = interpolateVariables(data.url || data.endpoint || '', chatData.variables);
+  if (!rawUrl || !rawUrl.startsWith('http')) return { success: false, error: 'URL inválida' };
+
+  let headers = { 'User-Agent': 'WhatsHub-Bot/1.0' };
+  if (data.headers) {
+    try {
+      const parsed = typeof data.headers === 'string' ? JSON.parse(interpolateVariables(data.headers, chatData.variables)) : data.headers;
+      headers = { ...headers, ...parsed };
+    } catch (e) {}
+  }
+
+  let body = null;
+  if (method !== 'GET' && data.body) {
+    try {
+      body = typeof data.body === 'string' ? JSON.parse(interpolateVariables(data.body, chatData.variables)) : data.body;
+    } catch (e) {
+      body = interpolateVariables(data.body, chatData.variables);
+    }
+  }
+
+  console.log(`[FlowEngine] 🌐 Executando nó de Integração: ${method} ${rawUrl}`);
+
+  try {
+    const res = await axios({
+      method,
+      url: rawUrl,
+      headers,
+      data: body,
+      timeout: 8000
+    });
+    return { success: true, status: res.status, data: res.data };
+  } catch (err) {
+    console.warn('[FlowEngine] Falha na integração externa:', err.message);
+    return { success: false, status: err.response?.status || 500, error: err.message };
+  }
 }
 
 /**

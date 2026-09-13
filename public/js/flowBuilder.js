@@ -222,6 +222,70 @@ const FlowBuilder = {
   },
 
   renderNodeHtml(node) {
+    if (node.type === 'pixel') {
+      const pixelName = node.data?.pixelName || node.data?.pixelId || 'Catequese';
+      const eventType = node.data?.eventName || node.data?.tipo_evento || 'Compra';
+      const val = node.data?.eventValue || node.data?.valor_item || 'NaN';
+      const currency = node.data?.currency || 'BRL';
+      return `
+        <div class="flow-node node-pixel" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
+          <div class="node-header amber">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 14px;">🎯</span>
+              <span>${node.label || 'Pixel'}</span>
+            </div>
+            <div class="node-header-actions">
+              <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.duplicateNode('${node.id}')" title="Duplicar">📋</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.deleteNode('${node.id}')" title="Excluir">🗑️</span>
+            </div>
+          </div>
+          <div class="node-body">
+            <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 4px;">Disparar evento no Facebook:</div>
+            <div class="pixel-node-inner">
+              <div style="font-weight: 700; color: #fef08a; font-size: 12px;">${pixelName}</div>
+              <div style="color: #cbd5e1; font-size: 10.5px; margin-top: 2px;">Tipo: ${eventType} • Valor: ${val} ${currency}</div>
+            </div>
+          </div>
+          <div class="node-port port-in" title="Porta de Entrada (Conectar aqui)"></div>
+          <div class="node-port port-out" data-port="default" title="Porta de Saída (Puxar cabo daqui)"></div>
+        </div>
+      `;
+    }
+
+    if (node.type === 'integration') {
+      const method = (node.data?.method || 'GET').toUpperCase();
+      const url = node.data?.url || node.data?.endpoint || 'https://equinforce.com/utmify.php?phone={phone_number}&priceincents={comprovante.valor}&name={nome}';
+      return `
+        <div class="flow-node node-integration" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
+          <div class="node-header blue">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 14px;">🌐</span>
+              <span>${node.label || 'Integração'}</span>
+            </div>
+            <div class="node-header-actions">
+              <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.duplicateNode('${node.id}')" title="Duplicar">📋</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.deleteNode('${node.id}')" title="Excluir">🗑️</span>
+            </div>
+          </div>
+          <div class="node-body" style="position: relative;">
+            <div class="integration-url-pill" title="${url}">${url}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+              <div style="font-size: 11.5px; color: #cbd5e1;">Tipo: <strong>${method}</strong></div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font-size: 10px; color: #94a3b8; padding-right: 10px;">
+                <span>sucesso</span>
+                <span>erro</span>
+              </div>
+            </div>
+          </div>
+          <div class="node-port port-in" title="Porta de Entrada"></div>
+          <div class="node-port port-out port-success" data-port="success" style="top: 48px; right: -7px;" title="Porta de Sucesso (verde)"></div>
+          <div class="node-port port-out port-error" data-port="error" style="top: 72px; right: -7px;" title="Porta de Erro (vermelho)"></div>
+        </div>
+      `;
+    }
+
     let summaryText = 'Configuração ativa';
     if (node.data) {
       if (node.data.text) summaryText = node.data.text;
@@ -236,14 +300,21 @@ const FlowBuilder = {
     return `
       <div class="flow-node" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
         <div class="node-header ${node.color || 'blue'}">
-          <span>${node.icon || '⚡'}</span>
-          <span>${node.label}</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>${node.icon || '⚡'}</span>
+            <span>${node.label}</span>
+          </div>
+          <div class="node-header-actions">
+            <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
+            <span onclick="event.stopPropagation(); FlowBuilder.duplicateNode('${node.id}')" title="Duplicar">📋</span>
+            <span onclick="event.stopPropagation(); FlowBuilder.deleteNode('${node.id}')" title="Excluir">🗑️</span>
+          </div>
         </div>
         <div class="node-body">
-          ${summaryText}
+          ${node.type === 'message' ? `<div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 6px 8px; font-size: 11px;">📄 ${summaryText}</div>` : summaryText}
         </div>
         <div class="node-port port-in" title="Porta de Entrada (Conectar aqui)"></div>
-        <div class="node-port port-out" title="Porta de Saída (Puxar cabo daqui)"></div>
+        <div class="node-port port-out" data-port="default" title="Porta de Saída (Puxar cabo daqui)"></div>
       </div>
     `;
   },
@@ -263,12 +334,13 @@ const FlowBuilder = {
         e.stopPropagation();
         return;
       }
+      if (e.target.closest('.node-header-actions') || e.target.classList.contains('node-port')) return;
       this.openNodeModal(nodeEl.id);
     });
 
     // Mousedown para início de arraste do nó
     nodeEl.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 || e.target.classList.contains('node-port')) return;
+      if (e.button !== 0 || e.target.classList.contains('node-port') || e.target.closest('.node-header-actions')) return;
 
       this.isDraggingNode = true;
       this.draggedNode = nodeEl;
@@ -282,14 +354,15 @@ const FlowBuilder = {
       e.stopPropagation();
     });
 
-    // Porta de saída (out): Inicia conexão manual de cabo
-    const portOut = nodeEl.querySelector('.port-out');
-    if (portOut) {
+    // Portas de saída (out / success / error): Inicia conexão manual de cabo
+    const portsOut = nodeEl.querySelectorAll('.port-out');
+    portsOut.forEach(portOut => {
       portOut.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.startConnecting(nodeEl.id, e);
+        const portType = portOut.dataset.port || 'default';
+        this.startConnecting(nodeEl.id, e, portType);
       });
-    }
+    });
 
     // Porta de entrada (in): Finaliza conexão manual de cabo
     const portIn = nodeEl.querySelector('.port-in');
@@ -303,12 +376,16 @@ const FlowBuilder = {
     }
   },
 
-  startConnecting(fromNodeId, e) {
+  startConnecting(fromNodeId, e, portType = 'default') {
     this.isConnecting = true;
     this.connectFromNodeId = fromNodeId;
+    this.connectFromPortType = portType;
     const node = this.currentFlow.nodes.find(n => n.id === fromNodeId);
-    this.connectStartPos = { x: node.x + 210, y: node.y + 40 };
-    showToast('Cabo iniciado! Agora clique na porta azul (esquerda) do bloco de destino.', 'info');
+    let offsetY = 40;
+    if (portType === 'success') offsetY = 48;
+    else if (portType === 'error') offsetY = 72;
+    this.connectStartPos = { x: node.x + 210, y: node.y + offsetY };
+    showToast(`Cabo iniciado (${portType === 'error' ? 'Erro' : (portType === 'success' ? 'Sucesso' : 'Saída')})! Clique na porta azul do bloco de destino.`, 'info');
   },
 
   finishConnecting(toNodeId) {
@@ -318,23 +395,48 @@ const FlowBuilder = {
     const toNode = this.currentFlow.nodes.find(n => n.id === toNodeId);
 
     let defaultLabel = 'Próximo passo';
-    if (fromNode.type === 'condition') defaultLabel = '🟢 Resposta Positiva';
+    if (this.connectFromPortType === 'success') defaultLabel = '🟢 Sucesso';
+    else if (this.connectFromPortType === 'error') defaultLabel = '🔴 Erro';
+    else if (fromNode.type === 'condition') defaultLabel = '🟢 Resposta Positiva';
     else if (fromNode.type === 'ai') defaultLabel = '✅ Aprovado';
 
-    const branchLabel = prompt(`Conectar "${fromNode.label}" ➔ "${toNode.label}":\nDigite o nome desta ramificação (ex: Positivo, Negativo, Dúvida, Comprovante):`, defaultLabel);
+    const branchLabel = prompt(`Conectar "${fromNode.label}" ➔ "${toNode.label}":\nDigite o nome desta ramificação (ex: Sucesso, Erro, Positivo, Negativo):`, defaultLabel);
 
     if (!this.currentFlow.edges) this.currentFlow.edges = [];
     this.currentFlow.edges.push({
       id: `e_${Date.now()}`,
       from: this.connectFromNodeId,
       to: toNodeId,
-      label: branchLabel || ''
+      fromPort: this.connectFromPortType || 'default',
+      label: branchLabel || defaultLabel
     });
 
     this.isConnecting = false;
     this.connectFromNodeId = null;
+    this.connectFromPortType = null;
     this.drawConnections();
     showToast(`Conexão criada: ${fromNode.label} ➔ ${toNode.label}!`, 'success');
+  },
+
+  duplicateNode(nodeId) {
+    const node = this.currentFlow.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const cloned = JSON.parse(JSON.stringify(node));
+    cloned.id = `node_${Date.now()}`;
+    cloned.label = `${node.label} (Cópia)`;
+    cloned.x = (node.x || 100) + 40;
+    cloned.y = (node.y || 100) + 40;
+    this.currentFlow.nodes.push(cloned);
+
+    const viewport = document.getElementById('canvas-viewport');
+    if (viewport) {
+      viewport.insertAdjacentHTML('beforeend', this.renderNodeHtml(cloned));
+      const newEl = document.getElementById(cloned.id);
+      if (newEl) this.bindSingleNode(newEl);
+    }
+    this.drawConnections();
+    this.updateMiniMap();
+    showToast(`Bloco duplicado!`, 'success');
   },
 
   manageEdge(edgeId) {
@@ -543,7 +645,14 @@ const FlowBuilder = {
 
       if (fromNode && toNode) {
         const x1 = fromNode.x + 210;
-        const y1 = fromNode.y + 40;
+        let y1 = fromNode.y + 40;
+        if (fromNode.type === 'integration') {
+          if (edge.fromPort === 'success' || (edge.label && edge.label.toLowerCase().includes('sucesso'))) {
+            y1 = fromNode.y + 48;
+          } else if (edge.fromPort === 'error' || (edge.label && edge.label.toLowerCase().includes('erro'))) {
+            y1 = fromNode.y + 72;
+          }
+        }
         const x2 = toNode.x;
         const y2 = toNode.y + 40;
 
@@ -561,9 +670,9 @@ const FlowBuilder = {
 
         // Cor de destaque da aresta se tiver rótulo semântico
         let edgeColor = '#6366f1';
-        if (labelText.includes('Positiva') || labelText.includes('Aprovado')) edgeColor = '#10b981';
+        if (labelText.includes('Positiva') || labelText.includes('Aprovado') || labelText.toLowerCase().includes('sucesso') || edge.fromPort === 'success') edgeColor = '#10b981';
         else if (labelText.includes('Dúvida') || labelText.includes('Sigilo')) edgeColor = '#f59e0b';
-        else if (labelText.includes('Negativa') || labelText.includes('Aleatória')) edgeColor = '#ef4444';
+        else if (labelText.includes('Negativa') || labelText.includes('Aleatória') || labelText.toLowerCase().includes('erro') || edge.fromPort === 'error') edgeColor = '#ef4444';
 
         svgHtml += `
           <g class="canvas-edge-group" id="edge-group-${edge.id}">
@@ -709,6 +818,13 @@ const FlowBuilder = {
   openNodeModal(nodeId) {
     const node = this.currentFlow.nodes.find(n => n.id === nodeId);
     if (!node) return;
+
+    if (node.type === 'pixel') {
+      return this.openPixelModal(node);
+    }
+    if (node.type === 'integration') {
+      return this.openIntegrationModal(node);
+    }
 
     if (!node.data) node.data = {};
 
@@ -1226,6 +1342,398 @@ const FlowBuilder = {
 
     document.getElementById('node-config-modal').remove();
     showToast('Bloco atualizado com sucesso!', 'success');
+  },
+
+  /**
+   * MODAL ESPECÍFICO DO PIXEL CAPI (SCREENSHOT 2)
+   */
+  async openPixelModal(node) {
+    let pixels = [];
+    try {
+      pixels = await fetch('/api/pixels').then(r => r.json());
+    } catch(e) { pixels = []; }
+
+    const selectedPixelId = node.data?.pixelId || (pixels[0] ? pixels[0].id : '');
+    const selectedEvent = node.data?.eventName || node.data?.tipo_evento || 'Compra';
+    const pageId = node.data?.pageId || '1123948077469453';
+    const itemValue = node.data?.eventValue || node.data?.valor_item || '{comprovante.valor}';
+    const currency = node.data?.currency || 'BRL';
+
+    const modalHtml = `
+      <div class="node-modal-backdrop" id="node-config-modal">
+        <div class="modal-pixel-card">
+          <!-- Top Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="modal-header-icon-square" style="background: #eab308; color: #fff;">
+                🎯
+              </div>
+              <h3 style="font-size: 18px; font-weight: 700; margin: 0; font-family: 'Outfit', sans-serif;">Editar Pixel</h3>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()" style="border: none; background: transparent; font-size: 18px; color: var(--text-muted); cursor: pointer;">✕</button>
+          </div>
+
+          <!-- Pixel Configurado -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Pixel Configurado *</label>
+            <select class="form-select" id="modal-pixel-id" style="border-color: #eab308;">
+              ${pixels.length > 0 ? pixels.map(p => `
+                <option value="${p.id}" ${p.id === selectedPixelId ? 'selected' : ''}>${p.name || p.pixelId}</option>
+              `).join('') : `
+                <option value="pixel_catequese" selected>Catequese</option>
+              `}
+            </select>
+            <div style="font-size: 11px; color: #60a5fa; margin-top: 5px; cursor: pointer;" onclick="document.getElementById('node-config-modal').remove(); window.location.hash='#pixels';">
+              Configure seus pixels em Configurações ➔ Pixels do Facebook
+            </div>
+          </div>
+
+          <!-- Tipo do Evento -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Tipo do evento *</label>
+            <select class="form-select" id="modal-pixel-event" style="border-color: #eab308;">
+              <option value="Compra" ${selectedEvent === 'Compra' || selectedEvent === 'Purchase' ? 'selected' : ''}>Compra</option>
+              <option value="Lead" ${selectedEvent === 'Lead' ? 'selected' : ''}>Lead</option>
+              <option value="AddToCart" ${selectedEvent === 'AddToCart' ? 'selected' : ''}>Adicionar ao carrinho (AddToCart)</option>
+              <option value="InitiateCheckout" ${selectedEvent === 'InitiateCheckout' ? 'selected' : ''}>Iniciar finalização de compra (InitiateCheckout)</option>
+              <option value="CompleteRegistration" ${selectedEvent === 'CompleteRegistration' ? 'selected' : ''}>Cadastro concluído (CompleteRegistration)</option>
+              <option value="Contact" ${selectedEvent === 'Contact' ? 'selected' : ''}>Contato (Contact)</option>
+            </select>
+          </div>
+
+          <!-- Page ID -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Page ID (Obrigatório para WhatsApp) *</label>
+            <div style="position: relative; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px;">
+              <input type="text" id="modal-pixel-page-id" value="${pageId}" class="form-input" style="border: none; background: transparent; padding: 0; font-size: 14px; width: 100%;">
+              <div style="margin-top: 8px;">
+                <button type="button" class="btn-var-mini" onclick="FlowBuilder.insertVariableTo('modal-pixel-page-id', '{page_id}')" title="Inserir campo dinâmico">&lt;&gt;</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 5px; line-height: 1.4;">
+              ID da página do Facebook vinculada ao WhatsApp Business. Obrigatório para eventos via WhatsApp. Use o botão de variáveis na barra de ferramentas para inserir campos dinâmicos.
+            </div>
+          </div>
+
+          <!-- Valor do item -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Valor do item *</label>
+            <div style="position: relative; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px;">
+              <input type="text" id="modal-pixel-value" value="${itemValue}" class="form-input" style="border: none; background: transparent; padding: 0; font-size: 14px; width: 100%;">
+              <div style="margin-top: 8px;">
+                <button type="button" class="btn-var-mini" onclick="FlowBuilder.insertVariableTo('modal-pixel-value', '{comprovante.valor}')" title="Inserir campo dinâmico">&lt;&gt;</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 5px; line-height: 1.4;">
+              Usado apenas para eventos de compra. Use o botão de variáveis na barra de ferramentas para inserir campos dinâmicos.
+            </div>
+          </div>
+
+          <!-- Moeda -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Moeda *</label>
+            <select class="form-select" id="modal-pixel-currency" style="border-color: #eab308;">
+              <option value="BRL" ${currency === 'BRL' ? 'selected' : ''}>BRL: Real brasileiro</option>
+              <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD: Dólar americano</option>
+              <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>EUR: Euro</option>
+            </select>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 5px;">
+              Enviada junto com o valor da compra na Conversions API. Padrão: BRL.
+            </div>
+          </div>
+
+          <!-- Box Como Funciona -->
+          <div style="display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+            <span style="font-weight: 700; font-size: 15px; color: #94a3b8;">$</span>
+            <div style="font-size: 11.5px; color: #94a3b8; line-height: 1.4;">
+              <strong style="color: #f1f5f9; display: block; margin-bottom: 2px;">Como funciona</strong>
+              Este nó dispara eventos no Facebook através da Conversions API. Selecione um pixel configurado nas Configurações para usar.
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()">Cancelar</button>
+            <button type="button" class="btn btn-primary" style="background: #a855f7; border-color: #a855f7; padding: 8px 24px; font-weight: 700;" onclick="FlowBuilder.savePixelModal('${node.id}')">Salvar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  },
+
+  savePixelModal(nodeId) {
+    const node = this.currentFlow.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    if (!node.data) node.data = {};
+    const pixelSel = document.getElementById('modal-pixel-id');
+    node.data.pixelId = pixelSel ? pixelSel.value : '';
+    node.data.pixelName = pixelSel && pixelSel.selectedOptions[0] ? pixelSel.selectedOptions[0].text : 'Catequese';
+    
+    const eventSel = document.getElementById('modal-pixel-event');
+    node.data.eventName = eventSel ? eventSel.value : 'Compra';
+    node.data.tipo_evento = node.data.eventName;
+
+    node.data.pageId = document.getElementById('modal-pixel-page-id')?.value || '';
+    node.data.eventValue = document.getElementById('modal-pixel-value')?.value || '{comprovante.valor}';
+    node.data.valor_item = node.data.eventValue;
+    node.data.currency = document.getElementById('modal-pixel-currency')?.value || 'BRL';
+
+    const el = document.getElementById(nodeId);
+    if (el) {
+      const inner = el.querySelector('.pixel-node-inner');
+      if (inner) {
+        inner.innerHTML = `
+          <div style="font-weight: 700; color: #fef08a; font-size: 12px;">${node.data.pixelName}</div>
+          <div style="color: #cbd5e1; font-size: 10.5px; margin-top: 2px;">Tipo: ${node.data.eventName} • Valor: ${node.data.eventValue} ${node.data.currency}</div>
+        `;
+      }
+    }
+
+    document.getElementById('node-config-modal')?.remove();
+    showToast('Pixel configurado com sucesso!', 'success');
+  },
+
+  /**
+   * MODAL ESPECÍFICO DE INTEGRAÇÃO / WEBHOOK (SCREENSHOTS 3, 4, 5)
+   */
+  openIntegrationModal(node) {
+    const method = node.data?.method || 'GET';
+    const url = node.data?.url || node.data?.endpoint || 'https://equinforce.com/utmify.php?phone={phone_number}&priceincents={comprovante.valor}&name={nome}';
+    const headers = node.data?.headers || '{\n  "Content-Type": "application/json",\n  "Authorization": "Bearer {token}",\n  "X-API-Key": "sua-chave-api"\n}';
+    const body = node.data?.body || '{\n  "nome": "{nome}",\n  "email": "{email}",\n  "telefone": "{phone_number}",\n  "mensagem": "Olá {nome}, bem-vindo!"\n}';
+
+    const modalHtml = `
+      <div class="node-modal-backdrop" id="node-config-modal">
+        <div class="modal-integration-card">
+          <!-- Top Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="modal-header-icon-square" style="background: #2563eb; color: #fff;">
+                🌐
+              </div>
+              <h3 style="font-size: 18px; font-weight: 700; margin: 0; font-family: 'Outfit', sans-serif;">Editar Integração</h3>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()" style="border: none; background: transparent; font-size: 18px; color: var(--text-muted); cursor: pointer;">✕</button>
+          </div>
+
+          <!-- Method -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Tipo de requisição POST/PUT/GET *</label>
+            <select class="form-select" id="modal-int-method">
+              <option value="GET" ${method === 'GET' ? 'selected' : ''}>GET</option>
+              <option value="POST" ${method === 'POST' ? 'selected' : ''}>POST</option>
+              <option value="PUT" ${method === 'PUT' ? 'selected' : ''}>PUT</option>
+              <option value="DELETE" ${method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+            </select>
+          </div>
+
+          <!-- URL -->
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Url da requisição *</label>
+            <div class="input-with-var">
+              <input type="text" id="modal-int-url" value="${url}" class="form-input" style="font-family: monospace; font-size: 12.5px;">
+              <button type="button" class="btn-insert-var" onclick="FlowBuilder.insertVariableTo('modal-int-url', '{phone_number}')" title="Inserir variável">&lt;&gt;</button>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
+              Use variáveis como {nome}, {phone_number}, {email} para substituir valores dinamicamente
+            </div>
+          </div>
+
+          <!-- Navigation Tabs Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px;">
+            <div class="nav-tabs-custom" style="border-bottom: none; margin-bottom: 0;">
+              <button type="button" class="nav-tab-custom-btn active" id="tab-int-btn-headers" onclick="FlowBuilder.switchIntTab('headers')">Header da requisição</button>
+              <button type="button" class="nav-tab-custom-btn" id="tab-int-btn-body" onclick="FlowBuilder.switchIntTab('body')">Corpo da requisição</button>
+              <button type="button" class="nav-tab-custom-btn" id="tab-int-btn-response" onclick="FlowBuilder.switchIntTab('response')">Mapear resposta</button>
+            </div>
+            <button type="button" class="btn btn-primary" style="background: #2563eb; border-color: #2563eb; padding: 6px 14px; font-size: 12.5px; display: flex; align-items: center; gap: 6px;" onclick="FlowBuilder.testIntegrationRequest('${node.id}')">
+              <span>▶</span>
+              <span>Testar requisição</span>
+            </button>
+          </div>
+
+          <!-- Tab 1: Headers -->
+          <div id="tab-int-pane-headers">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin: 0; font-size: 12.5px;">Dados do header</label>
+            </div>
+            <div style="position: relative; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;">
+              <textarea id="modal-int-headers" class="form-textarea" style="background: transparent; border: none; font-family: monospace; font-size: 12px; min-height: 150px; line-height: 1.5;">${headers}</textarea>
+              <div style="text-align: right; margin-top: 4px;">
+                <button type="button" class="btn-var-mini" onclick="FlowBuilder.insertVariableTo('modal-int-headers', '{token}')" title="Inserir variável">&lt;&gt;</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 6px;">
+              Formato JSON. Exemplo: {"Content-Type": "application/json"}
+            </div>
+          </div>
+
+          <!-- Tab 2: Body -->
+          <div id="tab-int-pane-body" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin: 0; font-size: 12.5px;">Dados da requisição</label>
+            </div>
+            <div style="position: relative; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;">
+              <textarea id="modal-int-body" class="form-textarea" style="background: transparent; border: none; font-family: monospace; font-size: 12px; min-height: 150px; line-height: 1.5;">${body}</textarea>
+              <div style="text-align: right; margin-top: 4px;">
+                <button type="button" class="btn-var-mini" onclick="FlowBuilder.insertVariableTo('modal-int-body', '{phone_number}')" title="Inserir variável">&lt;&gt;</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 6px;">
+              JSON com aspas retas. Textos entre aspas; número pode ir sem aspas. Exemplo: {"nome":"{full_name}","numero":"{phone_number}"}
+            </div>
+          </div>
+
+          <!-- Tab 3: Response Mapping -->
+          <div id="tab-int-pane-response" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600;">
+              <span>Status:</span>
+              <span id="modal-int-status-badge" style="color: #94a3b8; font-size: 13px;">● Aguardando teste</span>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 12px; color: #94a3b8; min-height: 110px; max-height: 160px; overflow-y: auto; white-space: pre-wrap;" id="modal-int-response-box">{} 0 items</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 6px;">
+              Execute um teste para ver a resposta da requisição
+            </div>
+
+            <div style="margin-top: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="form-label" style="margin: 0; font-size: 13px;">Campos</label>
+                <button type="button" class="btn btn-primary" style="background: #2563eb; border-color: #2563eb; font-size: 12px; padding: 4px 10px;" onclick="FlowBuilder.addMappingField()">+ Adicionar campo</button>
+              </div>
+              <div id="modal-int-fields-container" style="border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; padding: 22px; text-align: center; color: #94a3b8; font-size: 12px;">
+                <div style="font-size: 24px; margin-bottom: 6px;">🌐</div>
+                Nenhum campo adicionado. Clique em "Adicionar campo" para mapear campos da resposta.
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()">Cancelar</button>
+            <button type="button" class="btn btn-primary" style="background: #a855f7; border-color: #a855f7; padding: 8px 24px; font-weight: 700;" onclick="FlowBuilder.saveIntegrationModal('${node.id}')">Salvar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  },
+
+  saveIntegrationModal(nodeId) {
+    const node = this.currentFlow.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    if (!node.data) node.data = {};
+    node.data.method = document.getElementById('modal-int-method')?.value || 'GET';
+    node.data.url = document.getElementById('modal-int-url')?.value || '';
+    node.data.endpoint = node.data.url;
+    node.data.headers = document.getElementById('modal-int-headers')?.value || '';
+    node.data.body = document.getElementById('modal-int-body')?.value || '';
+
+    const el = document.getElementById(nodeId);
+    if (el) {
+      const pill = el.querySelector('.integration-url-pill');
+      if (pill) {
+        pill.textContent = node.data.url;
+        pill.title = node.data.url;
+      }
+      const typeText = el.querySelector('.node-body strong');
+      if (typeText) typeText.textContent = node.data.method;
+    }
+
+    document.getElementById('node-config-modal')?.remove();
+    showToast('Integração salva com sucesso!', 'success');
+  },
+
+  switchIntTab(tabName) {
+    ['headers', 'body', 'response'].forEach(t => {
+      const btn = document.getElementById(`tab-int-btn-${t}`);
+      const pane = document.getElementById(`tab-int-pane-${t}`);
+      if (btn) btn.classList.toggle('active', t === tabName);
+      if (pane) pane.style.display = t === tabName ? 'block' : 'none';
+    });
+  },
+
+  insertVariableTo(targetId, varTag) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const start = el.selectionStart || el.value.length;
+    el.value = el.value.slice(0, start) + varTag + el.value.slice(start);
+    el.focus();
+  },
+
+  async testIntegrationRequest(nodeId) {
+    const method = document.getElementById('modal-int-method')?.value || 'GET';
+    const url = document.getElementById('modal-int-url')?.value || '';
+    const headers = document.getElementById('modal-int-headers')?.value || '';
+    const body = document.getElementById('modal-int-body')?.value || '';
+
+    const statusBadge = document.getElementById('modal-int-status-badge');
+    const responseBox = document.getElementById('modal-int-response-box');
+
+    FlowBuilder.switchIntTab('response');
+
+    if (statusBadge) {
+      statusBadge.style.color = '#eab308';
+      statusBadge.textContent = '● Executando teste...';
+    }
+    if (responseBox) {
+      responseBox.textContent = 'Enviando requisição via servidor...';
+    }
+
+    try {
+      const res = await fetch('/api/integrations/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, url, headers, body })
+      });
+      const result = await res.json();
+
+      if (statusBadge) {
+        if (result.ok || (result.status >= 200 && result.status < 300)) {
+          statusBadge.style.color = '#10b981';
+          statusBadge.textContent = `● Status ${result.status} ${result.statusText || 'OK'}`;
+        } else {
+          statusBadge.style.color = '#ef4444';
+          statusBadge.textContent = `● Status ${result.status || 500} ${result.statusText || 'Erro'}`;
+        }
+      }
+
+      if (responseBox) {
+        responseBox.textContent = typeof result.data === 'object' 
+          ? JSON.stringify(result.data, null, 2) 
+          : String(result.data || result.error || 'Sem dados de resposta');
+      }
+    } catch (err) {
+      if (statusBadge) {
+        statusBadge.style.color = '#ef4444';
+        statusBadge.textContent = `● Erro de conexão`;
+      }
+      if (responseBox) {
+        responseBox.textContent = `Erro ao disparar teste: ${err.message}`;
+      }
+    }
+  },
+
+  addMappingField() {
+    const container = document.getElementById('modal-int-fields-container');
+    if (!container) return;
+    const fieldId = `field_${Date.now()}`;
+    const rowHtml = `
+      <div id="${fieldId}" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+        <input type="text" class="form-input" placeholder="Campo da resposta (ex: data.id)" style="font-size: 12px; padding: 4px 8px;">
+        <span style="color: var(--text-muted); font-size: 11px;">➔</span>
+        <input type="text" class="form-input" placeholder="Salvar em variável (ex: {id})" style="font-size: 12px; padding: 4px 8px;">
+        <button type="button" class="btn btn-secondary" style="padding: 2px 8px; color: var(--red);" onclick="document.getElementById('${fieldId}').remove()">✕</button>
+      </div>
+    `;
+    if (container.querySelector('div[style*="font-size: 24px"]')) {
+      container.innerHTML = '';
+    }
+    container.insertAdjacentHTML('beforeend', rowHtml);
   },
 
   deleteNode(nodeId) {

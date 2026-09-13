@@ -44,9 +44,38 @@ function showToast(message, type = 'success') {
   }, 3500);
 }
 
+// Tema Claro / Escuro
+function initTheme() {
+  const savedTheme = localStorage.getItem('app_theme') || 'dark';
+  if (savedTheme === 'light') {
+    document.body.classList.add('theme-light');
+  } else {
+    document.body.classList.remove('theme-light');
+  }
+  updateThemeButton();
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('theme-light');
+  localStorage.setItem('app_theme', isLight ? 'light' : 'dark');
+  updateThemeButton();
+  if (state.currentView === 'overview') {
+    renderOverview();
+  }
+}
+
+function updateThemeButton() {
+  const btn = document.getElementById('theme-btn');
+  if (!btn) return;
+  const isLight = document.body.classList.contains('theme-light');
+  btn.innerHTML = isLight ? '🌙 Tema Escuro' : '☀️ Tema Claro';
+  btn.title = isLight ? 'Alternar para Tema Escuro' : 'Alternar para Tema Claro';
+}
+
 // Router
 window.addEventListener('hashchange', handleRoute);
 window.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   initRealtimeEvents();
   handleRoute();
 });
@@ -63,13 +92,14 @@ function handleRoute() {
   });
 
   const titles = {
-    overview: '📊 Dashboard — Visão Geral',
+    overview: '📊 Dashboard — Visão Geral & Conversão',
     inbox: '💬 Chats ao vivo',
     kanban: '🗂️ Kanban de Atendimento',
     contacts: '👥 Contatos & Leads',
     flows: '🔗 Fluxos — Automações e fluxos de atendimento',
     'flow-canvas': '🕸️ Editor Visual de Fluxo (n8n Canvas)',
     instances: '🔌 Conexões (Meta Cloud API)',
+    pixels: '🎯 Facebook Pixels & Conversions API (CAPI)',
     webhooks: '📡 Webhooks de Entrada',
     settings: '🤖 Inteligência Artificial & Checkouts',
     studio: '🎨 Estúdio de Calibração das Provas',
@@ -87,6 +117,7 @@ function handleRoute() {
   else if (route === 'flows') FlowBuilder.renderList(container);
   else if (route === 'flow-canvas') FlowBuilder.renderCanvas(container, params.get('id') || 'fluxo-espiao-foto');
   else if (route === 'instances') renderInstances();
+  else if (route === 'pixels') renderPixels();
   else if (route === 'webhooks') renderWebhooks();
   else if (route === 'settings') renderSettings();
   else if (route === 'studio') renderStudio();
@@ -127,10 +158,15 @@ async function updateBadges() {
 /* =========================================================================
    VIEW 1: OVERVIEW (VISÃO GERAL)
    ========================================================================= */
+/* =========================================================================
+   VIEW 1: OVERVIEW (DASHBOARD EXECUTIVA & FUNIL DE CONVERSÃO %)
+   ========================================================================= */
+let salesChartInstance = null;
+
 async function renderOverview() {
   try {
     const [statsRes, instRes, funnelRes] = await Promise.all([
-      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/dashboard/stats').then(r => r.json()),
       fetch('/api/instances').then(r => r.json()),
       fetch('/api/funnel').then(r => r.json())
     ]);
@@ -141,92 +177,553 @@ async function renderOverview() {
 
     document.getElementById('badge-chips').textContent = instRes.length;
 
+    const kpis = statsRes.kpis || {};
+    const funnel = statsRes.funnel || [];
+    const recentSales = statsRes.recentSales || [];
+    const recentLogs = statsRes.recentPixelLogs || [];
+
     const html = `
-      <div class="grid-stats">
+      <!-- Cabeçalho da Dashboard -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 700; font-family: 'Outfit', sans-serif;">Dashboard de Conversão & Vendas</h2>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
+            Acompanhe a retenção do funil em tempo real, pedidos aprovados e eventos do Pixel.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="renderOverview()" style="padding: 6px 12px; font-size: 12.5px;">
+            🔄 Atualizar Dados
+          </button>
+          <a class="btn btn-primary" href="#pixels" style="padding: 6px 14px; font-size: 12.5px; text-decoration: none;">
+            🎯 Configurar Pixels
+          </a>
+        </div>
+      </div>
+
+      <!-- 4 Cards de Métricas Principais (KPIs) -->
+      <div class="grid-stats" style="margin-bottom: 24px;">
         <div class="stat-card">
-          <div class="stat-icon green">💬</div>
+          <div class="stat-icon green">💰</div>
           <div>
-            <div class="stat-label">Total de Leads Atendidos</div>
-            <div class="stat-value">${statsRes.totalLeads}</div>
+            <div class="stat-label">Faturamento Total</div>
+            <div class="stat-value" style="color: #10b981;">R$ ${Number(kpis.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+              ✅ ${kpis.salesCount || 0} pedidos aprovados
+            </div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon cyan">📸</div>
-          <div>
-            <div class="stat-label">Provas com Áudio Geradas</div>
-            <div class="stat-value">${statsRes.totalProofsSent}</div>
-          </div>
-        </div>
+
         <div class="stat-card">
           <div class="stat-icon purple">🎯</div>
           <div>
-            <div class="stat-label">Taxa de Conversão da Prova</div>
-            <div class="stat-value">${statsRes.conversionRate}%</div>
+            <div class="stat-label">Taxa de Conversão Global</div>
+            <div class="stat-value" style="color: #a855f7;">${kpis.globalConversionRate || '0.0%'}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+              Leads que startaram ➔ Pagaram
+            </div>
           </div>
         </div>
+
         <div class="stat-card">
-          <div class="stat-icon amber">📱</div>
+          <div class="stat-icon cyan">👥</div>
           <div>
-            <div class="stat-label">Chips da Meta Ativos</div>
-            <div class="stat-value">${statsRes.totalActiveChips} / ${instRes.length}</div>
+            <div class="stat-label">Total de Leads Atendidos</div>
+            <div class="stat-value" style="color: #06b6d4;">${kpis.totalLeads || 0}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+              Conversas iniciadas no bot
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon amber">📈</div>
+          <div>
+            <div class="stat-label">Ticket Médio</div>
+            <div class="stat-value" style="color: #f59e0b;">R$ ${Number(kpis.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+              Por cliente convertido
+            </div>
           </div>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+      <!-- Grid Principal: Funil de Conversão + Gráfico de Faturamento -->
+      <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <!-- Coluna 1: Funil de Conversão Passo a Passo -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">⚡ Status da Automação em Tempo Real</h3>
-            <span class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;">Funil ${funnelRes.active ? 'Ativo' : 'Pausado'}</span>
+            <div>
+              <h3 class="card-title">📉 Funil de Conversão do Fluxo (%)</h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+                Métrica de avanço dos leads etapa por etapa até o acesso master
+              </p>
+            </div>
+            <span class="nav-badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 600;">Tempo Real</span>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 16px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-              <div>
-                <div style="font-weight: 600;">1. Captura de Telefone & Análise</div>
-                <div style="font-size: 12px; color: var(--text-muted);">${funnelRes.analyzingMessage}</div>
+
+          <div class="funnel-card" style="margin-top: 8px;">
+            ${funnel.map(step => `
+              <div class="funnel-step">
+                <div class="funnel-step-header">
+                  <span>${step.name}</span>
+                  <div>
+                    <strong style="color: ${step.color};">${step.count} leads</strong>
+                    <span style="margin-left: 8px; font-size: 11.5px; color: var(--text-secondary); font-weight: 700;">${step.pct}</span>
+                  </div>
+                </div>
+                <div class="funnel-bar-bg">
+                  <div class="funnel-bar-fill" style="width: ${step.pct}; background: ${step.color};"></div>
+                </div>
               </div>
-              <span style="color: var(--wa-green); font-size: 13px; font-weight: 600;">${funnelRes.analyzingDelaySeconds}s delay</span>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-              <div>
-                <div style="font-weight: 600;">2. Geração da Foto Dinâmica</div>
-                <div style="font-size: 12px; color: var(--text-muted);">Recorta foto circular (raio: ${funnelRes.avatarCoordinates?.radius || 18}px) e sobrepõe na bolinha do áudio</div>
-              </div>
-              <span style="color: var(--cyan); font-size: 13px; font-weight: 600;">Instantâneo</span>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-              <div>
-                <div style="font-weight: 600;">3. Disparo da Prova + Áudio + Link de Pagamento</div>
-                <div style="font-size: 12px; color: var(--text-muted);">${funnelRes.checkoutUrl || 'Checkout configurado'}</div>
-              </div>
-              <span style="color: var(--purple); font-size: 13px; font-weight: 600;">Automático</span>
-            </div>
+            `).join('')}
           </div>
         </div>
 
+        <!-- Coluna 2: Gráfico de Vendas & Resumo dos Chips -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">📊 Faturamento Diário (R$)</h3>
+            </div>
+            <div style="height: 200px; position: relative;">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">📱 Conexões WhatsApp Ativas</h3>
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px;" onclick="window.location.hash='#instances'">Ver chips</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              ${instRes.length === 0 ? `
+                <div style="font-size: 12.5px; color: var(--text-muted); text-align: center; padding: 12px;">Nenhum chip conectado ainda.</div>
+              ` : instRes.map(i => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="status-dot" style="background: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--amber)'};"></span>
+                    <div>
+                      <strong style="font-size: 13px;">${i.name}</strong>
+                      <div style="font-size: 11px; color: var(--text-muted);">${i.phoneNumber || 'Pronto para uso'}</div>
+                    </div>
+                  </div>
+                  <span style="font-size: 11px; color: var(--wa-green); font-weight: 600;">Ativo</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção Inferior: Pedidos do Webhook & Logs CAPI -->
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px;">
+        <!-- Tabela de Pedidos Pagos (Webhook Kirvano / etc) -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">📱 Seus Chips Conectados</h3>
+            <div>
+              <h3 class="card-title">💳 Últimos Pedidos Pagos (Webhook)</h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Notificações recebidas via Kirvano / Gateways</p>
+            </div>
+            <span style="font-size: 11.5px; color: var(--text-muted);">${recentSales.length} recentes</span>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            ${instRes.map(i => `
-              <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                <div class="status-dot" style="background: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--red)'}; box-shadow: 0 0 10px ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--red)'};"></div>
-                <div style="flex: 1;">
-                  <div style="font-weight: 600; font-size: 13px;">${i.name}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">${i.phoneNumber || 'Sem número'}</div>
+
+          <div style="overflow-x: auto;">
+            <table class="flows-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Telefone</th>
+                  <th>Produto</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentSales.length === 0 ? `
+                  <tr>
+                    <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12.5px;">
+                      Nenhum pedido recebido ainda via Webhook.<br>
+                      Configure o Webhook na Kirvano usando a URL em <a href="#pixels" style="color: #a855f7;">Pixels & CAPI</a>.
+                    </td>
+                  </tr>
+                ` : recentSales.map(s => `
+                  <tr>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">
+                      ${new Date(s.timestamp).toLocaleDateString()} ${new Date(s.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </td>
+                    <td style="font-size: 12.5px; font-weight: 600;">${s.phone}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${s.productName || 'Acesso Painel'}</td>
+                    <td style="font-size: 12.5px; color: #10b981; font-weight: 700;">R$ ${Number(s.amount).toFixed(2)}</td>
+                    <td>
+                      <span class="btn" style="padding: 2px 7px; font-size: 10.5px; background: rgba(16,185,129,0.15); color: #10b981;">
+                        ● APROVADO
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabela de Disparos CAPI Meta -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">🎯 Disparos de Pixel CAPI</h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Eventos enviados para o Facebook Ads</p>
+            </div>
+            <a href="#pixels" class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px; text-decoration: none;">Ver todos</a>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${recentLogs.length === 0 ? `
+              <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12.5px;">
+                Nenhum evento disparado ainda.<br>
+                Cadastre seu Pixel na aba <a href="#pixels" style="color: #a855f7;">Pixels & CAPI</a>.
+              </div>
+            ` : recentLogs.map(l => `
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px;">
+                <div>
+                  <div style="font-weight: 600; color: #fff;">
+                    ${l.eventName}
+                    ${l.value ? `<span style="color: #10b981; margin-left: 6px;">R$ ${l.value}</span>` : ''}
+                  </div>
+                  <div style="font-size: 10.5px; color: var(--text-muted);">
+                    Pixel: ${l.pixelId} • Tel: ...${String(l.phone || '').slice(-4)}
+                  </div>
                 </div>
-                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="window.location.hash='#instances'">Gerenciar</button>
+                <span class="btn" style="padding: 2px 6px; font-size: 10px; background: ${l.status === 'sucesso' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color: ${l.status === 'sucesso' ? '#10b981' : '#ef4444'};">
+                  ${l.status.toUpperCase()}
+                </span>
               </div>
             `).join('')}
-            <button class="btn btn-primary" style="margin-top: 10px; width: 100%;" onclick="openAddChipModal()">+ Adicionar Chip</button>
           </div>
         </div>
       </div>
     `;
+
     document.getElementById('view-container').innerHTML = html;
+
+    // Inicializa o Chart.js
+    initSalesChart(statsRes.salesChart || {});
+
   } catch (err) {
     document.getElementById('view-container').innerHTML = `<div class="card">Erro ao carregar visão geral: ${err.message}</div>`;
+  }
+}
+
+function initSalesChart(salesByDay) {
+  const ctx = document.getElementById('salesChart');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  if (salesChartInstance) {
+    salesChartInstance.destroy();
+  }
+
+  const labels = Object.keys(salesByDay);
+  const data = Object.values(salesByDay);
+
+  if (labels.length === 0) {
+    labels.push('Hoje');
+    data.push(0);
+  }
+
+  const isLight = document.body.classList.contains('theme-light');
+  const textColor = isLight ? '#475569' : '#94a3b8';
+  const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+
+  salesChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Vendas (R$)',
+        data: data,
+        backgroundColor: '#7c3aed',
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: 11 } }
+        },
+        y: {
+          grid: { color: gridColor },
+          ticks: {
+            color: textColor,
+            font: { size: 11 },
+            callback: (v) => 'R$ ' + v
+          }
+        }
+      }
+    }
+  });
+}
+
+/* =========================================================================
+   VIEW: PIXELS DO FACEBOOK & CONVERSIONS API (CAPI)
+   ========================================================================= */
+async function renderPixels() {
+  const [pixels, logs, settings] = await Promise.all([
+    fetch('/api/pixels').then(r => r.json()),
+    fetch('/api/pixels/logs').then(r => r.json()),
+    fetch('/api/settings').then(r => r.json())
+  ]);
+
+  const webhookUrl = `${window.location.origin}/api/webhooks/payment`;
+
+  const html = `
+    <!-- Top banner de Webhook de Pagamentos -->
+    <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(124, 58, 237, 0.4); background: rgba(124, 58, 237, 0.05);">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">📡</span>
+            <strong style="font-size: 15px; color: #c4b5fd;">URL do Webhook de Pedidos Pagos (Kirvano / Gateways)</strong>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+            Cole esta URL no painel de Webhooks da sua plataforma de pagamento (Kirvano, Kiwify, etc.). Quando o cliente pagar, o pedido entra na Dashboard e dispara o Pixel de Compra (Purchase) automaticamente!
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" class="form-input" id="webhook-url-input" value="${webhookUrl}" readonly style="width: 380px; font-size: 12px; font-family: monospace;">
+          <button class="btn btn-primary" onclick="copyWebhookUrl()">📋 Copiar URL</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <!-- Coluna 1: Cadastro Manual de Pixel -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🎯 Configurar Novo Pixel do Facebook</h3>
+        </div>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+          Insira as credenciais geradas no seu Gerenciador de Eventos da Meta para disparar eventos de conversão via servidor (CAPI).
+        </p>
+
+        <form onsubmit="savePixelConfig(event)">
+          <div class="form-group">
+            <label class="form-label">Nome de Identificação do Pixel *</label>
+            <input type="text" class="form-input" id="pix-name" placeholder="Ex: Pixel Principal - Funil Espião" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pixel ID (Meta Ads) *</label>
+            <input type="text" class="form-input" id="pix-id" placeholder="Ex: 1388636936143540" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Token de Acesso da Conversions API (CAPI) *</label>
+            <input type="password" class="form-input" id="pix-token" placeholder="EAAG..." required>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Gerado em: Gerenciador de Eventos ➔ Configurações ➔ API de Conversões ➔ Gerar token de acesso.
+            </p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Page ID do Facebook *</label>
+              <input type="text" class="form-input" id="pix-page-id" placeholder="Ex: 1123948077469453">
+              <p style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">ID da página vinculada ao WhatsApp Business.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Test Event Code (Opcional)</label>
+              <input type="text" class="form-input" id="pix-test-code" placeholder="Ex: TEST12345">
+              <p style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">Para testar no Gerenciador de Eventos.</p>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+            Salvar e Ativar Pixel
+          </button>
+        </form>
+      </div>
+
+      <!-- Coluna 2: Pixels Cadastrados -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📋 Pixels Configurados no Sistema</h3>
+          <span class="nav-badge" style="background: rgba(124, 58, 237, 0.2); color: #c4b5fd;">${pixels.length} Ativo(s)</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          ${pixels.length === 0 ? `
+            <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+              Nenhum pixel cadastrado ainda.<br>
+              Preencha o formulário ao lado para cadastrar seu primeiro Pixel do Facebook.
+            </div>
+          ` : pixels.map(p => `
+            <div style="padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="color: #fff; font-size: 14px;">${p.name}</strong>
+                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                  ID: <span style="font-family: monospace; color: #c4b5fd;">${p.pixelId}</span>
+                  ${p.pageId ? `• Page ID: ${p.pageId}` : ''}
+                </div>
+                ${p.testEventCode ? `<div style="font-size: 11px; color: var(--amber); margin-top: 2px;">🧪 Test Code: ${p.testEventCode}</div>` : ''}
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testPixelManual('${p.pixelId}', '${p.accessToken}', '${p.pageId || ''}', '${p.testEventCode || ''}')">
+                  ▶ Testar
+                </button>
+                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deletePixelConfig('${p.id}')">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela de Auditoria de Eventos Disparados -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">📊 Auditoria de Disparos de Conversão (Logs CAPI)</h3>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
+            Histórico completo de eventos enviados do seu servidor para a Meta
+          </p>
+        </div>
+        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="renderPixels()">🔄 Atualizar Logs</button>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="flows-table">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Evento</th>
+              <th>Pixel ID</th>
+              <th>Telefone (E.164)</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Detalhes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.length === 0 ? `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12.5px;">
+                  Nenhum evento registrado ainda.
+                </td>
+              </tr>
+            ` : logs.map(l => `
+              <tr>
+                <td style="font-size: 11.5px; color: var(--text-muted);">
+                  ${new Date(l.timestamp).toLocaleDateString()} ${new Date(l.timestamp).toLocaleTimeString()}
+                </td>
+                <td style="font-weight: 600; color: #fff;">${l.eventName}</td>
+                <td style="font-family: monospace; font-size: 11.5px; color: #c4b5fd;">${l.pixelId}</td>
+                <td style="font-size: 12px;">${l.phone || '—'}</td>
+                <td style="font-size: 12px; color: #10b981; font-weight: 600;">${l.value ? `R$ ${Number(l.value).toFixed(2)}` : '—'}</td>
+                <td>
+                  <span class="btn" style="padding: 2px 7px; font-size: 10.5px; background: ${l.status === 'sucesso' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color: ${l.status === 'sucesso' ? '#10b981' : '#ef4444'};">
+                    ● ${l.status.toUpperCase()}
+                  </span>
+                </td>
+                <td style="font-size: 11px; color: var(--text-muted);">
+                  ${l.error || (l.eventsReceived ? `${l.eventsReceived} evento(s) recebido(s)` : 'Simulado')}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('view-container').innerHTML = html;
+}
+
+function copyWebhookUrl() {
+  const input = document.getElementById('webhook-url-input');
+  if (input) {
+    navigator.clipboard.writeText(input.value);
+    showToast('URL do Webhook copiada com sucesso!', 'success');
+  }
+}
+
+async function savePixelConfig(e) {
+  e.preventDefault();
+  const name = document.getElementById('pix-name').value.trim();
+  const pixelId = document.getElementById('pix-id').value.trim();
+  const accessToken = document.getElementById('pix-token').value.trim();
+  const pageId = document.getElementById('pix-page-id').value.trim();
+  const testEventCode = document.getElementById('pix-test-code').value.trim();
+
+  try {
+    const res = await fetch('/api/pixels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pixelId, accessToken, pageId, testEventCode })
+    }).then(r => r.json());
+
+    if (res.success) {
+      showToast('Pixel configurado e ativado com sucesso!', 'success');
+      renderPixels();
+    } else {
+      showToast('Erro ao salvar pixel: ' + (res.error || 'Falha'), 'danger');
+    }
+  } catch (err) {
+    showToast('Erro de rede: ' + err.message, 'danger');
+  }
+}
+
+async function deletePixelConfig(id) {
+  if (!confirm('Deseja excluir este Pixel?')) return;
+  try {
+    await fetch(`/api/pixels/${id}`, { method: 'DELETE' });
+    showToast('Pixel excluído com sucesso!');
+    renderPixels();
+  } catch (err) {
+    showToast('Erro ao excluir: ' + err.message, 'danger');
+  }
+}
+
+async function testPixelManual(pixelId, accessToken, pageId, testEventCode) {
+  const phone = prompt('Digite um telefone para o teste (DDD+número, ex: 11912345678):', '11999998888');
+  if (!phone) return;
+
+  showToast('Enviando evento de teste para a Meta...', 'info');
+
+  try {
+    const res = await fetch('/api/pixels/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixelId,
+        accessToken,
+        pageId,
+        testEventCode,
+        eventName: 'Purchase',
+        phone,
+        value: 49.90,
+        currency: 'BRL'
+      })
+    }).then(r => r.json());
+
+    if (res.success) {
+      showToast(`✓ Sucesso! ${res.eventsReceived || 1} evento recebido pela Meta (Trace ID: ${res.fbTraceId || 'ok'})`, 'success');
+      renderPixels();
+    } else {
+      showToast('❌ Erro da Meta: ' + (res.error || 'Falha no disparo'), 'danger');
+      renderPixels();
+    }
+  } catch (err) {
+    showToast('Erro ao testar: ' + err.message, 'danger');
   }
 }
 

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -67,6 +68,12 @@
           </a>
         </li>
         <li>
+          <a class="nav-item" data-view="pixels" href="#pixels">
+            <span class="nav-icon">🎯</span>
+            <span>Pixels & CAPI</span>
+          </a>
+        </li>
+        <li>
           <a class="nav-item" data-view="webhooks" href="#webhooks">
             <span class="nav-icon">📡</span>
             <span>Webhooks de entrada</span>
@@ -108,6 +115,9 @@
       <header class="top-bar">
         <div class="top-title" id="top-title">Visão Geral</div>
         <div class="top-actions">
+          <button class="btn btn-secondary" id="theme-btn" onclick="toggleTheme()" title="Alternar entre tema Claro e Escuro" style="font-weight: 600;">
+            ☀️ Tema Claro
+          </button>
           <button class="btn btn-secondary" onclick="window.location.hash = '#simulator'">
             🧪 Simular Lead Agora
           </button>

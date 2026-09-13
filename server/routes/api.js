@@ -660,27 +660,311 @@ router.post('/facebook/disconnect', (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/facebook/test-event', async (req, res) => {
+/* =========================================================================
+   ROTAS DE PIXELS DO FACEBOOK (CAPI / EVENTOS SERVER-SIDE)
+   ========================================================================= */
+
+router.get('/pixels', (req, res) => {
+  const pixels = db.getPixels();
+  res.json(pixels);
+});
+
+router.post('/pixels', (req, res) => {
+  const { name, pixelId, accessToken, pageId, testEventCode } = req.body;
+  if (!pixelId || !accessToken) {
+    return res.status(400).json({ error: 'Pixel ID e Access Token são obrigatórios' });
+  }
+
+  const saved = db.addPixel({
+    name: name || `Pixel ${pixelId}`,
+    pixelId: String(pixelId).trim(),
+    accessToken: String(accessToken).trim(),
+    pageId: pageId ? String(pageId).trim() : '',
+    testEventCode: testEventCode ? String(testEventCode).trim() : ''
+  });
+
+  res.json({ success: true, pixel: saved });
+});
+
+router.delete('/pixels/:id', (req, res) => {
+  db.deletePixel(req.params.id);
+  res.json({ success: true });
+});
+
+router.post('/pixels/test', async (req, res) => {
+  const { pixelId, accessToken, eventName, phone, value, currency, pageId, testEventCode } = req.body;
+  if (!pixelId || !accessToken) {
+    return res.status(400).json({ error: 'Pixel ID e Access Token são obrigatórios' });
+  }
+
   try {
-    const { eventName, phone, value } = req.body;
-    const settings = db.getSettings();
-    const fb = settings.facebook;
-
-    if (!fb || !fb.pixelId || !fb.accessToken) {
-      return res.status(400).json({ error: 'Nenhum Pixel ou Token configurado' });
-    }
-
     const result = await metaService.sendPixelConversion(
-      fb.pixelId,
-      fb.accessToken,
-      eventName || 'Lead',
+      pixelId,
+      accessToken,
+      eventName || 'Purchase',
       phone || '5511999999999',
-      { value: value || 49.90, currency: 'BRL' }
+      {
+        value: Number(value) || 49.90,
+        currency: currency || 'BRL',
+        pageId: pageId || undefined,
+        testEventCode: testEventCode || undefined
+      }
     );
 
-    res.json({ success: true, result });
+    res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/pixels/logs', (req, res) => {
+  const logs = db.getPixelLogs();
+  res.json(logs);
+});
+
+/* =========================================================================
+   WEBHOOK UNIVERSAL DE PAGAMENTOS (KIRVANO, KIWIFY, PERFECTPAY, ETC.)
+   ========================================================================= */
+
+router.post('/webhooks/payment', async (req, res) => {
+  try {
+    const body = req.body || {};
+    console.log('[Webhook Payment] Notificação recebida:', JSON.stringify(body));
+
+    // Extrai telefone do cliente em diferentes formatos de gateway
+    const rawPhone = 
+      body.phone ||
+      body.customer?.phone ||
+      body.customer?.mobile ||
+      body.buyer?.phone ||
+      body.client?.phone ||
+      body.data?.customer?.phone ||
+      body.data?.phone || '';
+
+    const cleanPhone = String(rawPhone).replace(/\D/g, '');
+
+    // Extrai valor monetário
+    const rawAmount = 
+      body.amount ||
+      body.price ||
+      body.value ||
+      body.total ||
+      body.data?.amount ||
+      body.data?.price || 49.90;
+
+    const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 49.90;
+
+    // Extrai status e evento
+    const status = (body.status || body.event || body.order_status || 'approved').toLowerCase();
+    const isApproved = status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud');
+
+    // Registra a venda no banco
+    const sale = db.addSale({
+      phone: cleanPhone || 'desconhecido',
+      amount: amount,
+      currency: body.currency || 'BRL',
+      status: isApproved ? 'aprovado' : status,
+      platform: body.platform || 'Kirvano / Gateway',
+      orderId: body.order_id || body.id || `ord_${Date.now()}`,
+      productName: body.product_name || body.product?.name || 'Acesso Painel Mavrol'
+    });
+
+    // Se tiver telefone válido, atualiza o lead no CRM
+    if (cleanPhone) {
+      const chats = db.getChats();
+      let chat = chats[cleanPhone];
+      if (chat) {
+        chat.paidTotal = (chat.paidTotal || 0) + amount;
+        chat.lastPaymentTime = new Date().toISOString();
+        chat.orderStatus = isApproved ? 'PAGO' : status;
+        db.saveChats(chats);
+        eventBus.emit('chat_updated', { phone: cleanPhone });
+      }
+    }
+
+    // Se estiver aprovado, dispara evento Purchase no Pixel configurado
+    if (isApproved) {
+      const pixels = db.getPixels();
+      if (pixels && pixels.length > 0) {
+        const primaryPixel = pixels[0];
+        try {
+          await metaService.sendPixelConversion(
+            primaryPixel.pixelId,
+            primaryPixel.accessToken,
+            'Purchase',
+            cleanPhone,
+            {
+              value: amount,
+              currency: 'BRL',
+              pageId: primaryPixel.pageId || undefined,
+              testEventCode: primaryPixel.testEventCode || undefined
+            }
+          );
+        } catch (pixErr) {
+          console.warn('[Webhook Payment] Aviso disparando CAPI:', pixErr.message);
+        }
+      }
+    }
+
+    eventBus.emit('new_sale', sale);
+    res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id });
+  } catch (err) {
+    console.error('[Webhook Payment Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* =========================================================================
+   ESTATÍSTICAS DA DASHBOARD & FUNIL DE CONVERSÃO
+   ========================================================================= */
+
+router.get('/dashboard/stats', (req, res) => {
+  const chats = db.getChats();
+  const sales = db.getSales();
+  const pixels = db.getPixels();
+  const pixelLogs = db.getPixelLogs();
+
+  const chatList = Object.values(chats);
+  const totalLeads = chatList.length;
+
+  // 1. Etapas do funil com contagens reais
+  const stepStarted = totalLeads;
+  const stepNumberProvided = chatList.filter(c => c.variables?.alvo || (c.messages || []).length > 2).length;
+  const stepProofGenerated = chatList.filter(c => c.variables?.photoUrl || (c.messages || []).some(m => m.mediaType === 'image')).length;
+  const stepOfferSent = chatList.filter(c => c.state === 'OFERTA_ENVIADA' || c.state === 'NEGOCIACAO' || c.state === 'FINALIZADO' || c.upsellStage !== 'stage_49').length;
+  
+  const stepPaid49 = chatList.filter(c => ['stage_100', 'stage_200', 'stage_400', 'stage_finalizado'].includes(c.upsellStage) || (c.paidTotal && c.paidTotal >= 49)).length;
+  const stepPaid100 = chatList.filter(c => ['stage_200', 'stage_400', 'stage_finalizado'].includes(c.upsellStage) || (c.paidTotal && c.paidTotal >= 149)).length;
+  const stepPaid200 = chatList.filter(c => ['stage_400', 'stage_finalizado'].includes(c.upsellStage) || (c.paidTotal && c.paidTotal >= 349)).length;
+  const stepPaid400 = chatList.filter(c => c.upsellStage === 'stage_finalizado' || c.state === 'FINALIZADO' || (c.paidTotal && c.paidTotal >= 749)).length;
+
+  // 2. Cálculos financeiros
+  const approvedSales = sales.filter(s => s.status === 'aprovado');
+  const totalRevenue = approvedSales.reduce((acc, s) => acc + Number(s.amount || 0), 0);
+  const averageTicket = approvedSales.length > 0 ? (totalRevenue / approvedSales.length) : 0;
+  const globalConversionRate = totalLeads > 0 ? ((stepPaid49 / totalLeads) * 100).toFixed(1) : '0.0';
+
+  // 3. Taxas de retenção de cada etapa (%)
+  const calcRate = (current, total) => total > 0 ? ((current / total) * 100).toFixed(1) : '0.0';
+
+  const funnelStages = [
+    { name: '1. Início (Boas-Vindas)', count: stepStarted, pct: '100%', drop: '0%', color: '#3b82f6' },
+    { name: '2. Número Enviado', count: stepNumberProvided, pct: `${calcRate(stepNumberProvided, stepStarted)}%`, color: '#6366f1' },
+    { name: '3. Prova Gerada', count: stepProofGenerated, pct: `${calcRate(stepProofGenerated, stepStarted)}%`, color: '#8b5cf6' },
+    { name: '4. Oferta R$ 49,90', count: stepOfferSent, pct: `${calcRate(stepOfferSent, stepStarted)}%`, color: '#ec4899' },
+    { name: '5. Pagou R$ 49,90', count: stepPaid49, pct: `${calcRate(stepPaid49, stepStarted)}%`, color: '#10b981' },
+    { name: '6. Upsell R$ 100', count: stepPaid100, pct: `${calcRate(stepPaid100, stepStarted)}%`, color: '#059669' },
+    { name: '7. Upsell R$ 200', count: stepPaid200, pct: `${calcRate(stepPaid200, stepStarted)}%`, color: '#047857' },
+    { name: '8. Acesso Master R$ 400', count: stepPaid400, pct: `${calcRate(stepPaid400, stepStarted)}%`, color: '#065f46' }
+  ];
+
+  // 4. Vendas agrupadas para gráfico
+  const salesByDay = {};
+  sales.forEach(s => {
+    const day = s.timestamp ? s.timestamp.substring(0, 10) : 'Hoje';
+    salesByDay[day] = (salesByDay[day] || 0) + Number(s.amount || 0);
+  });
+
+  res.json({
+    kpis: {
+      totalRevenue: totalRevenue.toFixed(2),
+      salesCount: approvedSales.length,
+      averageTicket: averageTicket.toFixed(2),
+      totalLeads,
+      globalConversionRate: `${globalConversionRate}%`,
+      activePixelsCount: pixels.length,
+      pixelEventsCount: pixelLogs.length
+    },
+    funnel: funnelStages,
+    salesChart: salesByDay,
+    recentSales: sales.slice(0, 8),
+    recentPixelLogs: pixelLogs.slice(0, 6)
+  });
+});
+
+/**
+ * =========================================================================
+ * TESTE DE REQUISIÇÃO DE INTEGRAÇÃO (NÓ DO FLUXO)
+ * =========================================================================
+ */
+router.post('/integrations/test', async (req, res) => {
+  try {
+    const { method = 'GET', url, headers = {}, body } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'URL da requisição é obrigatória' });
+    }
+
+    // Interpolação de variáveis de teste para a simulação
+    const dummyVars = {
+      '{phone_number}': '5511999999999',
+      '{telefone}': '5511999999999',
+      '{nome}': 'Carlos Eduardo',
+      '{full_name}': 'Carlos Eduardo',
+      '{primeiro_nome}': 'Carlos',
+      '{email}': 'carlos@exemplo.com',
+      '{comprovante.valor}': '4990',
+      '{valor_atual}': '49.90',
+      '{token}': 'demo_token_123'
+    };
+
+    let resolvedUrl = url;
+    for (const [key, val] of Object.entries(dummyVars)) {
+      resolvedUrl = resolvedUrl.split(key).join(val);
+    }
+
+    let parsedHeaders = typeof headers === 'string' ? {} : (headers || {});
+    if (typeof headers === 'string' && headers.trim()) {
+      try {
+        let hText = headers;
+        for (const [key, val] of Object.entries(dummyVars)) {
+          hText = hText.split(key).join(val);
+        }
+        parsedHeaders = JSON.parse(hText);
+      } catch (e) {
+        // Fallback se não for JSON válido
+        parsedHeaders = { 'Content-Type': 'application/json' };
+      }
+    }
+
+    let fetchOptions = {
+      method: method.toUpperCase(),
+      headers: parsedHeaders,
+      signal: AbortSignal.timeout(10000)
+    };
+
+    if (['POST', 'PUT', 'PATCH'].includes(fetchOptions.method) && body) {
+      let bText = typeof body === 'string' ? body : JSON.stringify(body);
+      for (const [key, val] of Object.entries(dummyVars)) {
+        bText = bText.split(key).join(val);
+      }
+      fetchOptions.body = bText;
+    }
+
+    const response = await fetch(resolvedUrl, fetchOptions);
+    const contentType = response.headers.get('content-type') || '';
+    let responseData;
+    if (contentType.includes('application/json')) {
+      responseData = await response.json();
+    } else {
+      responseData = await response.text();
+    }
+
+    res.json({
+      success: true,
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      data: responseData
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      status: 500,
+      statusText: 'Request Failed',
+      ok: false,
+      error: err.message,
+      data: { error: err.message, code: 'FETCH_ERROR' }
+    });
   }
 });
 

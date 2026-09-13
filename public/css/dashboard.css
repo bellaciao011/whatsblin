@@ -1572,6 +1572,360 @@ input:checked + .slider:before {
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.55);
 }
 
+/* =========================================================================
+   TEMA CLARO (LIGHT THEME) - LIMPO, MODERNO E PROFISSIONAL
+   ========================================================================= */
 
+body.theme-light {
+  --bg-main: #f8fafc;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-input: #f8fafc;
+  
+  --border-color: rgba(0, 0, 0, 0.09);
+  --border-glow: rgba(37, 211, 102, 0.15);
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+}
 
+body.theme-light .card {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+body.theme-light .sidebar {
+  background: #ffffff;
+  border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .top-bar {
+  background: #ffffff;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .nav-item {
+  color: #475569;
+}
+body.theme-light .nav-item:hover,
+body.theme-light .nav-item.active {
+  background: rgba(37, 211, 102, 0.1);
+  color: var(--wa-green-dark);
+}
+
+body.theme-light .form-input,
+body.theme-light .form-select,
+body.theme-light .form-textarea {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+body.theme-light .form-input:focus,
+body.theme-light .form-select:focus,
+body.theme-light .form-textarea:focus {
+  background: #ffffff !important;
+  border-color: #7c3aed !important;
+}
+
+body.theme-light .btn-secondary {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+body.theme-light .btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+body.theme-light .canvas-root {
+  background-color: #f1f5f9;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1.2px, transparent 1.2px);
+}
+
+body.theme-light .flow-node {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.14);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+}
+
+body.theme-light .flow-node .node-body {
+  color: #334155;
+}
+
+body.theme-light .table-th,
+body.theme-light th {
+  background: #f8fafc !important;
+  color: #64748b !important;
+}
+
+body.theme-light .table-td,
+body.theme-light td {
+  border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+  color: #1e293b !important;
+}
+
+/* =========================================================================
+   FUNIL DE CONVERSÃO VISUAL (%)
+   ========================================================================= */
+
+.funnel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.funnel-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.funnel-step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.funnel-bar-bg {
+  width: 100%;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+body.theme-light .funnel-bar-bg {
+  background: #e2e8f0;
+}
+
+.funnel-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================================================================
+   MODAL DE PIXEL E INTEGRAÇÃO
+   ========================================================================= */
+
+.input-with-var {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-var input,
+.input-with-var textarea {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.btn-insert-var {
+  position: absolute;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c4b5fd;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-insert-var:hover {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.nav-tabs-custom {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 18px;
+  gap: 8px;
+}
+
+.nav-tab-custom-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-tab-custom-btn:hover {
+  color: #fff;
+}
+
+.nav-tab-custom-btn.active {
+  color: #a855f7;
+  border-bottom-color: #a855f7;
+}
+
+body.theme-light .nav-tab-custom-btn:hover {
+  color: #0f172a;
+}
+body.theme-light .nav-tab-custom-btn.active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+}
+
+/* =========================================================================
+   NÓS CUSTOMIZADOS DO CANVAS (SCREENSHOTS 1, 2, 3, 4, 5)
+   ========================================================================= */
+
+.node-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+.node-header-actions span {
+  cursor: pointer;
+  font-size: 12px;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.node-header-actions span:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Nó Pixel (Dourado/Amarelo) */
+.flow-node.node-pixel {
+  border-color: rgba(217, 119, 6, 0.5);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 12px rgba(217, 119, 6, 0.15);
+}
+
+.flow-node.node-pixel:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.3);
+}
+
+.flow-node.node-pixel .node-header {
+  background: #b45309;
+}
+
+.pixel-node-inner {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-top: 6px;
+}
+
+body.theme-light .pixel-node-inner {
+  background: #fefce8;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+/* Nó Integração (Azul) */
+.flow-node.node-integration {
+  border-color: rgba(37, 99, 235, 0.5);
+}
+
+.flow-node.node-integration:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.3);
+}
+
+.integration-url-pill {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 10px;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+body.theme-light .integration-url-pill {
+  background: #eff6ff;
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #1e40af;
+}
+
+/* Portas Customizadas de Saída da Integração */
+.port-success {
+  background: #10b981 !important;
+  box-shadow: 0 0 8px #10b981 !important;
+}
+
+.port-error {
+  background: #ef4444 !important;
+  box-shadow: 0 0 8px #ef4444 !important;
+}
+
+.btn-var-mini {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-var-mini:hover {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
+body.theme-light .btn-var-mini {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #475569;
+}
+
+/* Modais Específicos das Telas de Edição */
+.modal-pixel-card,
+.modal-integration-card {
+  width: 100%;
+  max-width: 580px;
+  background: #151c2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+  padding: 24px;
+  color: #f1f5f9;
+  animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.theme-light .modal-pixel-card,
+body.theme-light .modal-integration-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header-icon-square {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
 

@@ -86,5 +86,58 @@ module.exports = {
 
     writeJson('chats.json', chats);
     return { chat: chats[phone], newMessage: msg };
+  },
+
+  getPixels: () => readJson('pixels.json', []),
+  savePixels: (data) => writeJson('pixels.json', data),
+  addPixel: (pixelData) => {
+    const pixels = readJson('pixels.json', []);
+    const newPixel = {
+      id: pixelData.id || 'pix_' + Date.now(),
+      createdAt: new Date().toISOString(),
+      ...pixelData
+    };
+    const idx = pixels.findIndex(p => p.id === newPixel.id || p.pixelId === newPixel.pixelId);
+    if (idx >= 0) {
+      pixels[idx] = { ...pixels[idx], ...newPixel };
+    } else {
+      pixels.push(newPixel);
+    }
+    writeJson('pixels.json', pixels);
+    return newPixel;
+  },
+  deletePixel: (id) => {
+    const pixels = readJson('pixels.json', []);
+    const filtered = pixels.filter(p => p.id !== id && p.pixelId !== id);
+    writeJson('pixels.json', filtered);
+    return true;
+  },
+
+  getPixelLogs: () => readJson('pixel_logs.json', []),
+  addPixelLog: (logData) => {
+    const logs = readJson('pixel_logs.json', []);
+    const log = {
+      id: 'log_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      timestamp: new Date().toISOString(),
+      ...logData
+    };
+    logs.unshift(log);
+    if (logs.length > 200) logs.length = 200; // Limite de 200 registros recentes
+    writeJson('pixel_logs.json', logs);
+    return log;
+  },
+
+  getSales: () => readJson('sales.json', []),
+  saveSales: (data) => writeJson('sales.json', data),
+  addSale: (saleData) => {
+    const sales = readJson('sales.json', []);
+    const sale = {
+      id: saleData.id || 'sale_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      timestamp: new Date().toISOString(),
+      ...saleData
+    };
+    sales.unshift(sale);
+    writeJson('sales.json', sales);
+    return sale;
   }
 };

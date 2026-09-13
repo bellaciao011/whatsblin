@@ -41,6 +41,7 @@ app.use((req, res, next) => {
   // - /api/generate-proof (utilizada pela Leona síncrona para gerar as provas)
   if (
     req.path.startsWith('/api/auth/') ||
+    req.path.startsWith('/api/webhooks/') ||
     req.path.startsWith('/api/generate-proof') ||
     req.path.startsWith('/api/gerar-foto') ||
     req.path.startsWith('/generate-proof') ||

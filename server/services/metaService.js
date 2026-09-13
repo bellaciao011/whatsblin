@@ -223,42 +223,134 @@ async function validateAndFetchMetaDetails(accessToken) {
 }
 
 /**
- * Dispara evento oficial para a API de Conversões do Facebook (CAPI / Pixel)
+ * Normaliza telefone para formato internacional E.164 (somente dígitos, sem +)
  */
-async function sendPixelConversion(pixelId, accessToken, eventName, leadPhone, customData = {}) {
+function normalizePhoneE164(phone) {
+  if (!phone) return '';
+  let digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 10 || digits.length === 11) {
+    digits = '55' + digits;
+  }
+  return digits;
+}
+
+/**
+ * Dispara evento oficial para a API de Conversões do Facebook (CAPI / Pixel) via WhatsApp Business Messaging
+ */
+async function sendPixelConversion(pixelId, accessToken, eventName, leadPhone, options = {}) {
+  const db = require('../storage/db');
+  
   if (!pixelId || !accessToken) {
-    console.warn('[Meta CAPI] Pixel ID ou Access Token ausentes. Evento simulado:', eventName);
-    return { simulated: true, eventName, leadPhone };
+    const simMsg = '[Meta CAPI] Pixel ID ou Access Token ausentes. Evento registrado em modo simulação.';
+    console.warn(simMsg, eventName);
+    const simLog = db.addPixelLog({
+      pixelId: pixelId || 'simulado',
+      eventName,
+      phone: leadPhone,
+      status: 'simulado',
+      message: 'Token ou Pixel ID não configurados',
+      value: options.value || 0
+    });
+    return { success: true, simulated: true, eventName, leadPhone, logId: simLog.id };
   }
 
-  const cleanPhone = (leadPhone || '').replace(/\D/g, '');
+  const cleanPhone = normalizePhoneE164(leadPhone);
   const hashedPhone = cleanPhone ? hashSha256(cleanPhone) : undefined;
+  const eventId = options.eventId || `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  const payload = {
-    data: [
-      {
-        event_name: eventName,
-        event_time: Math.floor(Date.now() / 1000),
-        action_source: 'chat',
-        user_data: {
-          ph: hashedPhone ? [hashedPhone] : undefined
-        },
-        custom_data: {
-          currency: customData.currency || 'BRL',
-          value: customData.value || 0,
-          content_name: customData.content_name || 'Mavrol WhatsApp Flow',
-          ...customData
-        }
-      }
-    ]
+  const userData = {
+    ph: hashedPhone ? [hashedPhone] : []
   };
 
-  const url = `${GRAPH_API_BASE}/${pixelId}/events`;
-  const res = await axios.post(url, payload, {
-    params: { access_token: accessToken }
-  });
+  if (options.pageId) {
+    userData.page_id = String(options.pageId).trim();
+  }
+  if (options.ctwaClid) {
+    userData.ctwa_clid = String(options.ctwaClid).trim();
+  }
 
-  return res.data;
+  const customData = {
+    currency: options.currency || 'BRL',
+    value: Number(options.value) || 0,
+    content_name: options.contentName || 'Funil WhatsApp Oficial'
+  };
+
+  const eventPayload = {
+    event_name: eventName || 'Purchase',
+    event_time: Math.floor(Date.now() / 1000),
+    action_source: 'business_messaging',
+    messaging_channel: 'whatsapp',
+    user_data: userData,
+    custom_data: customData,
+    event_id: eventId
+  };
+
+  const requestBody = {
+    data: [eventPayload]
+  };
+
+  if (options.testEventCode) {
+    requestBody.test_event_code = String(options.testEventCode).trim();
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${pixelId}/events`;
+
+  try {
+    const res = await axios.post(url, requestBody, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    console.log(`[Meta CAPI] ✓ Evento "${eventName}" enviado para o Pixel ${pixelId}. Eventos recebidos: ${res.data.events_received}`);
+
+    const log = db.addPixelLog({
+      pixelId,
+      pixelName: options.pixelName || 'Pixel',
+      eventName,
+      phone: cleanPhone,
+      pageId: options.pageId || null,
+      value: customData.value,
+      currency: customData.currency,
+      status: 'sucesso',
+      eventsReceived: res.data.events_received,
+      fbTraceId: res.data.fbtrace_id,
+      testEventCode: options.testEventCode || null
+    });
+
+    return {
+      success: true,
+      eventsReceived: res.data.events_received,
+      fbTraceId: res.data.fbtrace_id,
+      logId: log.id,
+      data: res.data
+    };
+  } catch (err) {
+    const errorDetail = err.response?.data?.error?.message || err.message;
+    console.error(`[Meta CAPI Error] Falha ao disparar evento "${eventName}":`, errorDetail);
+
+    const log = db.addPixelLog({
+      pixelId,
+      pixelName: options.pixelName || 'Pixel',
+      eventName,
+      phone: cleanPhone,
+      pageId: options.pageId || null,
+      value: customData.value,
+      currency: customData.currency,
+      status: 'erro',
+      error: errorDetail,
+      responseCode: err.response?.status || 500
+    });
+
+    return {
+      success: false,
+      error: errorDetail,
+      status: err.response?.status || 500,
+      logId: log.id
+    };
+  }
 }
 
 /**
@@ -336,6 +428,8 @@ module.exports = {
   sendAudioMessage,
   validateAndFetchMetaDetails,
   sendPixelConversion,
+  normalizePhoneE164,
+  hashSha256,
   exchangeCodeForToken,
   getPhoneNumberDetails,
   subscribeAppToWaba,
