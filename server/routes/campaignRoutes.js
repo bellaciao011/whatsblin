@@ -8,6 +8,46 @@ const db = require('../storage/db');
  */
 router.get('/:slug', (req, res) => {
   try {
+    // 1. Verificação de Host Header (Multi-Domain Routing Seguro)
+    const rawHost = req.headers.host || '';
+    const cleanHost = rawHost.split(':')[0].toLowerCase().trim();
+
+    // Permite domínios do sistema (localhost, IPs locais, domínios padrão do Railway)
+    const isSystemHost = cleanHost === 'localhost' || 
+                         cleanHost === '127.0.0.1' || 
+                         cleanHost.endsWith('.railway.app') || 
+                         cleanHost.endsWith('.up.railway.app');
+
+    let customDomainRecord = null;
+    if (!isSystemHost) {
+      customDomainRecord = db.getCustomDomainByHostname(cleanHost);
+      // Se não for um host do sistema e não estiver cadastrado como ativo, rejeita com 404 seguro
+      if (!customDomainRecord || !customDomainRecord.ativo || customDomainRecord.status !== 'ativo') {
+        console.warn(`[Campaign Security] ⛔ Acesso negado via Host não autorizado ou inativo: "${cleanHost}" (URL: ${req.originalUrl})`);
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="utf-8">
+            <title>404 - Domínio Não Autorizado</title>
+            <style>
+              body { background: #0a0a0f; color: #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+              .box { text-align: center; max-width: 480px; padding: 32px; background: #12121a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+              h1 { color: #f87171; font-size: 24px; margin: 0 0 8px; }
+              p { font-size: 14px; color: #94a3b8; line-height: 1.5; margin: 0; }
+            </style>
+          </head>
+          <body>
+            <div class="box">
+              <h1>404 - Domínio Não Autorizado</h1>
+              <p>Este domínio não está ativo ou não foi registrado para esta campanha.</p>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+    }
+
     const slug = req.params.slug;
     const campaigns = db.getTrafficCampaigns();
     let campaign = campaigns.find(c => c.slug === slug || c.id === slug);
@@ -15,10 +55,10 @@ router.get('/:slug', (req, res) => {
     // Se a campanha não existir explicitamente, cria uma sob demanda para nunca perder tráfego
     if (!campaign) {
       campaign = db.addTrafficCampaign({
-        nome: `Campanha TikTok (${slug})`,
+        nome: `Campanha (${slug})`,
         slug: slug,
         url_destino: 'https://minhapressel.com',
-        mensagem_template: 'Oii vim pelo TikTok (código {codigo})'
+        mensagem_template: 'Oii vim pelo anúncio (código {codigo})'
       });
     }
 
@@ -62,6 +102,9 @@ router.get('/:slug', (req, res) => {
     db.addTrafficAttribution({
       codigo,
       platform,
+      host: cleanHost,
+      dominio_customizado_id: customDomainRecord?.id || null,
+      dominio_customizado: customDomainRecord?.dominio || null,
       ttclid,
       fbclid,
       ttp,

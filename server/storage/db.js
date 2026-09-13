@@ -324,5 +324,77 @@ module.exports = {
     if (logs.length > 300) logs.length = 300;
     writeJson('tiktok_logs.json', logs);
     return log;
+  },
+
+  // =========================================================================
+  // DOMÍNIOS CUSTOMIZADOS (RAILWAY API)
+  // =========================================================================
+  getCustomDomains: () => readJson('dominios_customizados.json', []),
+  saveCustomDomains: (data) => writeJson('dominios_customizados.json', data),
+
+  getCustomDomainById: (id) => {
+    const domains = readJson('dominios_customizados.json', []);
+    return domains.find(d => d.id === id || d.railway_domain_id === id) || null;
+  },
+
+  getCustomDomainByHostname: (hostname) => {
+    if (!hostname) return null;
+    const cleanHost = String(hostname).toLowerCase().trim().split(':')[0];
+    const domains = readJson('dominios_customizados.json', []);
+    return domains.find(d => d.dominio.toLowerCase().trim() === cleanHost) || null;
+  },
+
+  addCustomDomain: (data) => {
+    const domains = readJson('dominios_customizados.json', []);
+    const cleanDomain = String(data.dominio || data.domain || '')
+      .toLowerCase()
+      .trim()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '');
+
+    const newRecord = {
+      id: data.id || `dom_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      dominio: cleanDomain,
+      cname_target: data.cname_target || data.cnameTarget || '',
+      railway_domain_id: data.railway_domain_id || data.railwayDomainId || '',
+      status: data.status || 'pendente',
+      ativo: data.ativo !== undefined ? data.ativo : true,
+      account_id: data.account_id || 'acc_admin_default',
+      criado_em: data.criado_em || new Date().toISOString(),
+      atualizado_em: new Date().toISOString()
+    };
+
+    const existingIdx = domains.findIndex(d => d.dominio === cleanDomain);
+    if (existingIdx >= 0) {
+      domains[existingIdx] = { ...domains[existingIdx], ...newRecord, atualizado_em: new Date().toISOString() };
+      writeJson('dominios_customizados.json', domains);
+      return domains[existingIdx];
+    } else {
+      domains.push(newRecord);
+      writeJson('dominios_customizados.json', domains);
+      return newRecord;
+    }
+  },
+
+  updateCustomDomain: (id, updates) => {
+    const domains = readJson('dominios_customizados.json', []);
+    const idx = domains.findIndex(d => d.id === id || d.railway_domain_id === id);
+    if (idx >= 0) {
+      domains[idx] = {
+        ...domains[idx],
+        ...updates,
+        atualizado_em: new Date().toISOString()
+      };
+      writeJson('dominios_customizados.json', domains);
+      return domains[idx];
+    }
+    return null;
+  },
+
+  deleteCustomDomain: (id) => {
+    const domains = readJson('dominios_customizados.json', []);
+    const filtered = domains.filter(d => d.id !== id && d.railway_domain_id !== id);
+    writeJson('dominios_customizados.json', filtered);
+    return true;
   }
 };

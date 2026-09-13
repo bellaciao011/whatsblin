@@ -1023,21 +1023,24 @@ router.get('/traffic/campaigns', (req, res) => {
   const campaigns = db.getTrafficCampaigns();
   const host = req.get('host') || 'localhost:3000';
   const protocol = req.protocol || 'http';
-  const baseUrl = `${protocol}://${host}`;
 
-  const mapped = campaigns.map(c => ({
-    ...c,
-    shortUrl: `${baseUrl}/c/${c.slug}`,
-    targetPresellWithCodeSample: `${c.presell_url}${c.presell_url.includes('?') ? '&' : '?'}codigo=AB79KP`,
-    whatsappSample: `https://wa.me/${(c.whatsapp_number || '').replace(/\D/g, '')}?text=${encodeURIComponent((c.message_template || '').replace('{codigo}', 'AB79KP'))}`
-  }));
+  const mapped = campaigns.map(c => {
+    const domainToUse = c.custom_domain || host;
+    const protoToUse = c.custom_domain ? 'https' : protocol;
+    return {
+      ...c,
+      shortUrl: `${protoToUse}://${domainToUse}/c/${c.slug}`,
+      targetPresellWithCodeSample: `${c.presell_url}${c.presell_url.includes('?') ? '&' : '?'}codigo=AB79KP`,
+      whatsappSample: `https://wa.me/${(c.whatsapp_number || '').replace(/\D/g, '')}?text=${encodeURIComponent((c.message_template || '').replace('{codigo}', 'AB79KP'))}`
+    };
+  });
 
   res.json(mapped);
 });
 
 // Criar nova campanha
 router.post('/traffic/campaigns', (req, res) => {
-  const { name, presell_url, whatsapp_number, message_template, slug } = req.body;
+  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain } = req.body;
 
   if (!name || !presell_url || !whatsapp_number) {
     return res.status(400).json({ error: 'Nome, URL de destino (pressel) e WhatsApp são obrigatórios' });
@@ -1048,18 +1051,20 @@ router.post('/traffic/campaigns', (req, res) => {
     presell_url,
     whatsapp_number,
     message_template,
-    slug
+    slug,
+    custom_domain: custom_domain ? String(custom_domain).trim().toLowerCase() : null
   });
 
   const host = req.get('host') || 'localhost:3000';
   const protocol = req.protocol || 'http';
-  const baseUrl = `${protocol}://${host}`;
+  const domainToUse = campaign.custom_domain || host;
+  const protoToUse = campaign.custom_domain ? 'https' : protocol;
 
   res.json({
     success: true,
     campaign: {
       ...campaign,
-      shortUrl: `${baseUrl}/c/${campaign.slug}`
+      shortUrl: `${protoToUse}://${domainToUse}/c/${campaign.slug}`
     }
   });
 });

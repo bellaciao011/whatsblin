@@ -178,6 +178,11 @@ function handleRoute() {
     item.classList.toggle('active', item.dataset.view === route);
   });
 
+  if (window.domainPollingTimer && route !== 'dominios') {
+    clearInterval(window.domainPollingTimer);
+    window.domainPollingTimer = null;
+  }
+
   const titles = {
     overview: '📊 Dashboard — Visão Geral & Conversão',
     'fluxo-ao-vivo': '🔴 Fluxo ao Vivo — Monitoramento em Tempo Real (Leads & Partículas)',
@@ -189,6 +194,7 @@ function handleRoute() {
     instances: '🔌 Conexões (Meta Cloud API)',
     pixels: '🎯 Pixels & CAPI (Facebook + TikTok)',
     tiktok: '🎵 Atribuição TikTok Ads & Server-side CAPI',
+    dominios: '🌐 Domínios Customizados (Railway API)',
     webhooks: '📡 Webhooks de Entrada',
     settings: '🤖 Inteligência Artificial & Checkouts',
     studio: '🎨 Estúdio de Calibração das Provas',
@@ -209,6 +215,7 @@ function handleRoute() {
   else if (route === 'instances') renderInstances();
   else if (route === 'pixels') renderPixels();
   else if (route === 'tiktok') renderTikTokAttribution();
+  else if (route === 'dominios') renderDomains();
   else if (route === 'webhooks') renderWebhooks();
   else if (route === 'settings') renderSettings();
   else if (route === 'studio') renderStudio();
@@ -3301,11 +3308,17 @@ function switchTikTokTab(tabName) {
 }
 
 /**
- * MODAL: CRIAR LINK DE CAMPANHA
+ * MODAL: CRIAR LINK DE CAMPANHA (COM SELETOR DE DOMÍNIO CUSTOMIZADO)
  */
-function openCreateCampaignModal() {
-  const host = window.location.host || 'localhost:3000';
+async function openCreateCampaignModal() {
+  const defaultHost = window.location.host || 'localhost:3000';
   const proto = window.location.protocol || 'http:';
+
+  let activeDomains = [];
+  try {
+    const res = await fetch('/api/dominios').then(r => r.json());
+    activeDomains = (res.domains || []).filter(d => d.status === 'ativo' && d.ativo !== false);
+  } catch (e) {}
 
   const modalHtml = `
     <div class="node-modal-backdrop" id="campaign-modal">
@@ -3316,8 +3329,8 @@ function openCreateCampaignModal() {
               🔗
             </div>
             <div>
-              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: #fff;">Novo Link de Campanha TikTok</h3>
-              <div style="font-size: 11.5px; color: var(--text-secondary);">Gera a URL curta para usar no anúncio do TikTok Ads</div>
+              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: #fff;">Novo Link de Campanha</h3>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Gera a URL curta para usar no anúncio do TikTok Ads ou Facebook Ads</div>
             </div>
           </div>
           <button class="btn btn-secondary" onclick="document.getElementById('campaign-modal').remove()" style="border: none; background: transparent; font-size: 18px;">✕</button>
@@ -3329,10 +3342,25 @@ function openCreateCampaignModal() {
             <input type="text" class="form-input" id="camp-input-name" placeholder="Ex: Espião WhatsApp - VSL 01" required>
           </div>
 
+          <!-- Seletor de Domínio Customizado (Requisito 8) -->
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin: 0;">Domínio do Link de Anúncio *</label>
+              <a href="#dominios" onclick="document.getElementById('campaign-modal')?.remove();" style="color: #a855f7; font-size: 11px; text-decoration: none; font-weight: 600;">+ Adicionar Domínio Próprio</a>
+            </div>
+            <select class="form-select" id="camp-input-domain" onchange="updateCampSlugPrefix(this.value)" style="border-color: rgba(254, 44, 85, 0.4);">
+              <option value="">Padrão do Sistema (${defaultHost})</option>
+              ${activeDomains.map(d => `
+                <option value="${d.dominio}">🌐 ${d.dominio} (Ativo & SSL Verificado)</option>
+              `).join('')}
+            </select>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Selecione o domínio customizado com o qual este link será veiculado no anúncio.</div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Slug da URL Curta (Opcional)</label>
             <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding-left: 10px;">
-              <span style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${proto}//${host}/c/</span>
+              <span id="camp-slug-prefix" style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${proto}//${defaultHost}/c/</span>
               <input type="text" class="form-input" id="camp-input-slug" placeholder="espiao-vsl-01" style="border: none; background: transparent; font-family: monospace;">
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Deixe vazio para gerar automaticamente com base no nome.</div>
@@ -3351,7 +3379,7 @@ function openCreateCampaignModal() {
 
           <div class="form-group">
             <label class="form-label">Template da Mensagem do WhatsApp *</label>
-            <textarea class="form-textarea" id="camp-input-template" style="min-height: 80px;" required>Oii vim pelo TikTok (código {codigo})</textarea>
+            <textarea class="form-textarea" id="camp-input-template" style="min-height: 80px;" required>Oii vim pelo anúncio (código {codigo})</textarea>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">A tag <code>{codigo}</code> será substituída pelo código único de 6 caracteres na pressel.</div>
           </div>
 
@@ -3367,10 +3395,19 @@ function openCreateCampaignModal() {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
+function updateCampSlugPrefix(selectedDomain) {
+  const prefixSpan = document.getElementById('camp-slug-prefix');
+  if (!prefixSpan) return;
+  const domain = selectedDomain || window.location.host || 'localhost:3000';
+  const proto = selectedDomain ? 'https:' : (window.location.protocol || 'http:');
+  prefixSpan.textContent = `${proto}//${domain}/c/`;
+}
+
 async function handleCreateCampaign(e) {
   e.preventDefault();
   const name = document.getElementById('camp-input-name').value.trim();
   const slug = document.getElementById('camp-input-slug').value.trim();
+  const custom_domain = document.getElementById('camp-input-domain')?.value || '';
   const presell_url = document.getElementById('camp-input-presell').value.trim();
   const whatsapp_number = document.getElementById('camp-input-whatsapp').value.trim();
   const message_template = document.getElementById('camp-input-template').value.trim();
@@ -3379,7 +3416,7 @@ async function handleCreateCampaign(e) {
     const res = await fetch('/api/traffic/campaigns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, presell_url, whatsapp_number, message_template })
+      body: JSON.stringify({ name, slug, presell_url, whatsapp_number, message_template, custom_domain })
     });
     const data = await res.json();
 
@@ -3632,6 +3669,429 @@ function copyToClipboard(text, msg = 'Copiado com sucesso!') {
     showToast(msg, 'success');
   }
 }
+
+/**
+ * =========================================================================
+ * TELA: DOMÍNIOS CUSTOMIZADOS (AUTOMATIZADO VIA RAILWAY API)
+ * =========================================================================
+ */
+async function renderDomains() {
+  const container = document.getElementById('view-container');
+  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando domínios...</div>';
+
+  try {
+    const res = await fetch('/api/dominios').then(r => r.json());
+    const domains = res.domains || [];
+    const railwayConfig = res.railwayConfig || {};
+
+    // Inicia polling se houver algum domínio pendente
+    startDomainPolling(domains);
+
+    const pendingCount = domains.filter(d => d.status === 'pendente').length;
+    const activeCount = domains.filter(d => d.status === 'ativo' && d.ativo !== false).length;
+
+    container.innerHTML = `
+      <div class="domains-view">
+        <!-- Top Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h2 style="font-size: 22px; font-weight: 700; font-family: 'Outfit', sans-serif; color: #fff; display: flex; align-items: center; gap: 10px;">
+              🌐 Domínios Customizados (Railway API)
+            </h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+              Use domínios próprios nos anúncios do TikTok/Facebook Ads com provisionamento e SSL automáticos via Railway.
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="openRailwayConfigModal()" style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              ⚙️ Credenciais Railway ${railwayConfig.hasToken ? '🟢' : '🟡'}
+            </button>
+            <button class="btn btn-primary" onclick="document.getElementById('domain-input-field')?.focus()" style="font-size: 13px;">
+              + Adicionar Domínio
+            </button>
+          </div>
+        </div>
+
+        <!-- Alerta de Segurança & Reputação de Domínio (Requisito 10) -->
+        <div class="card" style="padding: 16px; margin-bottom: 24px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px;">
+          <div style="display: flex; gap: 12px; align-items: flex-start;">
+            <span style="font-size: 20px;">⚠️</span>
+            <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
+              <strong style="color: #fbbf24;">Atenção sobre Segurança & Reputação do Domínio:</strong><br>
+              Domínios novos ou com histórico em listas de spam/blacklists sofrem rejeição em anúncios e têm a captura de cookies essenciais (<code>_ttp</code> do TikTok e <code>fbclid</code> do Facebook) bloqueada pelos navegadores.
+              Utilize sempre domínios com boa reputação e DNS configurado corretamente para obter máxima aprovação de criativos e rastreamento server-side.
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Top: Formulário de Cadastro + Instruções DNS -->
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <!-- Formulário -->
+          <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px;">Cadastrar Novo Domínio</h3>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 20px;">
+              Digite o domínio que você comprou avulso (ex: <code>promo123.com</code> ou <code>ir.meudominio.com</code>). O sistema provisionará automaticamente no Railway.
+            </p>
+
+            <form onsubmit="handleCreateDomain(event)">
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Nome do Domínio ou Subdomínio *</label>
+                <div style="display: flex; gap: 10px;">
+                  <input type="text" id="domain-input-field" class="form-input" 
+                    placeholder="ex: promo123.com ou ir.meudominio.com" 
+                    style="flex: 1; font-family: monospace; font-size: 14px; padding: 10px 14px;" required>
+                  <button type="submit" id="btn-submit-domain" class="btn btn-primary" style="font-weight: 700; padding: 10px 22px; white-space: nowrap;">
+                    Adicionar Domínio
+                  </button>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                  Não inclua <code>http://</code> ou <code>/</code>. Aceita domínios raiz ou subdomínios.
+                </div>
+              </div>
+            </form>
+
+            <div style="display: flex; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 12px; color: #cbd5e1;">
+                Domínios Ativos: <strong style="color: #10b981;">${activeCount}</strong>
+              </div>
+              <div style="font-size: 12px; color: #cbd5e1;">
+                Aguardando DNS: <strong style="color: #f59e0b;">${pendingCount}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card de Instruções CNAME -->
+          <div class="card" style="padding: 24px; background: rgba(18, 24, 38, 0.6);">
+            <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>📘</span> Como Apontar no seu DNS
+            </h3>
+            <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.7;">
+              1. Acesse o painel onde você comprou o domínio (Cloudflare, Namecheap, GoDaddy, Hostinger, Registro.br etc).<br>
+              2. Vá na seção de <strong>Gerenciamento de DNS</strong>.<br>
+              3. Crie um novo registro com:<br>
+              &nbsp;&nbsp;• <strong>Tipo:</strong> <code style="color: #06b6d4;">CNAME</code><br>
+              &nbsp;&nbsp;• <strong>Nome (Host):</strong> <code style="color: #a855f7;">subdomínio</code> (ou <code>@</code> para raiz)<br>
+              &nbsp;&nbsp;• <strong>Valor (Target):</strong> O target fornecido no card abaixo.<br>
+              4. O Railway emitirá o certificado SSL automaticamente assim que o DNS propagar!
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Domínios Cadastrados -->
+        <div class="card" style="padding: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <h3 style="font-size: 17px; font-weight: 700; color: #fff; margin: 0;">Domínios Configurados no Sistema</h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+                ${domains.length} domínio(s) cadastrado(s). ${pendingCount > 0 ? '🔄 Verificação automática ativa a cada 30 segundos...' : 'Todos os domínios verificados.'}
+              </p>
+            </div>
+            <button class="btn btn-secondary" onclick="renderDomains()" style="font-size: 12px;">🔄 Atualizar Lista</button>
+          </div>
+
+          ${domains.length > 0 ? `
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              ${domains.map(d => {
+                const isAtivo = d.status === 'ativo' && d.ativo !== false;
+                const isPendente = d.status === 'pendente';
+                const isDesativado = d.ativo === false;
+
+                const sub = d.dominio.split('.').length > 2 ? d.dominio.split('.')[0] : '@';
+
+                return `
+                  <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid ${isAtivo ? 'rgba(16, 185, 129, 0.3)' : (isPendente ? 'rgba(245, 158, 11, 0.3)' : 'rgba(255,255,255,0.06)')}; border-radius: 12px; padding: 20px; box-shadow: ${isAtivo ? '0 0 20px rgba(16, 185, 129, 0.08)' : 'none'};">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                      
+                      <!-- Info Esquerda -->
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                          <span style="font-size: 20px;">🌐</span>
+                          <span style="font-size: 16px; font-weight: 700; color: #fff; font-family: monospace;">${d.dominio}</span>
+                          
+                          ${isAtivo ? `
+                            <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px;">
+                              <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span>
+                              ✅ Ativo e pronto pra uso
+                            </span>
+                          ` : isPendente ? `
+                            <span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px;">
+                              <span class="live-dot-pulse" style="background: #f59e0b; width: 6px; height: 6px;"></span>
+                              Aguardando DNS
+                            </span>
+                          ` : `
+                            <span style="background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 11.5px; padding: 3px 10px; border-radius: 20px;">
+                              ⚪ Desativado / Aposentado
+                            </span>
+                          `}
+                        </div>
+
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">
+                          Cadastrado em: ${new Date(d.criado_em).toLocaleString('pt-BR')} • Railway Domain ID: <code>${d.railway_domain_id || '-'}</code>
+                        </div>
+                      </div>
+
+                      <!-- Ações Direita -->
+                      <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="checkDomainStatusNow('${d.id}')" style="font-size: 12px; padding: 6px 12px;" title="Consultar status imediato no Railway">
+                          ⚡ Verificar Agora
+                        </button>
+                        <button class="btn btn-secondary" onclick="handleToggleDomainActive('${d.id}')" style="font-size: 12px; padding: 6px 12px;" title="Ativar ou desativar">
+                          ${d.ativo ? '⏸️ Desativar' : '▶️ Ativar'}
+                        </button>
+                        <button class="btn btn-secondary" onclick="handleDeleteDomain('${d.id}')" style="font-size: 12px; padding: 6px 12px; color: var(--red);" title="Excluir domínio">
+                          🗑️ Remover
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Box de Apontamento DNS / CNAME Target -->
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                      <div style="font-size: 12.5px; color: #cbd5e1;">
+                        <span style="color: #94a3b8; margin-right: 6px;">Instrução DNS:</span>
+                        Crie CNAME: <strong>Nome:</strong> <code style="color: #a855f7;">${sub}</code> ➔ 
+                        <strong>Valor:</strong> <code style="color: #06b6d4; font-size: 13px;" id="cname-val-${d.id}">${d.cname_target}</code>
+                      </div>
+                      <button class="btn btn-secondary" style="padding: 5px 14px; font-size: 12px; display: flex; align-items: center; gap: 6px;" onclick="copyToClipboard('${d.cname_target}', 'Valor CNAME copiado!')">
+                        📋 Copiar Valor
+                      </button>
+                    </div>
+
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : `
+            <div style="text-align: center; padding: 50px 20px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;">
+              <div style="font-size: 36px; margin-bottom: 12px;">🌐</div>
+              <h4 style="font-size: 15px; color: #fff; margin-bottom: 6px;">Nenhum domínio customizado cadastrado ainda</h4>
+              <p style="font-size: 12.5px; color: var(--text-muted); max-width: 420px; margin: 0 auto 18px auto;">
+                Adicione seu primeiro domínio próprio acima para gerar links de campanhas com sua marca e alta conversão no TikTok e Facebook Ads.
+              </p>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color: #ef4444; padding: 40px; text-align: center;">Erro carregando domínios: ${err.message}</div>`;
+  }
+}
+
+/**
+ * Cadastrar novo domínio via formulário
+ */
+async function handleCreateDomain(e) {
+  e.preventDefault();
+  const input = document.getElementById('domain-input-field');
+  const btn = document.getElementById('btn-submit-domain');
+  const dominio = (input?.value || '').trim();
+
+  if (!dominio) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Criando no Railway...';
+  }
+
+  try {
+    const res = await fetch('/api/dominios/criar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dominio })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Erro ao criar domínio');
+
+    showToast(`✓ Domínio ${dominio} registrado no Railway! Aponte o CNAME para ativar.`, 'success');
+    renderDomains();
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Adicionar Domínio';
+    }
+  }
+}
+
+/**
+ * Consulta status imediato de um domínio
+ */
+async function checkDomainStatusNow(id) {
+  try {
+    showToast('Consultando API do Railway...', 'info');
+    const res = await fetch(`/api/dominios/${id}/status`).then(r => r.json());
+    if (res.status === 'ativo') {
+      showToast(`🎉 Domínio ${res.dominio} verificado e ativo!`, 'success');
+    } else {
+      showToast(`Status atual: Aguardando propagação DNS / Certificado SSL (${res.certificateStatus || 'PENDING'})`, 'info');
+    }
+    renderDomains();
+  } catch (err) {
+    showToast(`Erro ao verificar: ${err.message}`, 'error');
+  }
+}
+
+/**
+ * Alterna ativo / desativado
+ */
+async function handleToggleDomainActive(id) {
+  try {
+    const res = await fetch(`/api/dominios/${id}/toggle-ativo`, { method: 'PATCH' }).then(r => r.json());
+    if (res.success) {
+      showToast(`Domínio ${res.domain.ativo ? 'ativado' : 'desativado'} com sucesso.`);
+      renderDomains();
+    }
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
+/**
+ * Exclui domínio
+ */
+async function handleDeleteDomain(id) {
+  if (!confirm('Deseja realmente remover este domínio do sistema e do Railway?')) return;
+
+  try {
+    const res = await fetch(`/api/dominios/${id}`, { method: 'DELETE' }).then(r => r.json());
+    if (res.success) {
+      showToast('Domínio removido com sucesso.');
+      renderDomains();
+    } else {
+      throw new Error(res.error);
+    }
+  } catch (err) {
+    showToast(`Erro ao remover: ${err.message}`, 'error');
+  }
+}
+
+/**
+ * Polling automático a cada 30s para domínios pendentes
+ */
+function startDomainPolling(domains) {
+  if (window.domainPollingTimer) {
+    clearInterval(window.domainPollingTimer);
+    window.domainPollingTimer = null;
+  }
+
+  const pendingDomains = domains.filter(d => d.status === 'pendente');
+  if (pendingDomains.length === 0) return;
+
+  console.log(`[Domain Polling] Iniciando polling para ${pendingDomains.length} domínio(s) pendente(s)...`);
+
+  window.domainPollingTimer = setInterval(async () => {
+    // Se saiu da tela de domínios, para o timer
+    if (state.currentView !== 'dominios') {
+      clearInterval(window.domainPollingTimer);
+      window.domainPollingTimer = null;
+      return;
+    }
+
+    let changed = false;
+    for (const d of pendingDomains) {
+      try {
+        const res = await fetch(`/api/dominios/${d.id}/status`).then(r => r.json());
+        if (res.status === 'ativo') {
+          changed = true;
+          showToast(`🎉 Domínio ${d.dominio} foi verificado e agora está ATIVO!`, 'success');
+        }
+      } catch (e) {}
+    }
+
+    if (changed) {
+      renderDomains();
+    }
+  }, 30000); // 30 segundos
+}
+
+/**
+ * Modal para configurar ou verificar credenciais do Railway
+ */
+async function openRailwayConfigModal() {
+  let cfg = {};
+  try {
+    const res = await fetch('/api/dominios').then(r => r.json());
+    cfg = res.railwayConfig || {};
+  } catch (e) {}
+
+  const modalHtml = `
+    <div class="node-modal-backdrop" id="railway-config-modal">
+      <div class="card" style="width: 540px; max-width: 96%; background: #111827; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.8);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">🚂</span>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 700; color: #fff; margin: 0;">Credenciais da API do Railway</h3>
+              <p style="font-size: 11.5px; color: var(--text-secondary); margin: 2px 0 0 0;">Necessárias para provisionar domínios e emitir SSL automaticamente</p>
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="document.getElementById('railway-config-modal').remove()" style="border: none; background: transparent; font-size: 18px;">✕</button>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 12px; margin-bottom: 18px; font-size: 12px; color: #cbd5e1; line-height: 1.5;">
+          💡 <strong>Dica Railway:</strong> Em produção no Railway, <code>RAILWAY_PROJECT_ID</code>, <code>RAILWAY_ENVIRONMENT_ID</code> e <code>RAILWAY_SERVICE_ID</code> são injetados automaticamente. Você só precisa gerar o <strong>API Token</strong> em: <em>Account Settings ➔ Tokens</em> no Railway.
+        </div>
+
+        <form onsubmit="handleSaveRailwayConfig(event)">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label">Railway API Token (RAILWAY_API_TOKEN) *</label>
+            <input type="password" id="railway-input-token" class="form-input" placeholder="ry_api_••••••••••••••••" style="font-family: monospace;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label">Project ID (Opcional se rodando no Railway)</label>
+            <input type="text" id="railway-input-project" class="form-input" placeholder="Ex: prj_xxxx ou UUID" style="font-family: monospace;">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Environment ID</label>
+              <input type="text" id="railway-input-env" class="form-input" placeholder="UUID do ambiente" style="font-family: monospace;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Service ID</label>
+              <input type="text" id="railway-input-service" class="form-input" placeholder="UUID do serviço" style="font-family: monospace;">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('railway-config-modal').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; font-weight: 700;">Salvar Credenciais</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleSaveRailwayConfig(e) {
+  e.preventDefault();
+  const apiToken = document.getElementById('railway-input-token')?.value || '';
+  const projectId = document.getElementById('railway-input-project')?.value || '';
+  const environmentId = document.getElementById('railway-input-env')?.value || '';
+  const serviceId = document.getElementById('railway-input-service')?.value || '';
+
+  try {
+    const res = await fetch('/api/dominios/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiToken, projectId, environmentId, serviceId })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('railway-config-modal')?.remove();
+    showToast('✓ Credenciais do Railway salvas com sucesso!', 'success');
+    renderDomains();
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
 
 
 

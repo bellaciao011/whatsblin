@@ -7,6 +7,7 @@ const authService = require('./services/authService');
 const webhookRoutes = require('./routes/webhook');
 const apiRoutes = require('./routes/api');
 const campaignRoutes = require('./routes/campaignRoutes');
+const domainRoutes = require('./routes/domainRoutes');
 
 const app = express();
 
@@ -80,6 +81,7 @@ app.use((req, res, next) => {
 
 // 3. ROTAS PROTEGIDAS (DISPONÍVEIS APENAS APÓS LOGIN)
 app.use('/api', apiRoutes);
+app.use('/api/dominios', domainRoutes);
 
 // Servir frontend do dashboard e scripts protegidos
 app.use(express.static(path.join(__dirname, '../public')));
