@@ -8,5 +8,9 @@
   "auth": {
     "username": "admin",
     "password": "admin123"
+  },
+  "facebook": {
+    "appId": "1388636936143540",
+    "appSecret": "685e2fbf3c2abc844e99ba24b039c511"
   }
 }
