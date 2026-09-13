@@ -1154,6 +1154,31 @@ body {
   background: #a855f7;
   box-shadow: 0 0 8px #a855f7;
 }
+.node-port.port-positive,
+.node-port.port-success {
+  background: #10b981 !important;
+  box-shadow: 0 0 8px #10b981 !important;
+}
+.node-port.port-positive:hover,
+.node-port.port-success:hover {
+  box-shadow: 0 0 14px #10b981 !important;
+}
+.node-port.port-doubt {
+  background: #f59e0b !important;
+  box-shadow: 0 0 8px #f59e0b !important;
+}
+.node-port.port-doubt:hover {
+  box-shadow: 0 0 14px #f59e0b !important;
+}
+.node-port.port-negative,
+.node-port.port-error {
+  background: #ef4444 !important;
+  box-shadow: 0 0 8px #ef4444 !important;
+}
+.node-port.port-negative:hover,
+.node-port.port-error:hover {
+  box-shadow: 0 0 14px #ef4444 !important;
+}
 
 /* Mini-map */
 .minimap {

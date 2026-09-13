@@ -378,6 +378,53 @@ const FlowBuilder = {
       `;
     }
 
+    if (node.type === 'condition') {
+      const ruleText = node.data?.rule || 'Classificar resposta do lead';
+      return `
+        <div class="flow-node node-condition" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px; min-height: 125px;">
+          <div class="node-header purple" style="background: linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>${node.icon || '🔀'}</span>
+              <span style="font-weight: 700;">${node.label || 'Condicional'}</span>
+            </div>
+            <div class="node-header-actions">
+              <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.duplicateNode('${node.id}')" title="Duplicar">📋</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.deleteNode('${node.id}')" title="Excluir">🗑️</span>
+            </div>
+          </div>
+          <div class="node-body" style="padding: 8px 10px 10px 10px; position: relative;">
+            <div style="font-size: 10px; color: #a78bfa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">
+              Rotas Inteligentes:
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 7px; font-size: 11px; padding-right: 14px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #6ee7b7; font-size: 10.5px; font-weight: 600;">🟢 Positiva</span>
+                <span style="font-size: 9.5px; color: #6ee7b7;">cabo verde ➔</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #fde047; font-size: 10.5px; font-weight: 600;">🟡 Dúvida</span>
+                <span style="font-size: 9.5px; color: #fbbf24;">cabo laranja ➔</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #fca5a5; font-size: 10.5px; font-weight: 600;">🔴 Negativa</span>
+                <span style="font-size: 9.5px; color: #f87171;">cabo vermelho ➔</span>
+              </div>
+            </div>
+            
+            <div style="margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 9.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${ruleText}">
+              Regra: ${ruleText}
+            </div>
+          </div>
+          <div class="node-port port-in" title="Porta de Entrada (Conectar aqui)"></div>
+          <div class="node-port port-out port-positive" data-port="positive" style="top: 42px; right: -7px;" title="🟢 Rota Positiva: Puxe o cabo verde para o bloco de resposta positiva"></div>
+          <div class="node-port port-out port-doubt" data-port="doubt" style="top: 68px; right: -7px;" title="🟡 Rota Dúvida: Puxe o cabo laranja para o bloco de dúvidas"></div>
+          <div class="node-port port-out port-negative" data-port="negative" style="top: 94px; right: -7px;" title="🔴 Rota Negativa: Puxe o cabo vermelho para o bloco de recusa/reforço"></div>
+        </div>
+      `;
+    }
+
     let summaryText = 'Configuração ativa';
     if (node.data) {
       if (node.data.text) summaryText = node.data.text;
@@ -421,7 +468,17 @@ const FlowBuilder = {
   bindSingleNode(nodeEl) {
     // Clique simples abre o modal (se não tiver sido arrastado e se não estiver conectando cabo)
     nodeEl.addEventListener('click', (e) => {
-      if (this.hasDraggedNode || this.isConnecting) {
+      if (this.isConnecting) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.target.classList.contains('port-in') && this.connectFromNodeId !== nodeEl.id) {
+          this.finishConnecting(nodeEl.id);
+        } else {
+          this.cancelConnecting();
+        }
+        return;
+      }
+      if (this.hasDraggedNode) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -433,6 +490,11 @@ const FlowBuilder = {
     // Mousedown para início de arraste do nó
     nodeEl.addEventListener('mousedown', (e) => {
       if (e.button !== 0 || e.target.classList.contains('node-port') || e.target.closest('.node-header-actions')) return;
+
+      if (this.isConnecting) {
+        this.cancelConnecting();
+        return;
+      }
 
       this.isDraggingNode = true;
       this.draggedNode = nodeEl;
@@ -446,12 +508,16 @@ const FlowBuilder = {
       e.stopPropagation();
     });
 
-    // Portas de saída (out / success / error): Inicia conexão manual de cabo
+    // Portas de saída (out / success / error / positive / doubt / negative): Inicia conexão manual de cabo
     const portsOut = nodeEl.querySelectorAll('.port-out');
     portsOut.forEach(portOut => {
       portOut.addEventListener('click', (e) => {
         e.stopPropagation();
         const portType = portOut.dataset.port || 'default';
+        if (this.isConnecting) {
+          this.cancelConnecting();
+          return;
+        }
         this.startConnecting(nodeEl.id, e, portType);
       });
     });
@@ -463,9 +529,26 @@ const FlowBuilder = {
         e.stopPropagation();
         if (this.isConnecting && this.connectFromNodeId && this.connectFromNodeId !== nodeEl.id) {
           this.finishConnecting(nodeEl.id);
+        } else if (this.isConnecting) {
+          this.cancelConnecting();
         }
       });
     }
+  },
+
+  cancelConnecting() {
+    if (!this.isConnecting) return;
+    this.isConnecting = false;
+    this.connectFromNodeId = null;
+    this.connectFromPortType = null;
+    this.connectStartPos = null;
+    this.currentMousePos = null;
+    this.drawConnections();
+
+    const banner = document.getElementById('connecting-guide-banner');
+    if (banner) banner.remove();
+
+    showToast('Ligação de cabo cancelada');
   },
 
   startConnecting(fromNodeId, e, portType = 'default') {
@@ -473,39 +556,81 @@ const FlowBuilder = {
     this.connectFromNodeId = fromNodeId;
     this.connectFromPortType = portType;
     const node = this.currentFlow.nodes.find(n => n.id === fromNodeId);
+    if (!node) return;
+
     let offsetY = 40;
-    if (portType === 'success') offsetY = 48;
-    else if (portType === 'error') offsetY = 72;
+    let portName = 'Saída';
+    let portColor = '#a855f7';
+
+    if (node.type === 'condition') {
+      if (portType === 'positive') {
+        offsetY = 42;
+        portName = '🟢 Resposta Positiva (Verde)';
+        portColor = '#10b981';
+      } else if (portType === 'doubt') {
+        offsetY = 68;
+        portName = '🟡 Dúvida / Sigilo (Laranja)';
+        portColor = '#f59e0b';
+      } else if (portType === 'negative') {
+        offsetY = 94;
+        portName = '🔴 Negativa / Objeção (Vermelho)';
+        portColor = '#ef4444';
+      }
+    } else if (portType === 'success') {
+      offsetY = 48;
+      portName = '✅ Sucesso (Verde)';
+      portColor = '#10b981';
+    } else if (portType === 'error') {
+      offsetY = 72;
+      portName = '❌ Erro (Vermelho)';
+      portColor = '#ef4444';
+    }
+
     this.connectStartPos = { x: node.x + 210, y: node.y + offsetY };
-    showToast(`Cabo iniciado (${portType === 'error' ? 'Erro' : (portType === 'success' ? 'Sucesso' : 'Saída')})! Clique na porta azul do bloco de destino.`, 'info');
+
+    // Banner flutuante no topo do canvas com botão Cancelar
+    const canvasRoot = document.getElementById('canvas-root');
+    document.getElementById('connecting-guide-banner')?.remove();
+    if (canvasRoot) {
+      const bannerHtml = `
+        <div id="connecting-guide-banner" style="position: absolute; top: 72px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(17, 14, 46, 0.95); border: 1.5px solid ${portColor}; box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px ${portColor}44; border-radius: 30px; padding: 7px 18px; display: flex; align-items: center; gap: 12px; color: #fff; font-size: 12.5px;">
+          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${portColor}; box-shadow: 0 0 8px ${portColor};"></span>
+          <span>Conectando: <strong>${portName}</strong>. Clique na porta azul do destino.</span>
+          <button type="button" onclick="FlowBuilder.cancelConnecting()" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #f87171; padding: 3px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; font-weight: 700;">
+            ✕ Cancelar (ou clique fora)
+          </button>
+        </div>
+      `;
+      canvasRoot.insertAdjacentHTML('beforeend', bannerHtml);
+    }
+
+    showToast(`Cabo (${portName}) ativo! Clique na porta azul do bloco de destino ou clique fora para cancelar.`, 'info');
   },
 
   pendingConnection: null,
   editingEdgeId: null,
 
   finishConnecting(toNodeId) {
+    const banner = document.getElementById('connecting-guide-banner');
+    if (banner) banner.remove();
+
     if (!this.connectFromNodeId || this.connectFromNodeId === toNodeId) {
-      this.isConnecting = false;
-      this.connectFromNodeId = null;
-      this.connectFromPortType = null;
-      this.drawConnections();
+      this.cancelConnecting();
       return;
     }
 
     const fromNode = this.currentFlow.nodes.find(n => n.id === this.connectFromNodeId);
     const toNode = this.currentFlow.nodes.find(n => n.id === toNodeId);
     if (!fromNode || !toNode) {
-      this.isConnecting = false;
-      this.connectFromNodeId = null;
-      this.connectFromPortType = null;
-      this.drawConnections();
+      this.cancelConnecting();
       return;
     }
 
+    const fromPort = this.connectFromPortType || 'default';
     this.pendingConnection = {
       fromNodeId: this.connectFromNodeId,
       toNodeId: toNodeId,
-      fromPort: this.connectFromPortType || 'default'
+      fromPort: fromPort
     };
 
     this.isConnecting = false;
@@ -513,15 +638,46 @@ const FlowBuilder = {
     this.connectFromPortType = null;
     this.drawConnections();
 
-    this.openBranchModal(fromNode, toNode);
+    this.openBranchModal(fromNode, toNode, null, fromPort);
   },
 
-  openBranchModal(fromNode, toNode, existingEdge = null) {
+  openBranchModal(fromNode, toNode, existingEdge = null, preselectedPort = null) {
     document.getElementById('branch-select-modal')?.remove();
 
     const isEdit = !!existingEdge;
     const fromLabel = fromNode?.label || 'Bloco de Origem';
     const toLabel = toNode?.label || 'Bloco de Destino';
+    const activePort = preselectedPort || (existingEdge ? existingEdge.fromPort : null);
+
+    let preselectedHintHtml = '';
+    if (activePort === 'doubt') {
+      preselectedHintHtml = `
+        <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 12px; color: #fbbf24; font-weight: 600;">🟡 Conexão iniciada da Rota de Dúvida</span>
+          <button type="button" class="btn btn-primary" style="background: #f59e0b; border-color: #d97706; color: #000; font-weight: 700; padding: 4px 12px; font-size: 11px;" onclick="FlowBuilder.applyBranchSelection('🟡 Dúvida / Como funciona?', '#f59e0b', 'doubt')">
+            Confirmar Cabo Laranja ✓
+          </button>
+        </div>
+      `;
+    } else if (activePort === 'positive') {
+      preselectedHintHtml = `
+        <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 12px; color: #34d399; font-weight: 600;">🟢 Conexão iniciada da Rota Positiva</span>
+          <button type="button" class="btn btn-primary" style="background: #10b981; border-color: #059669; color: #000; font-weight: 700; padding: 4px 12px; font-size: 11px;" onclick="FlowBuilder.applyBranchSelection('🟢 Resposta Positiva', '#10b981', 'positive')">
+            Confirmar Cabo Verde ✓
+          </button>
+        </div>
+      `;
+    } else if (activePort === 'negative') {
+      preselectedHintHtml = `
+        <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 12px; color: #f87171; font-weight: 600;">🔴 Conexão iniciada da Rota Negativa</span>
+          <button type="button" class="btn btn-primary" style="background: #ef4444; border-color: #dc2626; color: #fff; font-weight: 700; padding: 4px 12px; font-size: 11px;" onclick="FlowBuilder.applyBranchSelection('🔴 Resposta Negativa / Objeção', '#ef4444', 'negative')">
+            Confirmar Cabo Vermelho ✓
+          </button>
+        </div>
+      `;
+    }
 
     const modalHtml = `
       <div id="branch-select-modal" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100000; animation: fadeIn 0.2s ease;">
@@ -551,6 +707,8 @@ const FlowBuilder = {
             </div>
           </div>
 
+          ${preselectedHintHtml}
+
           <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
             Escolha um Tipo Rápido (1 Clique):
           </div>
@@ -558,20 +716,29 @@ const FlowBuilder = {
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px;">
             <!-- Opção 1: Positiva (Verde) -->
             <button type="button" onclick="FlowBuilder.applyBranchSelection('🟢 Resposta Positiva', '#10b981', 'positive')" 
-              style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
-              <span style="font-size: 14px;">🟢</span> Resposta Positiva / Sim
+              style="background: ${activePort === 'positive' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.1)'}; border: ${activePort === 'positive' ? '2px solid #10b981' : '1px solid rgba(16, 185, 129, 0.25)'}; color: #34d399; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">🟢</span> Resposta Positiva / Sim
+              </div>
+              ${activePort === 'positive' ? '<span style="font-size: 9.5px; background: #10b981; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: 700;">★ Rota</span>' : ''}
             </button>
 
             <!-- Opção 2: Dúvida (Âmbar / Laranja) -->
             <button type="button" onclick="FlowBuilder.applyBranchSelection('🟡 Dúvida / Como funciona?', '#f59e0b', 'doubt')" 
-              style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: #fbbf24; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
-              <span style="font-size: 14px;">🟡</span> Dúvida / Sigilo
+              style="background: ${activePort === 'doubt' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.1)'}; border: ${activePort === 'doubt' ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.25)'}; color: #fbbf24; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease; ${activePort === 'doubt' ? 'box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);' : ''}">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">🟡</span> Dúvida / Sigilo
+              </div>
+              ${activePort === 'doubt' ? '<span style="font-size: 9.5px; background: #f59e0b; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: 700;">★ Rota</span>' : ''}
             </button>
 
             <!-- Opção 3: Negativa / Objeção (Vermelho) -->
             <button type="button" onclick="FlowBuilder.applyBranchSelection('🔴 Resposta Negativa / Objeção', '#ef4444', 'negative')" 
-              style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
-              <span style="font-size: 14px;">🔴</span> Negativa / Objeção
+              style="background: ${activePort === 'negative' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.1)'}; border: ${activePort === 'negative' ? '2px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.25)'}; color: #f87171; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">🔴</span> Negativa / Objeção
+              </div>
+              ${activePort === 'negative' ? '<span style="font-size: 9.5px; background: #ef4444; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">★ Rota</span>' : ''}
             </button>
 
             <!-- Opção 4: Aguardar Resposta Novamente (Ciano) -->
@@ -753,6 +920,14 @@ const FlowBuilder = {
 
     // 2. PAN (ARRASTAR FUNDO DO CANVAS)
     canvasRoot.addEventListener('mousedown', (e) => {
+      // Se estiver conectando cabo e clicou no fundo do canvas, cancela imediatamente!
+      if (this.isConnecting) {
+        if (!e.target.closest('.port-in')) {
+          this.cancelConnecting();
+          return;
+        }
+      }
+
       if (
         e.target.closest('.flow-node') ||
         e.target.closest('.canvas-topbar') ||
@@ -769,6 +944,21 @@ const FlowBuilder = {
         this.isPanning = true;
         this.panStart = { x: e.clientX - this.panX, y: e.clientY - this.panY };
         canvasRoot.classList.add('panning');
+      }
+    });
+
+    // Clique no canvasRoot fora de port-in cancela conexão
+    canvasRoot.addEventListener('click', (e) => {
+      if (this.isConnecting && !e.target.closest('.port-in')) {
+        this.cancelConnecting();
+      }
+    });
+
+    // Clique com botão direito cancela conexão imediatamente
+    canvasRoot.addEventListener('contextmenu', (e) => {
+      if (this.isConnecting) {
+        e.preventDefault();
+        this.cancelConnecting();
       }
     });
 
@@ -839,10 +1029,7 @@ const FlowBuilder = {
     // Tecla Escape cancela ligação de cabo
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isConnecting) {
-        this.isConnecting = false;
-        this.connectFromNodeId = null;
-        this.drawConnections();
-        showToast('Ligação de cabo cancelada');
+        this.cancelConnecting();
       }
     });
   },
@@ -908,7 +1095,15 @@ const FlowBuilder = {
       if (fromNode && toNode) {
         const x1 = fromNode.x + 210;
         let y1 = fromNode.y + 40;
-        if (fromNode.type === 'integration' || fromNode.type === 'tiktok_pixel') {
+        if (fromNode.type === 'condition') {
+          if (edge.fromPort === 'positive' || (edge.label && (edge.label.includes('Positiva') || edge.label.includes('Sim')))) {
+            y1 = fromNode.y + 42;
+          } else if (edge.fromPort === 'doubt' || (edge.label && (edge.label.includes('Dúvida') || edge.label.includes('Sigilo')))) {
+            y1 = fromNode.y + 68;
+          } else if (edge.fromPort === 'negative' || (edge.label && (edge.label.includes('Negativa') || edge.label.includes('Objeção') || edge.label.includes('Aleatória')))) {
+            y1 = fromNode.y + 94;
+          }
+        } else if (fromNode.type === 'integration' || fromNode.type === 'tiktok_pixel') {
           if (edge.fromPort === 'success' || (edge.label && edge.label.toLowerCase().includes('sucesso'))) {
             y1 = fromNode.y + 48;
           } else if (edge.fromPort === 'error' || (edge.label && edge.label.toLowerCase().includes('erro'))) {
@@ -963,7 +1158,13 @@ const FlowBuilder = {
       const y2 = this.currentMousePos.y;
       const dx = Math.max(40, (x2 - x1) * 0.45);
       const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-      svgHtml += `<path class="canvas-edge temp" d="${pathD}" />`;
+      
+      let tempColor = '#38bdf8';
+      if (this.connectFromPortType === 'doubt') tempColor = '#f59e0b';
+      else if (this.connectFromPortType === 'positive' || this.connectFromPortType === 'success') tempColor = '#10b981';
+      else if (this.connectFromPortType === 'negative' || this.connectFromPortType === 'error') tempColor = '#ef4444';
+
+      svgHtml += `<path class="canvas-edge temp" d="${pathD}" style="stroke: ${tempColor}; filter: drop-shadow(0 0 6px ${tempColor});" />`;
     }
 
     svg.innerHTML = svgHtml;
@@ -1345,8 +1546,10 @@ const FlowBuilder = {
       `;
     }
 
-    // Identifica conexões que saem deste bloco
+    // Identifica conexões que saem deste bloco e outros blocos do fluxo
     const outgoingEdges = (this.currentFlow.edges || []).filter(e => e.from === nodeId);
+    const otherNodes = (this.currentFlow.nodes || []).filter(n => n.id !== nodeId);
+
     const connectionsHtml = outgoingEdges.map(e => {
       const target = this.currentFlow.nodes.find(n => n.id === e.to);
       return `
@@ -1401,13 +1604,56 @@ const FlowBuilder = {
 
               <!-- Rotas de Saída e Conexão de Cabos -->
               <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <label class="form-label" style="margin: 0; font-size: 12.5px;">Cabos e Rotas de Saída:</label>
-                  <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px; background: rgba(124, 58, 237, 0.2); border-color: #7c3aed;" onclick="document.getElementById('node-config-modal').remove(); FlowBuilder.startConnecting('${node.id}')">
-                    + Puxar Novo Cabo
-                  </button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                  <label class="form-label" style="margin: 0; font-size: 12.5px;">Cabos e Rotas de Saída Ativas:</label>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    ${node.type === 'condition' ? `
+                      <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; border-color: #10b981; color: #34d399;" onclick="document.getElementById('node-config-modal').remove(); FlowBuilder.startConnecting('${node.id}', null, 'positive')" title="Puxar cabo verde no Canvas">
+                        🟢 + Cabo Positivo
+                      </button>
+                      <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; border-color: #f59e0b; color: #fbbf24; background: rgba(245, 158, 11, 0.1);" onclick="document.getElementById('node-config-modal').remove(); FlowBuilder.startConnecting('${node.id}', null, 'doubt')" title="Puxar cabo laranja de Dúvida no Canvas">
+                        🟡 + Cabo Dúvida
+                      </button>
+                      <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; border-color: #ef4444; color: #f87171;" onclick="document.getElementById('node-config-modal').remove(); FlowBuilder.startConnecting('${node.id}', null, 'negative')" title="Puxar cabo vermelho no Canvas">
+                        🔴 + Cabo Negativo
+                      </button>
+                    ` : `
+                      <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px; background: rgba(124, 58, 237, 0.2); border-color: #7c3aed;" onclick="document.getElementById('node-config-modal').remove(); FlowBuilder.startConnecting('${node.id}')">
+                        + Puxar Novo Cabo
+                      </button>
+                    `}
+                  </div>
                 </div>
-                ${connectionsHtml || '<p style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px;">Nenhum cabo conectado saindo deste bloco ainda. Clique em "+ Puxar Novo Cabo" para ligar a outro bloco.</p>'}
+                ${connectionsHtml || '<p style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px;">Nenhum cabo conectado saindo deste bloco ainda.</p>'}
+
+                <!-- Conexão Rápida Manual Sem Arrastar para Funis Futuros -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 12px; margin-top: 12px;">
+                  <div style="font-size: 11.5px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>⚡ Ligar Rota Diretamente a Outro Bloco (Sem Arrastar):</span>
+                    <span style="font-size: 10px; color: #a78bfa; font-weight: 600;">Configuração Manual</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 8px; align-items: center;">
+                    <select id="direct-connect-route-type" class="form-select" style="font-size: 11px; padding: 6px 8px;">
+                      ${node.type === 'condition' ? `
+                        <option value="doubt" selected>🟡 Dúvida / Sigilo (Laranja)</option>
+                        <option value="positive">🟢 Resposta Positiva (Verde)</option>
+                        <option value="negative">🔴 Resposta Negativa (Vermelho)</option>
+                      ` : `
+                        <option value="default" selected>🟣 Próximo Passo Padrão</option>
+                        <option value="loop">🔄 Aguardar / Loop</option>
+                      `}
+                    </select>
+                    <select id="direct-connect-target-node" class="form-select" style="font-size: 11px; padding: 6px 8px;">
+                      ${otherNodes.map(n => `<option value="${n.id}">${n.icon || '⚡'} ${n.label}</option>`).join('')}
+                    </select>
+                    <button type="button" class="btn btn-primary" style="padding: 6px 12px; font-size: 11px; font-weight: 700; white-space: nowrap; ${node.type === 'condition' ? 'background: #f59e0b; border-color: #d97706; color: #000;' : ''}" onclick="FlowBuilder.connectNodesDirectly('${node.id}')">
+                      + Conectar
+                    </button>
+                  </div>
+                  <p style="font-size: 10.5px; color: #94a3b8; margin: 6px 0 0 0;">
+                    💡 Dica: Você pode ligar qualquer rota escolhendo o bloco de destino acima e clicando em <strong>"+ Conectar"</strong>, ou simplesmente clicando na bolinha correspondente (🟢, 🟡 ou 🔴) na lateral do cartão no Canvas!
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1448,7 +1694,7 @@ const FlowBuilder = {
                 </div>
               </div>
 
-              <div style="margin-top: 12px; padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+              <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px; color: var(--text-muted); line-height: 1.4;">
                 💡 <strong>Prévia Inteligente:</strong> As variáveis como <code>{primeiro_nome}</code> e <code>{alvo}</code> são simuladas acima como "Carlos" e "11988887777" para você ver exatamente como o lead receberá a mensagem!
               </div>
             </div>
@@ -1468,6 +1714,57 @@ const FlowBuilder = {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     this.updateLivePreview();
+  },
+
+  connectNodesDirectly(fromNodeId) {
+    const typeSelect = document.getElementById('direct-connect-route-type');
+    const targetSelect = document.getElementById('direct-connect-target-node');
+    if (!typeSelect || !targetSelect) return;
+
+    const routeType = typeSelect.value;
+    const toNodeId = targetSelect.value;
+    if (!toNodeId) return;
+
+    let label = 'Próximo passo';
+    let color = '#8b5cf6';
+    if (routeType === 'doubt') {
+      label = '🟡 Dúvida / Como funciona?';
+      color = '#f59e0b';
+    } else if (routeType === 'positive') {
+      label = '🟢 Resposta Positiva';
+      color = '#10b981';
+    } else if (routeType === 'negative') {
+      label = '🔴 Resposta Negativa / Objeção';
+      color = '#ef4444';
+    } else if (routeType === 'loop') {
+      label = '🔄 Aguardar Resposta Novamente';
+      color = '#06b6d4';
+    }
+
+    if (!this.currentFlow.edges) this.currentFlow.edges = [];
+
+    // Se já existir conexão dessa rota entre esses mesmos blocos, avisa
+    const existing = this.currentFlow.edges.find(e => e.from === fromNodeId && e.to === toNodeId && e.fromPort === routeType);
+    if (existing) {
+      showToast('Essa conexão já está ativa!', 'warning');
+      return;
+    }
+
+    this.currentFlow.edges.push({
+      id: `e_${Date.now()}`,
+      from: fromNodeId,
+      to: toNodeId,
+      fromPort: routeType,
+      label: label,
+      color: color
+    });
+
+    this.drawConnections();
+    showToast(`Conexão (${label}) configurada com sucesso!`, 'success');
+
+    // Recarrega o modal para mostrar a nova conexão ativa
+    document.getElementById('node-config-modal')?.remove();
+    this.openNodeModal(fromNodeId);
   },
 
   updateLivePreview() {
