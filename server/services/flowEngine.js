@@ -395,20 +395,60 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
           });
         }
       } else {
-        // Se houver pixel cadastrado e atribuição vinculada ao lead, efetua o disparo automático
-        const ttPixels = db.getTikTokPixels();
-        if (ttPixels && ttPixels.length > 0) {
-          const attribution = db.getTrafficAttributionByPhone(cleanPhone);
-          if (attribution) {
+        // Roteamento inteligente por plataforma de atribuição (Facebook CAPI ou TikTok Events API)
+        const attribution = db.getTrafficAttributionByPhone(cleanPhone);
+        const originPlatform = (attribution?.platform || (attribution?.ttclid ? 'tiktok' : (attribution?.fbclid ? 'facebook' : 'organico'))).toLowerCase();
+
+        if (originPlatform === 'facebook') {
+          const fbPixels = db.getPixels();
+          if (fbPixels && fbPixels.length > 0) {
+            metaService.sendConversionEvent({
+              pixelId: fbPixels[0].pixelId,
+              accessToken: fbPixels[0].accessToken,
+              eventName: 'Purchase',
+              phone: cleanPhone,
+              value: parseFloat(chatData.variables.valor_pago) || 49.90,
+              currency: flowLanguage === 'pt' ? 'BRL' : 'USD',
+              testEventCode: fbPixels[0].testEventCode
+            }).catch(e => console.warn('[FlowEngine] Erro disparo automático Facebook CAPI:', e.message));
+          }
+        } else if (originPlatform === 'tiktok') {
+          const ttPixels = db.getTikTokPixels();
+          if (ttPixels && ttPixels.length > 0) {
             tiktokService.sendTikTokEvent({
               pixelCode: ttPixels[0].pixel_code,
               accessToken: ttPixels[0].access_token,
               eventName: 'CompletePayment',
               phone: cleanPhone,
               attribution,
-              value: chatData.variables.valor_pago || 49.90,
+              value: parseFloat(chatData.variables.valor_pago) || 49.90,
               currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
-            }).catch(e => console.warn('[FlowEngine] Aviso disparo TikTok fallback:', e.message));
+            }).catch(e => console.warn('[FlowEngine] Erro disparo automático TikTok:', e.message));
+          }
+        } else {
+          // Origem mista ou orgânica: dispara nos pixels cadastrados para Advanced Matching
+          const fbPixels = db.getPixels();
+          if (fbPixels && fbPixels.length > 0) {
+            metaService.sendConversionEvent({
+              pixelId: fbPixels[0].pixelId,
+              accessToken: fbPixels[0].accessToken,
+              eventName: 'Purchase',
+              phone: cleanPhone,
+              value: parseFloat(chatData.variables.valor_pago) || 49.90,
+              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
+            }).catch(e => console.warn('[FlowEngine] Fallback Facebook CAPI:', e.message));
+          }
+          const ttPixels = db.getTikTokPixels();
+          if (ttPixels && ttPixels.length > 0) {
+            tiktokService.sendTikTokEvent({
+              pixelCode: ttPixels[0].pixel_code,
+              accessToken: ttPixels[0].access_token,
+              eventName: 'CompletePayment',
+              phone: cleanPhone,
+              attribution: attribution || {},
+              value: parseFloat(chatData.variables.valor_pago) || 49.90,
+              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
+            }).catch(e => console.warn('[FlowEngine] Fallback TikTok Events:', e.message));
           }
         }
       }

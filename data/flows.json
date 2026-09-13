@@ -350,29 +350,41 @@
         "id": "e4",
         "from": "node-condition-phone",
         "to": "node-doubt-welcome",
-        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)"
+        "fromPort": "doubt",
+        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)",
+        "color": "#f59e0b"
       },
       {
         "id": "e5",
         "from": "node-doubt-welcome",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e6",
         "from": "node-condition-phone",
         "to": "node-reinf-phone",
-        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'"
+        "fromPort": "negative",
+        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'",
+        "color": "#ef4444"
       },
       {
         "id": "e7",
         "from": "node-reinf-phone",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e8",
         "from": "node-condition-phone",
         "to": "node-analyzing-msg",
-        "label": "🟢 Resposta Positiva / Número com DDD"
+        "fromPort": "positive",
+        "label": "🟢 Resposta Positiva / Número com DDD",
+        "color": "#10b981"
       },
       {
         "id": "e9",
@@ -864,29 +876,41 @@
         "id": "e4",
         "from": "node-condition-phone",
         "to": "node-doubt-welcome",
-        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)"
+        "fromPort": "doubt",
+        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)",
+        "color": "#f59e0b"
       },
       {
         "id": "e5",
         "from": "node-doubt-welcome",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e6",
         "from": "node-condition-phone",
         "to": "node-reinf-phone",
-        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'"
+        "fromPort": "negative",
+        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'",
+        "color": "#ef4444"
       },
       {
         "id": "e7",
         "from": "node-reinf-phone",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e8",
         "from": "node-condition-phone",
         "to": "node-analyzing-msg",
-        "label": "🟢 Resposta Positiva / Número com DDD"
+        "fromPort": "positive",
+        "label": "🟢 Resposta Positiva / Número com DDD",
+        "color": "#10b981"
       },
       {
         "id": "e9",
@@ -1378,29 +1402,41 @@
         "id": "e4",
         "from": "node-condition-phone",
         "to": "node-doubt-welcome",
-        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)"
+        "fromPort": "doubt",
+        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)",
+        "color": "#f59e0b"
       },
       {
         "id": "e5",
         "from": "node-doubt-welcome",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e6",
         "from": "node-condition-phone",
         "to": "node-reinf-phone",
-        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'"
+        "fromPort": "negative",
+        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'",
+        "color": "#ef4444"
       },
       {
         "id": "e7",
         "from": "node-reinf-phone",
-        "to": "node-wait-reply"
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
       },
       {
         "id": "e8",
         "from": "node-condition-phone",
         "to": "node-analyzing-msg",
-        "label": "🟢 Resposta Positiva / Número com DDD"
+        "fromPort": "positive",
+        "label": "🟢 Resposta Positiva / Número com DDD",
+        "color": "#10b981"
       },
       {
         "id": "e9",

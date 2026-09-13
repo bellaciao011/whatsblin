@@ -267,16 +267,28 @@ const FlowBuilder = {
 
   renderNodeHtml(node) {
     if (node.type === 'pixel') {
-      const pixelName = node.data?.pixelName || (node.data?.pixelId ? `Pixel ${node.data.pixelId}` : 'Nenhum pixel selecionado');
+      const isTikTok = (node.data?.platform === 'tiktok') || (node.data?.pixelName && node.data.pixelName.toLowerCase().includes('tiktok'));
+      const pixelName = node.data?.pixelName || (node.data?.pixelId ? `Pixel ${node.data.pixelId}` : (isTikTok ? 'Pixel TikTok' : 'Pixel Facebook'));
       const eventType = node.data?.eventName || node.data?.tipo_evento || 'Compra';
       const val = node.data?.eventValue || node.data?.valor_item || '{comprovante.valor}';
       const currency = node.data?.currency || 'BRL';
+
+      const logoSvg = isTikTok ? `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="#ffffff" style="vertical-align: middle;"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.89 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.35 0 .68.07.99.19V9.43a6.35 6.35 0 0 0-.99-.08 6.34 6.34 0 1 0 6.33 6.34V8.75a8.28 8.28 0 0 0 4.77 1.48V6.76c-.34-.01-.68-.03-1-.07z"/></svg>
+      ` : `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="#ffffff" style="vertical-align: middle;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      `;
+
+      const headerGrad = isTikTok 
+        ? 'background: linear-gradient(135deg, #fe2c55 0%, #25f4ee 100%); color: #fff;' 
+        : 'background: linear-gradient(135deg, #1877f2 0%, #0d47a1 100%); color: #fff; box-shadow: 0 4px 15px rgba(24, 119, 242, 0.35);';
+
       return `
         <div class="flow-node node-pixel" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
-          <div class="node-header amber">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 14px;">🎯</span>
-              <span>${node.label || 'Pixel'}</span>
+          <div class="node-header" style="${headerGrad}">
+            <div style="display: flex; align-items: center; gap: 7px;">
+              ${logoSvg}
+              <span style="font-weight: 600;">${node.label || (isTikTok ? 'TikTok Pixel' : 'Facebook Pixel')}</span>
             </div>
             <div class="node-header-actions">
               <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
@@ -285,8 +297,8 @@ const FlowBuilder = {
             </div>
           </div>
           <div class="node-body">
-            <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 4px;">Disparar evento no Facebook:</div>
-            <div class="pixel-node-inner">
+            <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 4px;">Disparar evento (${isTikTok ? 'TikTok Events API' : 'Facebook CAPI'}):</div>
+            <div class="pixel-node-inner" style="border-left: 3px solid ${isTikTok ? '#fe2c55' : '#1877f2'};">
               <div style="font-weight: 700; color: #fef08a; font-size: 12px;">${pixelName}</div>
               <div style="color: #cbd5e1; font-size: 10.5px; margin-top: 2px;">Tipo: ${eventType} • Valor: ${val} ${currency}</div>
             </div>
@@ -337,10 +349,10 @@ const FlowBuilder = {
       const currency = node.data?.moeda || node.data?.currency || 'BRL';
       return `
         <div class="flow-node node-tiktok-pixel" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
-          <div class="node-header" style="background: linear-gradient(135deg, #fe2c55, #25f4ee); color: #fff;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 14px;">🎵</span>
-              <span>${node.label || 'Pixel TikTok'}</span>
+          <div class="node-header" style="background: linear-gradient(135deg, #fe2c55 0%, #25f4ee 100%); color: #fff; box-shadow: 0 4px 15px rgba(254, 44, 85, 0.35);">
+            <div style="display: flex; align-items: center; gap: 7px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#ffffff" style="vertical-align: middle;"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.89 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.35 0 .68.07.99.19V9.43a6.35 6.35 0 0 0-.99-.08 6.34 6.34 0 1 0 6.33 6.34V8.75a8.28 8.28 0 0 0 4.77 1.48V6.76c-.34-.01-.68-.03-1-.07z"/></svg>
+              <span style="font-weight: 600;">${node.label || 'Pixel TikTok'}</span>
             </div>
             <div class="node-header-actions">
               <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
@@ -468,34 +480,216 @@ const FlowBuilder = {
     showToast(`Cabo iniciado (${portType === 'error' ? 'Erro' : (portType === 'success' ? 'Sucesso' : 'Saída')})! Clique na porta azul do bloco de destino.`, 'info');
   },
 
+  pendingConnection: null,
+  editingEdgeId: null,
+
   finishConnecting(toNodeId) {
-    if (!this.connectFromNodeId || this.connectFromNodeId === toNodeId) return;
+    if (!this.connectFromNodeId || this.connectFromNodeId === toNodeId) {
+      this.isConnecting = false;
+      this.connectFromNodeId = null;
+      this.connectFromPortType = null;
+      this.drawConnections();
+      return;
+    }
 
     const fromNode = this.currentFlow.nodes.find(n => n.id === this.connectFromNodeId);
     const toNode = this.currentFlow.nodes.find(n => n.id === toNodeId);
+    if (!fromNode || !toNode) {
+      this.isConnecting = false;
+      this.connectFromNodeId = null;
+      this.connectFromPortType = null;
+      this.drawConnections();
+      return;
+    }
 
-    let defaultLabel = 'Próximo passo';
-    if (this.connectFromPortType === 'success') defaultLabel = '🟢 Sucesso';
-    else if (this.connectFromPortType === 'error') defaultLabel = '🔴 Erro';
-    else if (fromNode.type === 'condition') defaultLabel = '🟢 Resposta Positiva';
-    else if (fromNode.type === 'ai') defaultLabel = '✅ Aprovado';
-
-    const branchLabel = prompt(`Conectar "${fromNode.label}" ➔ "${toNode.label}":\nDigite o nome desta ramificação (ex: Sucesso, Erro, Positivo, Negativo):`, defaultLabel);
-
-    if (!this.currentFlow.edges) this.currentFlow.edges = [];
-    this.currentFlow.edges.push({
-      id: `e_${Date.now()}`,
-      from: this.connectFromNodeId,
-      to: toNodeId,
-      fromPort: this.connectFromPortType || 'default',
-      label: branchLabel || defaultLabel
-    });
+    this.pendingConnection = {
+      fromNodeId: this.connectFromNodeId,
+      toNodeId: toNodeId,
+      fromPort: this.connectFromPortType || 'default'
+    };
 
     this.isConnecting = false;
     this.connectFromNodeId = null;
     this.connectFromPortType = null;
     this.drawConnections();
-    showToast(`Conexão criada: ${fromNode.label} ➔ ${toNode.label}!`, 'success');
+
+    this.openBranchModal(fromNode, toNode);
+  },
+
+  openBranchModal(fromNode, toNode, existingEdge = null) {
+    document.getElementById('branch-select-modal')?.remove();
+
+    const isEdit = !!existingEdge;
+    const fromLabel = fromNode?.label || 'Bloco de Origem';
+    const toLabel = toNode?.label || 'Bloco de Destino';
+
+    const modalHtml = `
+      <div id="branch-select-modal" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100000; animation: fadeIn 0.2s ease;">
+        <div style="background: linear-gradient(180deg, #161622 0%, #0d0d14 100%); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; width: 460px; max-width: 92vw; padding: 24px; box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(124, 58, 237, 0.15);">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 20px;">🔌</span>
+              <div>
+                <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin: 0; font-family: 'Outfit', sans-serif;">
+                  ${isEdit ? 'Gerenciar Conexão / Ramificação' : 'Conectar Ramificação'}
+                </h3>
+                <p style="font-size: 11.5px; color: #94a3b8; margin: 2px 0 0 0;">Defina o tipo e a cor desta rota no funil</p>
+              </div>
+            </div>
+            <button type="button" onclick="FlowBuilder.closeBranchModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px;">✕</button>
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 12px; margin-bottom: 18px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px;">
+              <span style="color: #a855f7; font-weight: 600;">De:</span>
+              <span style="color: #f1f5f9; font-weight: 500;">${fromLabel}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-top: 6px;">
+              <span style="color: #06b6d4; font-weight: 600;">Para:</span>
+              <span style="color: #f1f5f9; font-weight: 500;">${toLabel}</span>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+            Escolha um Tipo Rápido (1 Clique):
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px;">
+            <!-- Opção 1: Positiva (Verde) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('🟢 Resposta Positiva', '#10b981', 'positive')" 
+              style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">🟢</span> Resposta Positiva / Sim
+            </button>
+
+            <!-- Opção 2: Dúvida (Âmbar / Laranja) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('🟡 Dúvida / Como funciona?', '#f59e0b', 'doubt')" 
+              style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: #fbbf24; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">🟡</span> Dúvida / Sigilo
+            </button>
+
+            <!-- Opção 3: Negativa / Objeção (Vermelho) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('🔴 Resposta Negativa / Objeção', '#ef4444', 'negative')" 
+              style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">🔴</span> Negativa / Objeção
+            </button>
+
+            <!-- Opção 4: Aguardar Resposta Novamente (Ciano) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('🔄 Aguardar Resposta Novamente', '#06b6d4', 'loop')" 
+              style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.25); color: #22d3ee; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">🔄</span> Aguardar / Loop
+            </button>
+
+            <!-- Opção 5: Próximo Passo Padrão (Roxo) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('Próximo passo', '#8b5cf6', 'default')" 
+              style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); color: #c084fc; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">🟣</span> Próximo Passo
+            </button>
+
+            <!-- Opção 6: Sucesso / API (Esmeralda) -->
+            <button type="button" onclick="FlowBuilder.applyBranchSelection('✅ Sucesso / Aprovado', '#10b981', 'success')" 
+              style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+              <span style="font-size: 14px;">✅</span> Sucesso / API
+            </button>
+          </div>
+
+          <!-- Texto Customizado -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 14px;">
+            <label style="font-size: 11.5px; color: #94a3b8; display: block; margin-bottom: 6px;">Ou digite um rótulo personalizado:</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="branch-modal-custom-input" class="form-input" 
+                value="${existingEdge ? (existingEdge.label || '') : ''}" 
+                placeholder="Ex: Se cliente pedir desconto..." 
+                style="flex: 1; padding: 9px 12px; font-size: 13px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff;">
+              <button type="button" class="btn btn-primary" onclick="FlowBuilder.confirmCustomBranch()" style="padding: 9px 16px; font-size: 13px;">
+                Aplicar
+              </button>
+            </div>
+          </div>
+
+          ${isEdit ? `
+            <div style="margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+              <button type="button" onclick="FlowBuilder.deleteCurrentEdge('${existingEdge.id}')" 
+                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                🗑️ Excluir Este Cabo
+              </button>
+              <button type="button" onclick="FlowBuilder.closeBranchModal()" 
+                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+                Fechar
+              </button>
+            </div>
+          ` : ''}
+
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  },
+
+  closeBranchModal() {
+    document.getElementById('branch-select-modal')?.remove();
+    this.pendingConnection = null;
+    this.editingEdgeId = null;
+  },
+
+  applyBranchSelection(label, color, portType) {
+    if (this.editingEdgeId) {
+      const edge = this.currentFlow.edges.find(e => e.id === this.editingEdgeId);
+      if (edge) {
+        edge.label = label;
+        edge.color = color;
+        edge.fromPort = portType;
+        this.drawConnections();
+        showToast(`Cabo atualizado: "${label}"!`, 'success');
+      }
+      this.closeBranchModal();
+      return;
+    }
+
+    if (this.pendingConnection) {
+      if (!this.currentFlow.edges) this.currentFlow.edges = [];
+      this.currentFlow.edges.push({
+        id: `e_${Date.now()}`,
+        from: this.pendingConnection.fromNodeId,
+        to: this.pendingConnection.toNodeId,
+        fromPort: portType || this.pendingConnection.fromPort,
+        label: label,
+        color: color
+      });
+      this.drawConnections();
+      showToast(`Conexão criada: "${label}"!`, 'success');
+    }
+    this.closeBranchModal();
+  },
+
+  confirmCustomBranch() {
+    const input = document.getElementById('branch-modal-custom-input');
+    const label = (input?.value || '').trim() || 'Próximo passo';
+    let color = '#8b5cf6';
+    let port = 'default';
+    if (label.includes('Positiva') || label.includes('Sim') || label.toLowerCase().includes('sucesso')) {
+      color = '#10b981';
+      port = 'positive';
+    } else if (label.includes('Dúvida') || label.includes('Sigilo')) {
+      color = '#f59e0b';
+      port = 'doubt';
+    } else if (label.includes('Negativa') || label.includes('Não') || label.toLowerCase().includes('erro')) {
+      color = '#ef4444';
+      port = 'negative';
+    } else if (label.includes('Aguardar') || label.includes('Loop')) {
+      color = '#06b6d4';
+      port = 'loop';
+    }
+    this.applyBranchSelection(label, color, port);
+  },
+
+  deleteCurrentEdge(edgeId) {
+    if (!this.currentFlow || !this.currentFlow.edges) return;
+    this.currentFlow.edges = this.currentFlow.edges.filter(e => e.id !== edgeId);
+    this.drawConnections();
+    showToast('Cabo de conexão excluído com sucesso!', 'info');
+    this.closeBranchModal();
   },
 
   duplicateNode(nodeId) {
@@ -526,20 +720,8 @@ const FlowBuilder = {
     const fromNode = this.currentFlow.nodes.find(n => n.id === edge.from);
     const toNode = this.currentFlow.nodes.find(n => n.id === edge.to);
 
-    const action = prompt(`Cabo de Conexão:\nDe: "${fromNode?.label || edge.from}"\nPara: "${toNode?.label || edge.to}"\nRótulo atual: "${edge.label || 'Sem rótulo'}"\n\nDigite:\n1: Alterar nome/rótulo do cabo\n2: Excluir este cabo\n0: Cancelar`, '1');
-
-    if (action === '1') {
-      const newLabel = prompt('Novo nome para este cabo/ramificação:', edge.label || '');
-      if (newLabel !== null) {
-        edge.label = newLabel;
-        this.drawConnections();
-        showToast('Rótulo do cabo atualizado!');
-      }
-    } else if (action === '2') {
-      this.currentFlow.edges = this.currentFlow.edges.filter(e => e.id !== edgeId);
-      this.drawConnections();
-      showToast('Cabo de conexão excluído!');
-    }
+    this.editingEdgeId = edgeId;
+    this.openBranchModal(fromNode, toNode, edge);
   },
 
   initCanvasInteractions() {
@@ -748,11 +930,14 @@ const FlowBuilder = {
         const labelText = edge.label || '';
         const badgeWidth = Math.max(80, labelText.length * 7.5 + 24);
 
-        // Cor de destaque da aresta se tiver rótulo semântico
-        let edgeColor = '#6366f1';
-        if (labelText.includes('Positiva') || labelText.includes('Aprovado') || labelText.toLowerCase().includes('sucesso') || edge.fromPort === 'success') edgeColor = '#10b981';
-        else if (labelText.includes('Dúvida') || labelText.includes('Sigilo')) edgeColor = '#f59e0b';
-        else if (labelText.includes('Negativa') || labelText.includes('Aleatória') || labelText.toLowerCase().includes('erro') || edge.fromPort === 'error') edgeColor = '#ef4444';
+        // Cor de destaque da aresta se tiver rótulo semântico ou cor explícita
+        let edgeColor = edge.color || '#6366f1';
+        if (!edge.color) {
+          if (labelText.includes('Positiva') || labelText.includes('Aprovado') || labelText.toLowerCase().includes('sucesso') || edge.fromPort === 'success' || edge.fromPort === 'positive') edgeColor = '#10b981';
+          else if (labelText.includes('Dúvida') || labelText.includes('Sigilo') || edge.fromPort === 'doubt') edgeColor = '#f59e0b';
+          else if (labelText.includes('Negativa') || labelText.includes('Aleatória') || labelText.toLowerCase().includes('erro') || edge.fromPort === 'error' || edge.fromPort === 'negative') edgeColor = '#ef4444';
+          else if (labelText.includes('Aguardar') || labelText.includes('Loop') || edge.fromPort === 'loop' || edge.fromPort === 'wait') edgeColor = '#06b6d4';
+        }
 
         svgHtml += `
           <g class="canvas-edge-group" id="edge-group-${edge.id}">

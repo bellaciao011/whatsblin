@@ -1142,6 +1142,146 @@ router.get('/traffic/report', (req, res) => {
 
 /**
  * =========================================================================
+ * ENDPOINT DO FLUXO AO VIVO (MONITORAMENTO EM TEMPO REAL)
+ * =========================================================================
+ */
+router.get('/traffic/live-flow', (req, res) => {
+  try {
+    const chats = db.getChats() || {};
+    const attributions = db.getTrafficAttributions() || [];
+    const chatList = Object.values(chats);
+
+    // 1. Mapeamento de Leads Ativos por Node
+    const nodeCounts = {
+      'node-start': 0,
+      'node-welcome': 0,
+      'node-wait-reply': 0,
+      'node-condition-phone': 0,
+      'node-doubt-welcome': 0,
+      'node-reinf-phone': 0,
+      'node-analyzing-msg': 0,
+      'node-delay': 0,
+      'node-api-lookup': 0,
+      'node-photo-branch': 0,
+      'node-proof-template-1': 0,
+      'node-proof-template-2': 0,
+      'node-offer-pix-49': 0,
+      'node-msg-comprovante': 0,
+      'node-wait-reaction': 0,
+      'node-ai-sentiment': 0,
+      'node-upsell-100': 0,
+      'node-wait-upsell-100': 0,
+      'node-ai-objection-100': 0,
+      'node-upsell-200': 0,
+      'node-wait-upsell-200': 0,
+      'node-ai-objection-200': 0,
+      'node-upsell-400': 0,
+      'node-wait-upsell-400': 0,
+      'node-ai-objection-400': 0,
+      'node-access-released': 0
+    };
+
+    chatList.forEach(c => {
+      const state = c.state || 'NOVO';
+      const stage = c.upsellStage || 'stage_49';
+
+      if (state === 'NOVO') nodeCounts['node-welcome']++;
+      else if (state === 'AGUARDANDO_NUMERO') nodeCounts['node-wait-reply']++;
+      else if (state === 'ANALISANDO') nodeCounts['node-delay']++;
+      else if (state === 'OFERTA_ENVIADA' || state === 'NEGOCIACAO') {
+        if (stage === 'stage_49') nodeCounts['node-offer-pix-49']++;
+        else if (stage === 'stage_100') nodeCounts['node-upsell-100']++;
+        else if (stage === 'stage_200') nodeCounts['node-upsell-200']++;
+        else if (stage === 'stage_400') nodeCounts['node-upsell-400']++;
+      } else if (state === 'FINALIZADO') {
+        nodeCounts['node-access-released']++;
+      }
+    });
+
+    // 2. Taxas Horárias e Totais por Plataforma de Origem
+    const oneHourAgo = Date.now() - 3600 * 1000;
+    let ttRecent = 0;
+    let fbRecent = 0;
+    let organicRecent = 0;
+
+    let ttTotal = 0;
+    let fbTotal = 0;
+    let organicTotal = 0;
+
+    attributions.forEach(attr => {
+      const created = new Date(attr.criado_em).getTime();
+      const isLastHour = created >= oneHourAgo;
+      const plat = (attr.platform || (attr.ttclid ? 'tiktok' : (attr.fbclid ? 'facebook' : 'organico'))).toLowerCase();
+
+      if (plat === 'tiktok') {
+        ttTotal++;
+        if (isLastHour) ttRecent++;
+      } else if (plat === 'facebook') {
+        fbTotal++;
+        if (isLastHour) fbRecent++;
+      } else {
+        organicTotal++;
+        if (isLastHour) organicRecent++;
+      }
+    });
+
+    // 3. Monta lista de eventos recentes para o Terminal de Feed ao Vivo
+    const events = [];
+    attributions.slice(0, 30).forEach(attr => {
+      const plat = (attr.platform || (attr.ttclid ? 'tiktok' : (attr.fbclid ? 'facebook' : 'organico'))).toLowerCase();
+      const phoneMasked = attr.telefone_vinculado 
+        ? `+${attr.telefone_vinculado.slice(0, 4)}...${attr.telefone_vinculado.slice(-4)}`
+        : `Clique [${attr.codigo}]`;
+
+      let action = 'Entrou no Link de Campanha';
+      if (attr.venda_confirmada) action = `💰 Comprou R$ ${(parseFloat(attr.venda_valor) || 49.90).toFixed(2)}`;
+      else if (attr.telefone_vinculado) action = 'Entrou no WhatsApp (Boas-Vindas)';
+
+      events.push({
+        id: `ev_${attr.codigo}_${attr.criado_em}`,
+        time: new Date(attr.confirmado_em || attr.vinculado_em || attr.criado_em).toLocaleTimeString('pt-BR'),
+        platform: plat,
+        title: action,
+        phone: phoneMasked,
+        campaign: attr.campanha_nome || 'Campanha Direta'
+      });
+    });
+
+    // 4. Intensidade de Partículas nas Conexões (Cargas de Tráfego)
+    const edgeFlows = {
+      'e1': Math.max(1, Math.min(5, Math.ceil((nodeCounts['node-welcome'] || 1)))),
+      'e2': Math.max(1, Math.min(4, Math.ceil((nodeCounts['node-wait-reply'] || 1)))),
+      'e3': 2,
+      'e8': Math.max(1, Math.min(4, Math.ceil((nodeCounts['node-delay'] || 1)))),
+      'e10': 2,
+      'e11': 2,
+      'e14': 2,
+      'e16': Math.max(1, Math.min(5, Math.ceil((nodeCounts['node-offer-pix-49'] || 1)))),
+      'e19': Math.max(1, Math.min(4, Math.ceil((nodeCounts['node-upsell-100'] || 1)))),
+      'e22': Math.max(1, Math.min(3, Math.ceil((nodeCounts['node-upsell-200'] || 1)))),
+      'e25': Math.max(1, Math.min(3, Math.ceil((nodeCounts['node-upsell-400'] || 1))))
+    };
+
+    res.json({
+      success: true,
+      activeNodes: nodeCounts,
+      totalActiveLeads: chatList.length,
+      platformRates: {
+        tiktok: { lastHour: ttRecent, total: ttTotal },
+        facebook: { lastHour: fbRecent, total: fbTotal },
+        organic: { lastHour: organicRecent, total: organicTotal }
+      },
+      edgeFlows,
+      recentEvents: events
+    });
+  } catch (err) {
+    console.error('[Live Flow API Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * =========================================================================
  * PIXELS TIKTOK (EVENTS API v1.3)
  * =========================================================================
  */

@@ -26,9 +26,23 @@ router.get('/:slug', (req, res) => {
     campaign.total_cliques = (campaign.total_cliques || 0) + 1;
     db.saveTrafficCampaigns(campaigns);
 
-    // Captura parâmetros de rastreamento do TikTok Ads
+    // Captura parâmetros de rastreamento de anúncios (TikTok Ads e Facebook Ads)
     const ttclid = req.query.ttclid || req.query.tt_clid || null;
-    const utm_source = req.query.utm_source || 'tiktok';
+    const fbclid = req.query.fbclid || req.query.fb_clid || null;
+    
+    // Auto-detecção inteligente de plataforma de origem
+    let platform = 'organico';
+    if (ttclid) {
+      platform = 'tiktok';
+    } else if (fbclid) {
+      platform = 'facebook';
+    } else {
+      const rawSrc = (req.query.utm_source || '').toLowerCase();
+      if (rawSrc.includes('tiktok') || rawSrc.includes('tt')) platform = 'tiktok';
+      else if (rawSrc.includes('face') || rawSrc.includes('meta') || rawSrc.includes('insta')) platform = 'facebook';
+    }
+
+    const utm_source = req.query.utm_source || platform;
     const utm_medium = req.query.utm_medium || req.query.tt_medium || null;
     const utm_campaign = req.query.utm_campaign || campaign.nome || null;
     const utm_content = req.query.utm_content || null;
@@ -44,10 +58,12 @@ router.get('/:slug', (req, res) => {
     // Gera código único curto de 6 caracteres alfanuméricos sem ambiguidade
     const codigo = db.generateUniqueAttributionCode();
 
-    // Salva registro na tabela de atribuições com validade de 48h
+    // Salva registro na tabela de atribuições com validade de 48h e plataforma identificada
     db.addTrafficAttribution({
       codigo,
+      platform,
       ttclid,
+      fbclid,
       ttp,
       utm_source,
       utm_medium,
@@ -59,7 +75,7 @@ router.get('/:slug', (req, res) => {
       pressel_url: campaign.url_destino || campaign.presell_url
     });
 
-    console.log(`[TikTok Attribution] 🚀 Clique registrado na campanha "${campaign.nome || campaign.name}" (${slug}) | Código gerado: ${codigo} | ttclid: ${ttclid || 'nenhum'}`);
+    console.log(`[Universal Campaign Attribution] 🚀 Clique registrado (${platform.toUpperCase()}) na campanha "${campaign.nome || campaign.name}" (${slug}) | Código: ${codigo} | ttclid: ${ttclid || '-'} | fbclid: ${fbclid || '-'}`);
 
     // Monta a URL de destino da pressel preservando e adicionando o código
     const targetUrl = campaign.url_destino || campaign.presell_url || 'https://minhapressel.com';
@@ -72,7 +88,9 @@ router.get('/:slug', (req, res) => {
 
     // Adiciona o código gerado como parâmetro principal da pressel
     destUrl.searchParams.set('codigo', codigo);
+    destUrl.searchParams.set('platform', platform);
     if (ttclid) destUrl.searchParams.set('ttclid', ttclid);
+    if (fbclid) destUrl.searchParams.set('fbclid', fbclid);
     if (ttp) destUrl.searchParams.set('ttp', ttp);
     if (utm_source) destUrl.searchParams.set('utm_source', utm_source);
     if (utm_medium) destUrl.searchParams.set('utm_medium', utm_medium);
@@ -92,7 +110,7 @@ router.get('/:slug', (req, res) => {
     // Redireciona (302) para a pressel
     return res.redirect(302, destUrl.toString());
   } catch (err) {
-    console.error('[TikTok Attribution Error] Falha no redirect:', err);
+    console.error('[Campaign Attribution Error] Falha no redirect:', err);
     return res.redirect(302, 'https://minhapressel.com');
   }
 });

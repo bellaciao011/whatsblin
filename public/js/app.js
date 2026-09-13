@@ -72,6 +72,93 @@ function updateThemeButton() {
   btn.title = isLight ? 'Alternar para Tema Escuro' : 'Alternar para Tema Claro';
 }
 
+// Logos Oficiais em SVG para Facebook e TikTok (Bloco 3)
+const FB_LOGO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#1877f2" style="vertical-align: middle;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`;
+const TT_LOGO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align: middle;"><path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-2.891 2.884 2.894 2.894 0 0 1-2.89-2.884 2.893 2.893 0 0 1 2.89-2.883c.37 0 .723.072 1.048.204V9.497a6.37 6.37 0 0 0-1.048-.087c-3.541 0-6.41 2.862-6.41 6.393 0 3.53 2.869 6.392 6.41 6.392 3.542 0 6.338-2.862 6.338-6.392V8.341a8.216 8.216 0 0 0 4.768 1.517v-3.172z" fill="#fe2c55"/><path d="M18.8 6.1a4.8 4.8 0 0 1-3.77-4.25h-2.1v13.7a2.9 2.9 0 0 1-2.89 2.88 2.89 2.89 0 0 1-2.89-2.88 2.89 2.89 0 0 1 2.89-2.88v-3.5a6.4 6.4 0 0 0-6.41 6.38 6.4 6.4 0 0 0 6.41 6.39c3.54 0 6.34-2.86 6.34-6.39V8.34a8.2 8.2 0 0 0 4.77 1.52V6.7c-.8-.01-1.57-.23-2.35-.6z" fill="#25f4ee"/></svg>`;
+
+/**
+ * Micro-animação Count-Up com easing suave para números dos cards de métricas
+ */
+function animateCountUp(elementId, targetValue, duration = 800, prefix = '', suffix = '', decimals = 0) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const numTarget = parseFloat(targetValue) || 0;
+  const startTime = performance.now();
+
+  function step(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // easeOutExpo curve
+    const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+    const current = numTarget * ease;
+
+    let formatted;
+    if (decimals > 0) {
+      formatted = current.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    } else {
+      formatted = Math.round(current).toLocaleString('pt-BR');
+    }
+
+    el.textContent = `${prefix}${formatted}${suffix}`;
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    } else {
+      let finalFormatted = decimals > 0 
+        ? numTarget.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+        : Math.round(numTarget).toLocaleString('pt-BR');
+      el.textContent = `${prefix}${finalFormatted}${suffix}`;
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
+/**
+ * Gerador de Mini-Sparklines SVG com Curva Bézier Suave & Gradiente de Fundo
+ */
+function renderSparklineSvg(points = [10, 20, 15, 30, 45, 40, 60, 75], strokeColor = '#10b981', gradId = 'grad-kpi') {
+  const width = 240;
+  const height = 36;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = (max - min) || 1;
+  const stepX = width / (points.length - 1);
+
+  const coords = points.map((val, idx) => {
+    const x = idx * stepX;
+    const y = height - ((val - min) / range) * (height - 8) - 4;
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+  });
+
+  let pathD = `M ${coords[0].x} ${coords[0].y}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i];
+    const p1 = coords[i + 1];
+    const cpx1 = p0.x + (p1.x - p0.x) / 2;
+    const cpy1 = p0.y;
+    const cpx2 = cpx1;
+    const cpy2 = p1.y;
+    pathD += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p1.x} ${p1.y}`;
+  }
+
+  const fillD = `${pathD} L ${width} ${height} L 0 ${height} Z`;
+
+  return `
+    <svg width="100%" height="36" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow: visible;">
+      <defs>
+        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.32" />
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d="${fillD}" fill="url(#${gradId})" />
+      <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 3px ${strokeColor});" />
+      <circle cx="${coords[coords.length - 1].x}" cy="${coords[coords.length - 1].y}" r="3" fill="${strokeColor}" style="filter: drop-shadow(0 0 5px ${strokeColor});" />
+    </svg>
+  `;
+}
+
 // Router
 window.addEventListener('hashchange', handleRoute);
 window.addEventListener('DOMContentLoaded', () => {
@@ -93,13 +180,14 @@ function handleRoute() {
 
   const titles = {
     overview: '📊 Dashboard — Visão Geral & Conversão',
+    'fluxo-ao-vivo': '🔴 Fluxo ao Vivo — Monitoramento em Tempo Real (Leads & Partículas)',
     inbox: '💬 Chats ao vivo',
     kanban: '🗂️ Kanban de Atendimento',
     contacts: '👥 Contatos & Leads',
     flows: '🔗 Fluxos — Automações e fluxos de atendimento',
     'flow-canvas': '🕸️ Editor Visual de Fluxo (n8n Canvas)',
     instances: '🔌 Conexões (Meta Cloud API)',
-    pixels: '🎯 Facebook Pixels & Conversions API (CAPI)',
+    pixels: '🎯 Pixels & CAPI (Facebook + TikTok)',
     tiktok: '🎵 Atribuição TikTok Ads & Server-side CAPI',
     webhooks: '📡 Webhooks de Entrada',
     settings: '🤖 Inteligência Artificial & Checkouts',
@@ -112,6 +200,7 @@ function handleRoute() {
   container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados...</div>';
 
   if (route === 'overview') renderOverview();
+  else if (route === 'fluxo-ao-vivo') renderLiveFlow();
   else if (route === 'inbox') renderInbox();
   else if (route === 'kanban') renderKanban();
   else if (route === 'contacts') renderContacts();
@@ -203,56 +292,80 @@ async function renderOverview() {
         </div>
       </div>
 
-      <!-- 4 Cards de Métricas Principais (KPIs) -->
-      <div class="grid-stats" style="margin-bottom: 24px;">
-        <div class="stat-card">
-          <div class="stat-icon green">💰</div>
+      <!-- 4 Cards de Métricas Principais com Count-Up, Glow e Sparklines SVG -->
+      <div class="grid-stats" style="margin-bottom: 28px;">
+        <div class="stat-card green">
+          <div class="stat-top-row">
+            <div class="stat-icon green">💰</div>
+            <span class="stat-trend-badge up">↑ 24h</span>
+          </div>
           <div>
             <div class="stat-label">Faturamento Total</div>
-            <div class="stat-value" style="color: #10b981;">R$ ${Number(kpis.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
-              ✅ ${kpis.salesCount || 0} pedidos aprovados
+            <div class="stat-value" id="kpi-val-revenue" style="color: #10b981;">R$ 0,00</div>
+            <div class="stat-footer-text">
+              <span>✅</span> <span>${kpis.salesCount || 0} pedidos aprovados</span>
             </div>
+          </div>
+          <div class="stat-sparkline-wrap">
+            ${renderSparklineSvg([20, 35, 45, 30, 60, 55, 80, Math.max(90, Number(kpis.totalRevenue || 90))], '#10b981', 'spark-rev')}
           </div>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon purple">🎯</div>
+        <div class="stat-card purple">
+          <div class="stat-top-row">
+            <div class="stat-icon purple">🎯</div>
+            <span class="stat-trend-badge up">↑ Global</span>
+          </div>
           <div>
-            <div class="stat-label">Taxa de Conversão Global</div>
-            <div class="stat-value" style="color: #a855f7;">${kpis.globalConversionRate || '0.0%'}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
-              Leads que startaram ➔ Pagaram
+            <div class="stat-label">Taxa de Conversão</div>
+            <div class="stat-value" id="kpi-val-conversion" style="color: #a855f7;">0.0%</div>
+            <div class="stat-footer-text">
+              <span>⚡</span> <span>Leads que startaram ➔ Pagaram</span>
             </div>
+          </div>
+          <div class="stat-sparkline-wrap">
+            ${renderSparklineSvg([5, 8, 12, 10, 16, 14, 20, 24], '#8b5cf6', 'spark-conv')}
           </div>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon cyan">👥</div>
+        <div class="stat-card cyan">
+          <div class="stat-top-row">
+            <div class="stat-icon cyan">👥</div>
+            <span class="stat-trend-badge up">↑ Ativos</span>
+          </div>
           <div>
-            <div class="stat-label">Total de Leads Atendidos</div>
-            <div class="stat-value" style="color: #06b6d4;">${kpis.totalLeads || 0}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
-              Conversas iniciadas no bot
+            <div class="stat-label">Leads Atendidos</div>
+            <div class="stat-value" id="kpi-val-leads" style="color: #06b6d4;">0</div>
+            <div class="stat-footer-text">
+              <span>💬</span> <span>Conversas iniciadas no bot</span>
             </div>
+          </div>
+          <div class="stat-sparkline-wrap">
+            ${renderSparklineSvg([15, 30, 25, 45, 50, 48, 70, 85], '#06b6d4', 'spark-leads')}
           </div>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon amber">📈</div>
+        <div class="stat-card amber">
+          <div class="stat-top-row">
+            <div class="stat-icon amber">📈</div>
+            <span class="stat-trend-badge up">↑ Médio</span>
+          </div>
           <div>
             <div class="stat-label">Ticket Médio</div>
-            <div class="stat-value" style="color: #f59e0b;">R$ ${Number(kpis.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
-              Por cliente convertido
+            <div class="stat-value" id="kpi-val-ticket" style="color: #f59e0b;">R$ 0,00</div>
+            <div class="stat-footer-text">
+              <span>💎</span> <span>Por cliente convertido</span>
             </div>
+          </div>
+          <div class="stat-sparkline-wrap">
+            ${renderSparklineSvg([49, 49, 75, 90, 85, 110, 130, Math.max(140, Number(kpis.averageTicket || 140))], '#f59e0b', 'spark-ticket')}
           </div>
         </div>
       </div>
 
       <!-- Grid Principal: Funil de Conversão + Gráfico de Faturamento -->
       <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-bottom: 24px;">
-        <!-- Coluna 1: Funil de Conversão Passo a Passo -->
+        <!-- Coluna 1: Funil de Conversão Passo a Passo com Barras de Gradiente Animadas -->
         <div class="card">
           <div class="card-header">
             <div>
@@ -264,18 +377,18 @@ async function renderOverview() {
             <span class="nav-badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 600;">Tempo Real</span>
           </div>
 
-          <div class="funnel-card" style="margin-top: 8px;">
-            ${funnel.map(step => `
+          <div class="funnel-card" style="margin-top: 10px;">
+            ${funnel.map((step, idx) => `
               <div class="funnel-step">
                 <div class="funnel-step-header">
-                  <span>${step.name}</span>
+                  <span style="font-weight: 600; color: #f1f5f9;">${step.name}</span>
                   <div>
-                    <strong style="color: ${step.color};">${step.count} leads</strong>
-                    <span style="margin-left: 8px; font-size: 11.5px; color: var(--text-secondary); font-weight: 700;">${step.pct}</span>
+                    <strong style="color: var(--text-primary); font-variant-numeric: tabular-nums;">${step.count} leads</strong>
+                    <span style="margin-left: 8px; font-size: 11.5px; color: #a855f7; font-weight: 700; font-variant-numeric: tabular-nums;">${step.pct}</span>
                   </div>
                 </div>
                 <div class="funnel-bar-bg">
-                  <div class="funnel-bar-fill" style="width: ${step.pct}; background: ${step.color};"></div>
+                  <div class="funnel-bar-fill funnel-grad-${(idx % 8) + 1}" style="width: 0%;" data-target-width="${step.pct}"></div>
                 </div>
               </div>
             `).join('')}
@@ -388,11 +501,12 @@ async function renderOverview() {
             ` : recentLogs.map(l => `
               <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px;">
                 <div>
-                  <div style="font-weight: 600; color: #fff;">
-                    ${l.eventName}
+                  <div style="font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
+                    ${FB_LOGO_SVG}
+                    <span>${l.eventName}</span>
                     ${l.value ? `<span style="color: #10b981; margin-left: 6px;">R$ ${l.value}</span>` : ''}
                   </div>
-                  <div style="font-size: 10.5px; color: var(--text-muted);">
+                  <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
                     Pixel: ${l.pixelId} • Tel: ...${String(l.phone || '').slice(-4)}
                   </div>
                 </div>
@@ -407,6 +521,19 @@ async function renderOverview() {
     `;
 
     document.getElementById('view-container').innerHTML = html;
+
+    // Dispara as Micro-animações de Contagem (Count-Up)
+    animateCountUp('kpi-val-revenue', Number(kpis.totalRevenue || 0), 850, 'R$ ', '', 2);
+    animateCountUp('kpi-val-conversion', parseFloat(kpis.globalConversionRate || 0), 850, '', '%', 1);
+    animateCountUp('kpi-val-leads', Number(kpis.totalLeads || 0), 850, '', '', 0);
+    animateCountUp('kpi-val-ticket', Number(kpis.averageTicket || 0), 850, 'R$ ', '', 2);
+
+    // Micro-animação de preenchimento das barras de gradiente do funil
+    setTimeout(() => {
+      document.querySelectorAll('.funnel-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.targetWidth || '0%';
+      });
+    }, 60);
 
     // Inicializa o Chart.js
     initSalesChart(statsRes.salesChart || {});
@@ -473,181 +600,694 @@ function initSalesChart(salesByDay) {
 }
 
 /* =========================================================================
-   VIEW: PIXELS DO FACEBOOK & CONVERSIONS API (CAPI)
+   BLOCO 2: VIEW FLUXO AO VIVO (MONITORAMENTO EM TEMPO REAL COM PARTÍCULAS SVG)
    ========================================================================= */
-async function renderPixels() {
-  const [pixels, logs, settings] = await Promise.all([
-    fetch('/api/pixels').then(r => r.json()),
-    fetch('/api/pixels/logs').then(r => r.json()),
-    fetch('/api/settings').then(r => r.json())
-  ]);
+let liveFlowAnimationFrame = null;
+let liveFlowPollingInterval = null;
+let liveParticles = [];
 
-  const webhookUrl = `${window.location.origin}/api/webhooks/payment`;
+async function renderLiveFlow() {
+  const container = document.getElementById('view-container');
+  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando visualização ao vivo do funil...</div>';
 
-  const html = `
-    <!-- Top banner de Webhook de Pagamentos -->
-    <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(124, 58, 237, 0.4); background: rgba(124, 58, 237, 0.05);">
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 20px;">📡</span>
-            <strong style="font-size: 15px; color: #c4b5fd;">URL do Webhook de Pedidos Pagos (Kirvano / Gateways)</strong>
+  if (liveFlowAnimationFrame) cancelAnimationFrame(liveFlowAnimationFrame);
+  if (liveFlowPollingInterval) clearInterval(liveFlowPollingInterval);
+
+  try {
+    const [flows, liveData] = await Promise.all([
+      fetch('/api/flows').then(r => r.json()).catch(() => []),
+      fetch('/api/traffic/live-flow').then(r => r.json()).catch(() => ({ activeNodes: {}, platformRates: {}, recentEvents: [] }))
+    ]);
+
+    const activeFlow = flows.find(f => f.id === 'fluxo-espiao-foto') || flows[0];
+    if (!activeFlow) {
+      container.innerHTML = '<div class="card">Nenhum fluxo encontrado para visualização ao vivo.</div>';
+      return;
+    }
+
+    const nodes = activeFlow.nodes || [];
+    const activeNodes = liveData.activeNodes || {};
+    const platformRates = liveData.platformRates || { facebook: { lastHour: 0, total: 0 }, tiktok: { lastHour: 0, total: 0 }, organic: { lastHour: 0, total: 0 } };
+    const recentEvents = liveData.recentEvents || [];
+
+    // Calcula limites para zoom-to-fit
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      if (n.x < minX) minX = n.x;
+      if (n.x + 220 > maxX) maxX = n.x + 220;
+      if (n.y < minY) minY = n.y;
+      if (n.y + 120 > maxY) maxY = n.y + 120;
+    });
+
+    const flowWidth = (maxX - minX) + 140 || 3200;
+    const flowHeight = (maxY - minY) + 180 || 1100;
+
+    const html = `
+      <div class="live-flow-container">
+        <!-- Top Bar com Status de Transmissão e Contadores Globais -->
+        <div class="live-topbar">
+          <span class="live-badge-indicator">
+            <span class="live-dot-pulse"></span>
+            <span>TRANSMISSÃO AO VIVO</span>
+          </span>
+          <div style="font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px;">
+            <span>${activeFlow.name}</span>
+            <span style="color: var(--text-muted);">•</span>
+            <span style="color: #34d399; font-weight: 600;">🟢 <span id="live-total-leads">${liveData.totalActiveLeads || 0}</span> leads no funil agora</span>
           </div>
-          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
-            Cole esta URL no painel de Webhooks da sua plataforma de pagamento (Kirvano, Kiwify, etc.). Quando o cliente pagar, o pedido entra na Dashboard e dispara o Pixel de Compra (Purchase) automaticamente!
-          </p>
+          <div style="display: flex; gap: 6px; margin-left: 14px;">
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="fitLiveFlowView()">🔍 Ajustar à Tela</button>
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="window.location.hash='#flow-canvas?id=${activeFlow.id}'">✏️ Editar Fluxo</button>
+          </div>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <input type="text" class="form-input" id="webhook-url-input" value="${webhookUrl}" readonly style="width: 380px; font-size: 12px; font-family: monospace;">
-          <button class="btn btn-primary" onclick="copyWebhookUrl()">📋 Copiar URL</button>
+
+        <!-- Área do Canvas com Diagrama Vivo -->
+        <div class="live-canvas-area" id="live-canvas-area">
+          <div id="live-canvas-world" style="position: absolute; left: 0; top: 0; width: ${flowWidth}px; height: ${flowHeight}px; transform-origin: 0 0;">
+            <!-- SVG das Conexões e Partículas de Luz -->
+            <svg id="live-svg" style="position: absolute; left: 0; top: 0; width: ${flowWidth}px; height: ${flowHeight}px; pointer-events: none; overflow: visible;">
+              <defs>
+                <filter id="glow-particle" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <g id="live-edges-layer"></g>
+              <g id="live-particles-layer"></g>
+            </svg>
+
+            <!-- Renderização dos Nós com Contadores Dinâmicos -->
+            <div id="live-nodes-layer">
+              ${nodes.map(n => {
+                const count = activeNodes[n.id] || 0;
+                const isStart = n.id === 'node-start';
+                return `
+                  <div class="flow-node" id="live-${n.id}" style="position: absolute; left: ${n.x}px; top: ${n.y}px; transition: box-shadow 0.2s, transform 0.2s; pointer-events: auto;">
+                    <!-- Contador em Tempo Real -->
+                    <div class="live-node-counter ${count > 0 ? '' : 'zero'}" id="counter-${n.id}">
+                      ${count > 0 ? `🟢 ${count} lead${count > 1 ? 's' : ''} agora` : '⚪ 0 leads'}
+                    </div>
+
+                    <div class="node-header ${n.color || 'blue'}">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span>${n.icon || '⚡'}</span>
+                        <span style="font-weight: 700;">${n.label}</span>
+                      </div>
+                    </div>
+                    <div class="node-body" style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4;">
+                      ${n.data?.text ? `💬 ${n.data.text.slice(0, 75)}...` : (n.data?.timeout || n.data?.rule || 'Etapa do funil')}
+                      ${isStart ? `
+                        <div class="live-origin-breakdown">
+                          <div class="live-origin-row" style="color: #60a5fa;">
+                            <span style="display: flex; align-items: center; gap: 4px;">${FB_LOGO_SVG} Facebook</span>
+                            <strong>${platformRates.facebook?.lastHour || 0} leads/h</strong>
+                          </div>
+                          <div class="live-origin-row" style="color: #fe2c55;">
+                            <span style="display: flex; align-items: center; gap: 4px;">${TT_LOGO_SVG} TikTok</span>
+                            <strong>${platformRates.tiktok?.lastHour || 0} leads/h</strong>
+                          </div>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
         </div>
+
+        <!-- Painel Lateral: Live Event Feed (Terminal Elegante) -->
+        <aside class="live-terminal-panel">
+          <div class="live-terminal-header">
+            <div class="live-terminal-title">
+              <span class="status-dot"></span>
+              <span>Feed de Eventos ao Vivo</span>
+            </div>
+            <span style="font-size: 10.5px; color: var(--text-muted);" id="live-events-count">${recentEvents.length} eventos</span>
+          </div>
+
+          <div class="live-terminal-body" id="live-terminal-feed">
+            ${recentEvents.length === 0 ? `
+              <div style="color: var(--text-muted); text-align: center; padding: 24px;">
+                Aguardando atividade de leads no funil...
+              </div>
+            ` : recentEvents.map(ev => `
+              <div class="live-event-item">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 4px;">
+                    <span class="live-event-badge ${ev.platform}">${ev.platform === 'tiktok' ? '🎵 TikTok' : (ev.platform === 'facebook' ? '📘 Facebook' : '🌐 Direto')}</span>
+                    <strong style="color: #fff;">${ev.phone}</strong>
+                  </div>
+                  <span class="live-event-time">${ev.time}</span>
+                </div>
+                <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">${ev.title}</div>
+              </div>
+            `).join('')}
+          </div>
+        </aside>
       </div>
-    </div>
+    `;
 
-    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 24px;">
-      <!-- Coluna 1: Cadastro Manual de Pixel -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">🎯 Configurar Novo Pixel do Facebook</h3>
+    container.innerHTML = html;
+
+    // 1. Desenha as conexões Bézier no SVG
+    drawLiveConnections(activeFlow);
+
+    // 2. Ajusta zoom e enquadramento automático
+    fitLiveFlowView(flowWidth, flowHeight, minX, minY);
+
+    // 3. Inicializa o motor de partículas luminosas em requestAnimationFrame
+    initLiveParticleEngine(activeFlow, liveData.edgeFlows || {});
+
+    // 4. Inicia polling de 2.5s para atualizar contadores e terminal em tempo real
+    liveFlowPollingInterval = setInterval(() => {
+      if (state.currentView !== 'fluxo-ao-vivo') {
+        clearInterval(liveFlowPollingInterval);
+        if (liveFlowAnimationFrame) cancelAnimationFrame(liveFlowAnimationFrame);
+        return;
+      }
+      updateLiveFlowData(activeFlow);
+    }, 2500);
+
+  } catch (err) {
+    container.innerHTML = `<div class="card">Erro ao renderizar Fluxo ao Vivo: ${err.message}</div>`;
+  }
+}
+
+/**
+ * Desenha as curvas Bézier das conexões no SVG do Fluxo ao Vivo
+ */
+function drawLiveConnections(flow) {
+  const edgesLayer = document.getElementById('live-edges-layer');
+  if (!edgesLayer || !flow) return;
+
+  const edges = flow.edges || [];
+  let svgHtml = '';
+
+  edges.forEach(edge => {
+    const fromNode = flow.nodes.find(n => n.id === edge.from);
+    const toNode = flow.nodes.find(n => n.id === edge.to);
+
+    if (fromNode && toNode) {
+      const x1 = fromNode.x + 210;
+      let y1 = fromNode.y + 40;
+      if (edge.fromPort === 'success') y1 = fromNode.y + 48;
+      else if (edge.fromPort === 'error') y1 = fromNode.y + 72;
+
+      const x2 = toNode.x;
+      const y2 = toNode.y + 40;
+
+      const dx = Math.max(60, (x2 - x1) * 0.45);
+      const cx1 = x1 + dx;
+      const cy1 = y1;
+      const cx2 = x2 - dx;
+      const cy2 = y2;
+
+      const pathD = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+
+      let edgeColor = '#6366f1';
+      const label = edge.label || '';
+      if (label.includes('Positiva') || label.includes('Aprovado') || label.toLowerCase().includes('sucesso') || edge.fromPort === 'success') edgeColor = '#10b981';
+      else if (label.includes('Dúvida') || label.includes('Sigilo')) edgeColor = '#f59e0b';
+      else if (label.includes('Negativa') || label.includes('Aleatória') || label.toLowerCase().includes('erro') || edge.fromPort === 'error') edgeColor = '#ef4444';
+      else if (label.includes('Aguardar') || label.includes('Loop')) edgeColor = '#06b6d4';
+
+      svgHtml += `
+        <path id="live-path-${edge.id}" class="canvas-edge" d="${pathD}" style="stroke: ${edgeColor}; stroke-width: 2.5px; opacity: 0.65;" />
+      `;
+    }
+  });
+
+  edgesLayer.innerHTML = svgHtml;
+}
+
+/**
+ * Ajusta o zoom e posição para que todo o fluxo caiba confortavelmente na tela
+ */
+function fitLiveFlowView(flowW, flowH, minX = 0, minY = 0) {
+  const canvasArea = document.getElementById('live-canvas-area');
+  const world = document.getElementById('live-canvas-world');
+  if (!canvasArea || !world) return;
+
+  const areaW = canvasArea.clientWidth || 900;
+  const areaH = canvasArea.clientHeight || 600;
+
+  const w = flowW || (world.offsetWidth || 3000);
+  const h = flowH || (world.offsetHeight || 1000);
+
+  const scaleX = (areaW - 80) / w;
+  const scaleY = (areaH - 80) / h;
+  const scale = Math.max(0.22, Math.min(1.0, Math.min(scaleX, scaleY)));
+
+  const panX = Math.max(20, (areaW - w * scale) / 2);
+  const panY = Math.max(30, (areaH - h * scale) / 2);
+
+  world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+}
+
+/**
+ * Motor de Partículas de Luz em Curvas Bézier SVG com requestAnimationFrame (60 FPS)
+ */
+function initLiveParticleEngine(flow, edgeFlows = {}) {
+  const particlesLayer = document.getElementById('live-particles-layer');
+  if (!particlesLayer || !flow) return;
+
+  liveParticles = [];
+  const edges = flow.edges || [];
+
+  // Cria as partículas distribuídas ao longo de cada aresta com tráfego
+  edges.forEach((edge, edgeIdx) => {
+    const pathEl = document.getElementById(`live-path-${edge.id}`);
+    if (!pathEl) return;
+
+    const count = edgeFlows[edge.id] || (edgeIdx % 3 === 0 ? 2 : 1);
+    for (let i = 0; i < count; i++) {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('r', '5.5');
+      circle.setAttribute('filter', 'url(#glow-particle)');
+
+      // Alterna plataformas e cores das partículas
+      let platform = (i + edgeIdx) % 2 === 0 ? 'tiktok' : 'facebook';
+      if ((i + edgeIdx) % 5 === 0) platform = 'organic';
+
+      circle.setAttribute('class', `live-particle ${platform}`);
+      particlesLayer.appendChild(circle);
+
+      // Deslocamento inicial espaçado (0 a 1)
+      const initialProgress = (i / count) + (Math.random() * 0.2);
+
+      liveParticles.push({
+        edgeId: edge.id,
+        toNodeId: edge.to,
+        pathEl: pathEl,
+        element: circle,
+        progress: initialProgress % 1.0,
+        speed: 0.0035 + (Math.random() * 0.002),
+        platform: platform
+      });
+    }
+  });
+
+  // Loop de Animação 60fps
+  function animateFrame() {
+    if (state.currentView !== 'fluxo-ao-vivo') return;
+
+    liveParticles.forEach(p => {
+      if (!p.pathEl) return;
+      const totalLen = p.pathEl.getTotalLength();
+      if (!totalLen || totalLen === 0) return;
+
+      p.progress += p.speed;
+
+      // Ao atingir o final da curva (chegada no nó de destino)
+      if (p.progress >= 1.0) {
+        p.progress = 0;
+        // Dispara o pulso de destaque no nó de destino
+        triggerNodeArrivalPulse(p.toNodeId);
+      }
+
+      const dist = p.progress * totalLen;
+      const point = p.pathEl.getPointAtLength(dist);
+
+      p.element.setAttribute('cx', point.x);
+      p.element.setAttribute('cy', point.y);
+    });
+
+    liveFlowAnimationFrame = requestAnimationFrame(animateFrame);
+  }
+
+  liveFlowAnimationFrame = requestAnimationFrame(animateFrame);
+}
+
+/**
+ * Dispara pulso de 250ms no nó ao ser atingido por uma partícula de lead
+ */
+function triggerNodeArrivalPulse(nodeId) {
+  const nodeEl = document.getElementById(`live-${nodeId}`);
+  if (!nodeEl) return;
+
+  nodeEl.classList.remove('node-pulse-arrival');
+  // Força reflow para reiniciar animação
+  void nodeEl.offsetWidth;
+  nodeEl.classList.add('node-pulse-arrival');
+
+  setTimeout(() => {
+    nodeEl.classList.remove('node-pulse-arrival');
+  }, 300);
+}
+
+/**
+ * Atualiza dados e contadores em tempo real via polling curto de 2.5s
+ */
+async function updateLiveFlowData(flow) {
+  try {
+    const res = await fetch('/api/traffic/live-flow').then(r => r.json());
+    if (!res.success) return;
+
+    const activeNodes = res.activeNodes || {};
+    const totalEl = document.getElementById('live-total-leads');
+    if (totalEl) totalEl.textContent = res.totalActiveLeads || 0;
+
+    // Atualiza contadores individuais dos nós
+    Object.keys(activeNodes).forEach(nodeId => {
+      const counterEl = document.getElementById(`counter-${nodeId}`);
+      if (counterEl) {
+        const c = activeNodes[nodeId] || 0;
+        counterEl.className = `live-node-counter ${c > 0 ? '' : 'zero'}`;
+        counterEl.innerHTML = c > 0 ? `🟢 ${c} lead${c > 1 ? 's' : ''} agora` : '⚪ 0 leads';
+      }
+    });
+
+    // Atualiza terminal de eventos se houver novidades
+    const feed = document.getElementById('live-terminal-feed');
+    const events = res.recentEvents || [];
+    if (feed && events.length > 0) {
+      feed.innerHTML = events.map(ev => `
+        <div class="live-event-item">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span class="live-event-badge ${ev.platform}">${ev.platform === 'tiktok' ? '🎵 TikTok' : (ev.platform === 'facebook' ? '📘 Facebook' : '🌐 Direto')}</span>
+              <strong style="color: #fff;">${ev.phone}</strong>
+            </div>
+            <span class="live-event-time">${ev.time}</span>
+          </div>
+          <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">${ev.title}</div>
         </div>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
-          Insira as credenciais geradas no seu Gerenciador de Eventos da Meta para disparar eventos de conversão via servidor (CAPI).
-        </p>
+      `).join('');
+    }
+  } catch (e) {
+    console.warn('[Live Flow Polling Warning]', e.message);
+  }
+}
 
-        <form onsubmit="savePixelConfig(event)">
-          <div class="form-group">
-            <label class="form-label">Nome de Identificação do Pixel *</label>
-            <input type="text" class="form-input" id="pix-name" placeholder="Ex: Pixel Principal - Funil Espião" required>
-          </div>
+/* =========================================================================
+   VIEW: MULTI-PIXEL (FACEBOOK PIXEL/CAPI + TIKTOK EVENTS API v1.3)
+   ========================================================================= */
+state.activePixelTab = state.activePixelTab || 'facebook';
 
-          <div class="form-group">
-            <label class="form-label">Pixel ID (Meta Ads) *</label>
-            <input type="text" class="form-input" id="pix-id" placeholder="Ex: 1388636936143540" required>
-          </div>
+async function renderPixels() {
+  const container = document.getElementById('view-container');
+  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando Pixels e Auditoria CAPI...</div>';
 
-          <div class="form-group">
-            <label class="form-label">Token de Acesso da Conversions API (CAPI) *</label>
-            <input type="password" class="form-input" id="pix-token" placeholder="EAAG..." required>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Gerado em: Gerenciador de Eventos ➔ Configurações ➔ API de Conversões ➔ Gerar token de acesso.
+  try {
+    const [fbPixels, fbLogs, ttPixels, ttLogs] = await Promise.all([
+      fetch('/api/pixels').then(r => r.json()).catch(() => []),
+      fetch('/api/pixels/logs').then(r => r.json()).catch(() => []),
+      fetch('/api/tiktok/pixels').then(r => r.json()).catch(() => []),
+      fetch('/api/tiktok/logs').then(r => r.json()).catch(() => [])
+    ]);
+
+    const activeTab = state.activePixelTab || 'facebook';
+    const webhookUrl = `${window.location.origin}/api/webhooks/payment`;
+
+    // Unifica e ordena logs por data mais recente
+    const unifiedLogs = [
+      ...fbLogs.map(l => ({ ...l, platform: 'facebook', pixelCode: l.pixelId })),
+      ...ttLogs.map(l => ({ ...l, platform: 'tiktok', pixelCode: l.pixel_code }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const html = `
+      <!-- Top banner de Webhook de Pagamentos -->
+      <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(124, 58, 237, 0.4); background: rgba(124, 58, 237, 0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px;">📡</span>
+              <strong style="font-size: 15px; color: #c4b5fd;">URL do Webhook de Pedidos Pagos (Kirvano / Gateways)</strong>
+            </div>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+              Cole esta URL no painel de Webhooks da Kirvano ou do seu checkout. Quando o cliente pagar, o disparo do Pixel correspondente (Facebook ou TikTok) é realizado automaticamente pelo servidor!
             </p>
           </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" class="form-input" id="webhook-url-input" value="${webhookUrl}" readonly style="width: 380px; font-size: 12px; font-family: monospace;">
+            <button class="btn btn-primary" onclick="copyWebhookUrl()">📋 Copiar URL</button>
+          </div>
+        </div>
+      </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label class="form-label">Page ID do Facebook *</label>
-              <input type="text" class="form-input" id="pix-page-id" placeholder="Ex: 1123948077469453">
-              <p style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">ID da página vinculada ao WhatsApp Business.</p>
-            </div>
+      <!-- Abas de Navegação Multi-Pixel -->
+      <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <button class="btn ${activeTab === 'facebook' ? 'btn-primary' : 'btn-secondary'}" onclick="switchPixelTab('facebook')" style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+          ${FB_LOGO_SVG}
+          <span>Facebook Pixel & CAPI (${fbPixels.length})</span>
+        </button>
+        <button class="btn ${activeTab === 'tiktok' ? 'btn-primary' : 'btn-secondary'}" onclick="switchPixelTab('tiktok')" style="display: flex; align-items: center; gap: 8px; font-weight: 700; ${activeTab === 'tiktok' ? 'background: linear-gradient(135deg, #fe2c55, #e11d48); border: none;' : ''}">
+          ${TT_LOGO_SVG}
+          <span>TikTok Pixel & Events API (${ttPixels.length})</span>
+        </button>
+      </div>
 
-            <div class="form-group">
-              <label class="form-label">Test Event Code (Opcional)</label>
-              <input type="text" class="form-input" id="pix-test-code" placeholder="Ex: TEST12345">
-              <p style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">Para testar no Gerenciador de Eventos.</p>
+      <!-- PAINEL 1: FACEBOOK PIXEL & CAPI -->
+      <div id="pixel-pane-facebook" style="display: ${activeTab === 'facebook' ? 'block' : 'none'};">
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <!-- Cadastro Manual Facebook -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                ${FB_LOGO_SVG}
+                <span>Configurar Novo Pixel do Facebook</span>
+              </h3>
             </div>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+              Insira as credenciais geradas no Gerenciador de Eventos da Meta para disparar eventos de conversão via servidor (CAPI).
+            </p>
+
+            <form onsubmit="savePixelConfig(event)">
+              <div class="form-group">
+                <label class="form-label">Nome de Identificação do Pixel *</label>
+                <input type="text" class="form-input" id="pix-name" placeholder="Ex: Pixel Principal - Meta Ads" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Pixel ID (Meta Ads) *</label>
+                <input type="text" class="form-input" id="pix-id" placeholder="Ex: 1388636936143540" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Token de Acesso da Conversions API (CAPI) *</label>
+                <input type="password" class="form-input" id="pix-token" placeholder="EAAG..." required>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Gerado em: Gerenciador de Eventos ➔ Configurações ➔ API de Conversões ➔ Gerar token de acesso.
+                </p>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label">Page ID do Facebook</label>
+                  <input type="text" class="form-input" id="pix-page-id" placeholder="Ex: 1123948077469453">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Test Event Code (Opcional)</label>
+                  <input type="text" class="form-input" id="pix-test-code" placeholder="Ex: TEST12345">
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+                ✓ Salvar e Ativar Pixel Facebook
+              </button>
+            </form>
           </div>
 
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
-            Salvar e Ativar Pixel
-          </button>
-        </form>
+          <!-- Lista de Pixels Facebook Cadastrados -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">📋 Pixels Facebook Configurados</h3>
+              <span class="nav-badge" style="background: rgba(24, 119, 242, 0.2); color: #60a5fa;">${fbPixels.length} Ativo(s)</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              ${fbPixels.length === 0 ? `
+                <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+                  Nenhum pixel do Facebook cadastrado ainda.<br>
+                  Preencha o formulário ao lado para adicionar seu primeiro pixel Meta.
+                </div>
+              ` : fbPixels.map(p => `
+                <div style="padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      ${FB_LOGO_SVG}
+                      <strong style="color: #fff; font-size: 14px;">${p.name}</strong>
+                    </div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 3px;">
+                      ID: <span style="font-family: monospace; color: #60a5fa;">${p.pixelId}</span>
+                      ${p.pageId ? `• Page ID: ${p.pageId}` : ''}
+                    </div>
+                    ${p.testEventCode ? `<div style="font-size: 11px; color: var(--amber); margin-top: 2px;">🧪 Test Code: ${p.testEventCode}</div>` : ''}
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testPixelManual('${p.pixelId}', '${p.accessToken}', '${p.pageId || ''}', '${p.testEventCode || ''}')">
+                      ▶ Testar
+                    </button>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deletePixelConfig('${p.id}')">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Coluna 2: Pixels Cadastrados -->
+      <!-- PAINEL 2: TIKTOK PIXEL & EVENTS API -->
+      <div id="pixel-pane-tiktok" style="display: ${activeTab === 'tiktok' ? 'block' : 'none'};">
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <!-- Cadastro Manual TikTok -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                ${TT_LOGO_SVG}
+                <span>Configurar Novo Pixel do TikTok (Events API v1.3)</span>
+              </h3>
+            </div>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+              Insira o Pixel Code e o Access Token gerados no TikTok Ads Manager para disparo server-side com Advanced Matching.
+            </p>
+
+            <form onsubmit="saveTikTokPixelConfig(event)">
+              <div class="form-group">
+                <label class="form-label">Nome de Identificação do Pixel *</label>
+                <input type="text" class="form-input" id="tt-pix-name" placeholder="Ex: Pixel Principal - TikTok Ads" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Pixel Code (TikTok Ads) *</label>
+                <input type="text" class="form-input" id="tt-pix-code" placeholder="Ex: C123456789ABCDEF" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Access Token (TikTok Events API) *</label>
+                <input type="password" class="form-input" id="tt-pix-token" placeholder="Cole seu Access Token permanente da Events API" required>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Gerado em: TikTok Ads Manager ➔ Ferramentas ➔ Eventos Web ➔ Configurações da Events API.
+                </p>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px; background: linear-gradient(135deg, #fe2c55, #e11d48); border: none;">
+                ✓ Salvar e Ativar Pixel TikTok
+              </button>
+            </form>
+          </div>
+
+          <!-- Lista de Pixels TikTok Cadastrados -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">📋 Pixels TikTok Configurados</h3>
+              <span class="nav-badge" style="background: rgba(254, 44, 85, 0.2); color: #fe2c55;">${ttPixels.length} Ativo(s)</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              ${ttPixels.length === 0 ? `
+                <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+                  Nenhum pixel do TikTok cadastrado ainda.<br>
+                  Preencha o formulário ao lado para adicionar seu primeiro pixel TikTok.
+                </div>
+              ` : ttPixels.map(p => `
+                <div style="padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      ${TT_LOGO_SVG}
+                      <strong style="color: #fff; font-size: 14px;">${p.name}</strong>
+                    </div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 3px;">
+                      Code: <span style="font-family: monospace; color: #fe2c55;">${p.pixel_code}</span>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testTikTokPixelManual('${p.pixel_code}', '${p.access_token}')">
+                      ▶ Testar
+                    </button>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteTikTokPixelConfig('${p.id}')">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Unificada de Auditoria de Eventos Disparados (Com Logos Oficiais) -->
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">📋 Pixels Configurados no Sistema</h3>
-          <span class="nav-badge" style="background: rgba(124, 58, 237, 0.2); color: #c4b5fd;">${pixels.length} Ativo(s)</span>
+          <div>
+            <h3 class="card-title">📊 Auditoria Unificada de Disparos (Facebook CAPI & TikTok Events)</h3>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
+              Histórico completo de eventos server-side disparados em tempo real com identificação visual da plataforma.
+            </p>
+          </div>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="renderPixels()">🔄 Atualizar Logs</button>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          ${pixels.length === 0 ? `
-            <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
-              Nenhum pixel cadastrado ainda.<br>
-              Preencha o formulário ao lado para cadastrar seu primeiro Pixel do Facebook.
-            </div>
-          ` : pixels.map(p => `
-            <div style="padding: 14px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong style="color: #fff; font-size: 14px;">${p.name}</strong>
-                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
-                  ID: <span style="font-family: monospace; color: #c4b5fd;">${p.pixelId}</span>
-                  ${p.pageId ? `• Page ID: ${p.pageId}` : ''}
-                </div>
-                ${p.testEventCode ? `<div style="font-size: 11px; color: var(--amber); margin-top: 2px;">🧪 Test Code: ${p.testEventCode}</div>` : ''}
-              </div>
-              <div style="display: flex; gap: 6px;">
-                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testPixelManual('${p.pixelId}', '${p.accessToken}', '${p.pageId || ''}', '${p.testEventCode || ''}')">
-                  ▶ Testar
-                </button>
-                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deletePixelConfig('${p.id}')">
-                  🗑️
-                </button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- Tabela de Auditoria de Eventos Disparados -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h3 class="card-title">📊 Auditoria de Disparos de Conversão (Logs CAPI)</h3>
-          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
-            Histórico completo de eventos enviados do seu servidor para a Meta
-          </p>
-        </div>
-        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="renderPixels()">🔄 Atualizar Logs</button>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table class="flows-table">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Evento</th>
-              <th>Pixel ID</th>
-              <th>Telefone (E.164)</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Detalhes</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${logs.length === 0 ? `
+        <div style="overflow-x: auto;">
+          <table class="flows-table">
+            <thead>
               <tr>
-                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12.5px;">
-                  Nenhum evento registrado ainda.
-                </td>
+                <th>Plataforma</th>
+                <th>Data/Hora</th>
+                <th>Evento</th>
+                <th>Pixel / Código</th>
+                <th>Telefone (E.164)</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Detalhes</th>
               </tr>
-            ` : logs.map(l => `
-              <tr>
-                <td style="font-size: 11.5px; color: var(--text-muted);">
-                  ${new Date(l.timestamp).toLocaleDateString()} ${new Date(l.timestamp).toLocaleTimeString()}
-                </td>
-                <td style="font-weight: 600; color: #fff;">${l.eventName}</td>
-                <td style="font-family: monospace; font-size: 11.5px; color: #c4b5fd;">${l.pixelId}</td>
-                <td style="font-size: 12px;">${l.phone || '—'}</td>
-                <td style="font-size: 12px; color: #10b981; font-weight: 600;">${l.value ? `R$ ${Number(l.value).toFixed(2)}` : '—'}</td>
-                <td>
-                  <span class="btn" style="padding: 2px 7px; font-size: 10.5px; background: ${l.status === 'sucesso' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color: ${l.status === 'sucesso' ? '#10b981' : '#ef4444'};">
-                    ● ${l.status.toUpperCase()}
-                  </span>
-                </td>
-                <td style="font-size: 11px; color: var(--text-muted);">
-                  ${l.error || (l.eventsReceived ? `${l.eventsReceived} evento(s) recebido(s)` : 'Simulado')}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${unifiedLogs.length === 0 ? `
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12.5px;">
+                    Nenhum evento registrado ainda.
+                  </td>
+                </tr>
+              ` : unifiedLogs.map(l => `
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px;">
+                      ${l.platform === 'facebook' ? FB_LOGO_SVG : TT_LOGO_SVG}
+                      <span style="color: ${l.platform === 'facebook' ? '#60a5fa' : '#fe2c55'};">
+                        ${l.platform === 'facebook' ? 'Facebook' : 'TikTok'}
+                      </span>
+                    </div>
+                  </td>
+                  <td style="font-size: 11.5px; color: var(--text-muted);">
+                    ${new Date(l.timestamp).toLocaleDateString()} ${new Date(l.timestamp).toLocaleTimeString()}
+                  </td>
+                  <td style="font-weight: 600; color: #fff;">${l.eventName || l.event}</td>
+                  <td style="font-family: monospace; font-size: 11.5px; color: #c4b5fd;">${l.pixelCode}</td>
+                  <td style="font-size: 12px;">${l.phone || '—'}</td>
+                  <td style="font-size: 12px; color: #10b981; font-weight: 600;">${l.value ? `R$ ${Number(l.value).toFixed(2)}` : '—'}</td>
+                  <td>
+                    <span class="btn" style="padding: 2px 7px; font-size: 10.5px; background: ${l.status === 'sucesso' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color: ${l.status === 'sucesso' ? '#10b981' : '#ef4444'};">
+                      ● ${(l.status || 'OK').toUpperCase()}
+                    </span>
+                  </td>
+                  <td style="font-size: 11px; color: var(--text-muted);">
+                    ${l.error || (l.eventsReceived ? `${l.eventsReceived} evento(s)` : (l.status === 'sucesso' ? 'Confirmado na API' : 'Pendente'))}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  `;
+    `;
 
-  document.getElementById('view-container').innerHTML = html;
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div class="card">Erro carregando pixels: ${err.message}</div>`;
+  }
+}
+
+function switchPixelTab(tab) {
+  state.activePixelTab = tab;
+  renderPixels();
 }
 
 function copyWebhookUrl() {
@@ -674,7 +1314,7 @@ async function savePixelConfig(e) {
     }).then(r => r.json());
 
     if (res.success) {
-      showToast('Pixel configurado e ativado com sucesso!', 'success');
+      showToast('Pixel do Facebook ativado com sucesso!', 'success');
       renderPixels();
     } else {
       showToast('Erro ao salvar pixel: ' + (res.error || 'Falha'), 'danger');
@@ -685,10 +1325,10 @@ async function savePixelConfig(e) {
 }
 
 async function deletePixelConfig(id) {
-  if (!confirm('Deseja excluir este Pixel?')) return;
+  if (!confirm('Deseja excluir este Pixel do Facebook?')) return;
   try {
     await fetch(`/api/pixels/${id}`, { method: 'DELETE' });
-    showToast('Pixel excluído com sucesso!');
+    showToast('Pixel do Facebook excluído com sucesso!');
     renderPixels();
   } catch (err) {
     showToast('Erro ao excluir: ' + err.message, 'danger');
@@ -696,10 +1336,10 @@ async function deletePixelConfig(id) {
 }
 
 async function testPixelManual(pixelId, accessToken, pageId, testEventCode) {
-  const phone = prompt('Digite um telefone para o teste (DDD+número, ex: 11912345678):', '11999998888');
+  const phone = prompt('Digite um telefone para teste (DDD+número):', '11999998888');
   if (!phone) return;
 
-  showToast('Enviando evento de teste para a Meta...', 'info');
+  showToast('Enviando evento de teste para o Facebook CAPI...', 'info');
 
   try {
     const res = await fetch('/api/pixels/test', {
@@ -718,7 +1358,7 @@ async function testPixelManual(pixelId, accessToken, pageId, testEventCode) {
     }).then(r => r.json());
 
     if (res.success) {
-      showToast(`✓ Sucesso! ${res.eventsReceived || 1} evento recebido pela Meta (Trace ID: ${res.fbTraceId || 'ok'})`, 'success');
+      showToast(`✓ Sucesso! Evento recebido pela Meta!`, 'success');
       renderPixels();
     } else {
       showToast('❌ Erro da Meta: ' + (res.error || 'Falha no disparo'), 'danger');
@@ -726,6 +1366,72 @@ async function testPixelManual(pixelId, accessToken, pageId, testEventCode) {
     }
   } catch (err) {
     showToast('Erro ao testar: ' + err.message, 'danger');
+  }
+}
+
+async function saveTikTokPixelConfig(e) {
+  e.preventDefault();
+  const name = document.getElementById('tt-pix-name').value.trim();
+  const pixel_code = document.getElementById('tt-pix-code').value.trim();
+  const access_token = document.getElementById('tt-pix-token').value.trim();
+
+  try {
+    const res = await fetch('/api/tiktok/pixels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pixel_code, access_token })
+    }).then(r => r.json());
+
+    if (res.success) {
+      showToast('Pixel do TikTok ativado com sucesso!', 'success');
+      renderPixels();
+    } else {
+      showToast('Erro ao salvar: ' + (res.error || 'Falha'), 'danger');
+    }
+  } catch (err) {
+    showToast('Erro de rede: ' + err.message, 'danger');
+  }
+}
+
+async function deleteTikTokPixelConfig(id) {
+  if (!confirm('Deseja excluir este Pixel do TikTok?')) return;
+  try {
+    await fetch(`/api/tiktok/pixels/${id}`, { method: 'DELETE' });
+    showToast('Pixel do TikTok excluído com sucesso!');
+    renderPixels();
+  } catch (err) {
+    showToast('Erro ao excluir: ' + err.message, 'danger');
+  }
+}
+
+async function testTikTokPixelManual(code, token) {
+  const phone = prompt('Digite um telefone para teste no TikTok:', '11999998888');
+  if (!phone) return;
+
+  showToast('Enviando evento para a TikTok Events API v1.3...', 'info');
+
+  try {
+    const res = await fetch('/api/tiktok/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixel_code: code,
+        access_token: token,
+        event_name: 'CompletePayment',
+        phone,
+        value: 49.90
+      })
+    }).then(r => r.json());
+
+    if (res.success) {
+      showToast('✓ Evento CompletePayment aceito pela TikTok Events API!', 'success');
+      renderPixels();
+    } else {
+      showToast('Erro do TikTok: ' + (res.error || 'Falha no disparo'), 'danger');
+      renderPixels();
+    }
+  } catch (err) {
+    showToast('Erro ao testar TikTok: ' + err.message, 'danger');
   }
 }
 
