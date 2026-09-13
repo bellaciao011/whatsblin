@@ -361,25 +361,5 @@
         "label": "✅ Comprovante R$ 200 Aprovado"
       }
     ]
-  },
-  {
-    "id": "fluxo-low-ticket-pix",
-    "name": "Fluxo Low Ticket Atualizado",
-    "description": "Funil de conversão rápida com envio imediato de chave PIX e desconto progressivo",
-    "status": "pausado",
-    "blocksCount": 21,
-    "updatedAt": "2026-09-11T23:42:00.000Z",
-    "nodes": [],
-    "edges": []
-  },
-  {
-    "id": "fluxo-mariana",
-    "name": "Fluxo Mariana (Atendimento Humano)",
-    "description": "Fluxo com transição suave para atendente humana após a qualificação do lead",
-    "status": "pausado",
-    "blocksCount": 18,
-    "updatedAt": "2026-09-10T21:57:00.000Z",
-    "nodes": [],
-    "edges": []
   }
 ]

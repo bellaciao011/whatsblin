@@ -1,11 +1,11 @@
 :root {
-  --bg-main: #0a0d14;
-  --bg-sidebar: #0f1420;
-  --bg-card: rgba(18, 24, 38, 0.75);
-  --bg-card-hover: rgba(26, 34, 52, 0.9);
-  --bg-input: #141b2a;
+  --bg-main: #000000;
+  --bg-sidebar: #080808;
+  --bg-card: #0d0d0d;
+  --bg-card-hover: #141414;
+  --bg-input: #121212;
   
-  --border-color: rgba(255, 255, 255, 0.07);
+  --border-color: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(37, 211, 102, 0.3);
   
   --wa-green: #25d366;
@@ -218,7 +218,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 32px;
-  background: rgba(15, 20, 32, 0.75);
+  background: rgba(8, 8, 8, 0.85);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -1395,13 +1395,13 @@ body {
    MODAL NOVA CONEXÃO (ESTILO LEONA FLOW / EMBEDDED SIGNUP)
    ========================================================================= */
 .leona-modal {
-  background: #0f1422;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #080808;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   width: 480px;
   max-width: 95%;
   padding: 24px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
   color: #f8fafc;
   animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }

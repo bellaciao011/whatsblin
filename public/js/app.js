@@ -71,7 +71,7 @@ function handleRoute() {
     'flow-canvas': '🕸️ Editor Visual de Fluxo (n8n Canvas)',
     instances: '🔌 Conexões (Meta Cloud API)',
     webhooks: '📡 Webhooks de Entrada',
-    settings: '📢 Facebook & IA',
+    settings: '🤖 Inteligência Artificial & Checkouts',
     studio: '🎨 Estúdio de Calibração das Provas',
     simulator: '🧪 Simulador de Lead'
   };
@@ -1244,83 +1244,10 @@ async function renderWebhooks() {
 async function renderSettings() {
   const settings = await fetch('/api/settings').then(r => r.json());
   const funnel = await fetch('/api/funnel').then(r => r.json());
-  const fb = await fetch('/api/facebook/status').then(r => r.json()).catch(() => ({ connected: false }));
   state.settings = settings;
   state.funnel = funnel;
-  state.facebook = fb;
-
-  const fbConnected = fb && fb.connected;
 
   const html = `
-    <!-- Card Principal de Integração com a Meta / Facebook Ads -->
-    <div class="card fb-connected-card" style="margin-bottom: 24px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
-        <div style="display: flex; align-items: center; gap: 14px;">
-          <div class="fb-logo-circle">f</div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <h3 style="font-size: 17px; font-weight: 700; color: #fff; margin: 0;">Integração Oficial Meta & Facebook Ads</h3>
-              <span class="btn" style="padding: 2px 8px; font-size: 11px; font-weight: 700; background: ${fbConnected ? 'rgba(37, 211, 102, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; color: ${fbConnected ? 'var(--wa-green)' : 'var(--text-muted)'};">
-                ${fbConnected ? '● CONECTADO' : '○ DESCONECTADO'}
-              </span>
-            </div>
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
-              ${fbConnected 
-                ? `Conectado como <strong>${fb.userName}</strong> (${fb.userEmail || 'ID: ' + fb.userId})` 
-                : 'Conecte sua conta do Facebook para importar Contas de Anúncio, Pixels e sincronizar WhatsApp Cloud API.'}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          ${fbConnected ? `
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-secondary" onclick="handleTestPixelEvent()">🎯 Testar Pixel (CAPI)</button>
-              <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="handleDisconnectFacebook()">Desconectar</button>
-            </div>
-          ` : `
-            <button class="btn-facebook" onclick="openFacebookModal()">
-              <span style="font-size: 16px; font-weight: 900;">f</span>
-              <span>Conectar com Facebook (Meta Ads)</span>
-            </button>
-          `}
-        </div>
-      </div>
-
-      ${fbConnected ? `
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
-          <div class="form-group" style="margin: 0;">
-            <label class="form-label" style="font-size: 12px;">Conta de Anúncios (Facebook Ads)</label>
-            <select class="form-select" id="fb-select-ad-account" onchange="handleSelectPixel(this.value, null)">
-              ${(fb.adAccounts || []).length > 0 
-                ? fb.adAccounts.map(acc => `<option value="${acc.id}" ${acc.id === fb.adAccountId ? 'selected' : ''}>${acc.name} (${acc.currency})</option>`).join('')
-                : '<option value="">Nenhuma conta de anúncios encontrada</option>'
-              }
-            </select>
-          </div>
-
-          <div class="form-group" style="margin: 0;">
-            <label class="form-label" style="font-size: 12px;">Pixel do Facebook (Conversions API)</label>
-            <select class="form-select" id="fb-select-pixel" onchange="handleSelectPixel(null, this.value)">
-              ${(fb.pixels || []).length > 0 
-                ? fb.pixels.map(p => `<option value="${p.id}" ${p.id === fb.pixelId ? 'selected' : ''}>${p.name} (ID: ${p.id})</option>`).join('')
-                : '<option value="">Nenhum pixel encontrado</option>'
-              }
-            </select>
-          </div>
-
-          <div class="form-group" style="margin: 0;">
-            <label class="form-label" style="font-size: 12px;">Números WhatsApp Conectados</label>
-            <div style="font-size: 12px; color: #34d399; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-              ${(fb.whatsappNumbers || []).length > 0
-                ? `${fb.whatsappNumbers.length} número(s) importado(s) da Meta`
-                : 'Webhook ativo configurado'}
-            </div>
-          </div>
-        </div>
-      ` : ''}
-    </div>
-
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
       <!-- Coluna 1: OpenAI & Cérebro do Bot -->
       <div class="card">

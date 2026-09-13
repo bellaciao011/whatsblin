@@ -113,7 +113,8 @@ const FlowBuilder = {
                   </td>
                   <td style="text-align: right;" onclick="event.stopPropagation()">
                     <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="FlowBuilder.openCanvas('${f.id}')">Abrir no Canvas ➔</button>
-                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="FlowBuilder.duplicateFlow('${f.id}')">📋</button>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" title="Duplicar fluxo" onclick="FlowBuilder.duplicateFlow('${f.id}')">📋</button>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" title="Excluir fluxo permanentemente" onclick="FlowBuilder.deleteFlow('${f.id}')">🗑️</button>
                   </td>
                 </tr>
               `).join('')}
@@ -160,6 +161,9 @@ const FlowBuilder = {
           </div>
 
           <div style="display: flex; gap: 10px;">
+            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="FlowBuilder.deleteFlow('${flow.id}')" title="Excluir este fluxo">
+              🗑️ Excluir Fluxo
+            </button>
             <button class="btn btn-primary" onclick="FlowBuilder.saveCurrentFlow()">
               💾 Salvar Fluxo
             </button>
@@ -1296,5 +1300,21 @@ const FlowBuilder = {
     await fetch(`/api/flows/${flowId}/duplicate`, { method: 'POST' });
     showToast('Fluxo duplicado!');
     FlowBuilder.renderList(document.getElementById('view-container'));
+  },
+
+  async deleteFlow(flowId) {
+    if (!confirm('Deseja realmente excluir este fluxo?')) return;
+    try {
+      const res = await fetch(`/api/flows/${flowId}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('✓ Fluxo excluído com sucesso!');
+        window.location.hash = '#flows';
+        FlowBuilder.renderList(document.getElementById('view-container'));
+      } else {
+        showToast('Erro ao excluir fluxo', 'error');
+      }
+    } catch(err) {
+      showToast('Erro: ' + err.message, 'error');
+    }
   }
 };

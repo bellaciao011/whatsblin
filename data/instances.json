@@ -1,14 +1,1 @@
-[
-  {
-    "id": "inst_1",
-    "name": "Chip Principal #1 (Meta Cloud API)",
-    "phoneNumber": "+55 71 99234-5678",
-    "phoneNumberId": "108492049283741",
-    "wabaId": "209384029384752",
-    "accessToken": "",
-    "status": "connected",
-    "totalSent": 142,
-    "totalReceived": 98,
-    "createdAt": "2026-09-12T12:00:00.000Z"
-  }
-]
+[]
