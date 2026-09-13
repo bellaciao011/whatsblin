@@ -34,7 +34,8 @@ const FlowBuilder = {
     { type: 'notification', label: 'Notificação', icon: '🔔', color: 'cyan', desc: 'Notificar atendente no WhatsApp ou Email' },
     { type: 'condition', label: 'Condicional', icon: '🔀', color: 'purple', desc: 'Desvio de rota por condição (SE/SENÃO)' },
     { type: 'distributor', label: 'Distribuidor', icon: '🔀', color: 'amber', desc: 'Distribuição entre múltiplos atendentes' },
-    { type: 'pixel', label: 'Pixel', icon: '🎯', color: 'amber', desc: 'Disparar evento do Facebook Pixel' },
+    { type: 'pixel', label: 'Pixel Facebook', icon: '🎯', color: 'amber', desc: 'Disparar evento do Facebook Pixel (CAPI)' },
+    { type: 'tiktok_pixel', label: 'Pixel TikTok', icon: '🎵', color: 'pink', desc: 'Disparar evento server-side TikTok Events API' },
     { type: 'delay', label: 'Intervalo Inteligente', icon: '⏱️', color: 'cyan', desc: 'Pausa realista simulando digitação' },
     { type: 'dept', label: 'Departamento', icon: '🏢', color: 'purple', desc: 'Transferir lead para setor específico' },
     { type: 'integration', label: 'Integração / API', icon: '🌐', color: 'darkblue', desc: 'Consulta de API externa ou Webhook' },
@@ -320,6 +321,42 @@ const FlowBuilder = {
                 <span>sucesso</span>
                 <span>erro</span>
               </div>
+            </div>
+          </div>
+          <div class="node-port port-in" title="Porta de Entrada"></div>
+          <div class="node-port port-out port-success" data-port="success" style="top: 48px; right: -7px;" title="Porta de Sucesso (verde)"></div>
+          <div class="node-port port-out port-error" data-port="error" style="top: 72px; right: -7px;" title="Porta de Erro (vermelho)"></div>
+        </div>
+      `;
+    }
+
+    if (node.type === 'tiktok_pixel') {
+      const pixelName = node.data?.pixelName || (node.data?.pixel_configurado_id ? `Pixel ${node.data.pixel_configurado_id}` : 'Pixel TikTok');
+      const eventType = node.data?.tipo_evento || node.data?.eventType || 'CompletePayment';
+      const val = node.data?.valor || node.data?.value || '{comprovante.valor}';
+      const currency = node.data?.moeda || node.data?.currency || 'BRL';
+      return `
+        <div class="flow-node node-tiktok-pixel" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
+          <div class="node-header" style="background: linear-gradient(135deg, #fe2c55, #25f4ee); color: #fff;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 14px;">🎵</span>
+              <span>${node.label || 'Pixel TikTok'}</span>
+            </div>
+            <div class="node-header-actions">
+              <span onclick="event.stopPropagation(); FlowBuilder.openNodeModal('${node.id}')" title="Editar">✏️</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.duplicateNode('${node.id}')" title="Duplicar">📋</span>
+              <span onclick="event.stopPropagation(); FlowBuilder.deleteNode('${node.id}')" title="Excluir">🗑️</span>
+            </div>
+          </div>
+          <div class="node-body" style="position: relative;">
+            <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 4px;">TikTok Events API v1.3:</div>
+            <div class="pixel-node-inner" style="border-left: 3px solid #fe2c55;">
+              <div style="font-weight: 700; color: #fe2c55; font-size: 12px;">${pixelName}</div>
+              <div style="color: #cbd5e1; font-size: 10.5px; margin-top: 2px;">${eventType} • ${val} ${currency}</div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; font-size: 10px; color: #94a3b8; padding-right: 10px; margin-top: 6px; flex-direction: column; align-items: flex-end;">
+              <span>sucesso</span>
+              <span>erro</span>
             </div>
           </div>
           <div class="node-port port-in" title="Porta de Entrada"></div>
@@ -689,7 +726,7 @@ const FlowBuilder = {
       if (fromNode && toNode) {
         const x1 = fromNode.x + 210;
         let y1 = fromNode.y + 40;
-        if (fromNode.type === 'integration') {
+        if (fromNode.type === 'integration' || fromNode.type === 'tiktok_pixel') {
           if (edge.fromPort === 'success' || (edge.label && edge.label.toLowerCase().includes('sucesso'))) {
             y1 = fromNode.y + 48;
           } else if (edge.fromPort === 'error' || (edge.label && edge.label.toLowerCase().includes('erro'))) {
@@ -850,6 +887,14 @@ const FlowBuilder = {
         return { tag: 'Lead Qualificado' };
       case 'kanban_step':
         return { columnId: 'em_analise', columnName: 'Em Análise' };
+      case 'tiktok_pixel':
+        return {
+          pixel_configurado_id: '',
+          tipo_evento: 'CompletePayment',
+          valor: '{comprovante.valor}',
+          moeda: 'BRL',
+          disparar_sem_atribuicao: true
+        };
       default:
         return { text: 'Configuração do bloco' };
     }
@@ -864,6 +909,9 @@ const FlowBuilder = {
 
     if (node.type === 'pixel') {
       return this.openPixelModal(node);
+    }
+    if (node.type === 'tiktok_pixel') {
+      return this.openTikTokPixelModal(node);
     }
     if (node.type === 'integration') {
       return this.openIntegrationModal(node);
@@ -1536,6 +1584,211 @@ const FlowBuilder = {
 
     document.getElementById('node-config-modal')?.remove();
     showToast('Pixel configurado com sucesso!', 'success');
+  },
+
+  /**
+   * MODAL ESPECÍFICO DO PIXEL TIKTOK (EVENTS API v1.3)
+   */
+  async openTikTokPixelModal(node) {
+    let pixels = [];
+    try {
+      pixels = await fetch('/api/tiktok/pixels').then(r => r.json());
+    } catch(e) { pixels = []; }
+
+    const selectedPixelId = node.data?.pixel_configurado_id || (pixels[0] ? pixels[0].pixel_code : '');
+    const selectedEvent = node.data?.tipo_evento || node.data?.eventType || 'CompletePayment';
+    const itemValue = node.data?.valor || node.data?.value || '{comprovante.valor}';
+    const currency = node.data?.moeda || node.data?.currency || 'BRL';
+    const allowWithoutAttr = node.data?.disparar_sem_atribuicao !== false;
+
+    const modalHtml = `
+      <div class="node-modal-backdrop" id="node-config-modal">
+        <div class="modal-tiktok-card">
+          <!-- Top Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="modal-header-icon-square" style="background: linear-gradient(135deg, #fe2c55, #25f4ee); color: #fff;">
+                🎵
+              </div>
+              <div>
+                <h3 style="font-size: 18px; font-weight: 700; margin: 0; font-family: 'Outfit', sans-serif;">Editar Pixel TikTok</h3>
+                <div style="font-size: 12px; color: var(--text-secondary);">Disparo Server-side via TikTok Events API v1.3</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()" style="border: none; background: transparent; font-size: 18px; color: var(--text-muted); cursor: pointer;">✕</button>
+          </div>
+
+          <!-- Pixel Configurado -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Pixel TikTok Configurado *</label>
+            <select class="form-select" id="modal-tt-pixel-id" style="border-color: rgba(254, 44, 85, 0.4);">
+              ${pixels.length > 0 ? pixels.map(p => `
+                <option value="${p.pixel_code}" ${p.pixel_code === selectedPixelId || p.id === selectedPixelId ? 'selected' : ''}>${p.name || 'Pixel'} (${p.pixel_code})</option>
+              `).join('') : `
+                <option value="" disabled selected>Nenhum pixel cadastrado ainda</option>
+              `}
+            </select>
+            <div style="font-size: 11px; color: #fe2c55; margin-top: 5px; cursor: pointer;" onclick="document.getElementById('node-config-modal').remove(); window.location.hash='#tiktok';">
+              ⚙️ Cadastrar ou gerenciar Pixels & Tokens na aba Atribuição TikTok
+            </div>
+          </div>
+
+          <!-- Tipo do Evento -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Tipo do evento (Events API) *</label>
+            <select class="form-select" id="modal-tt-event" style="border-color: rgba(254, 44, 85, 0.4);">
+              <option value="CompletePayment" ${selectedEvent === 'CompletePayment' ? 'selected' : ''}>CompletePayment (Pagamento Concluído / Venda)</option>
+              <option value="InitiateCheckout" ${selectedEvent === 'InitiateCheckout' ? 'selected' : ''}>InitiateCheckout (Início de Pagamento)</option>
+              <option value="Contact" ${selectedEvent === 'Contact' ? 'selected' : ''}>Contact (Contato no WhatsApp)</option>
+              <option value="SubmitForm" ${selectedEvent === 'SubmitForm' ? 'selected' : ''}>SubmitForm (Envio de Formulário/Número)</option>
+              <option value="ViewContent" ${selectedEvent === 'ViewContent' ? 'selected' : ''}>ViewContent (Visualização da Oferta)</option>
+            </select>
+          </div>
+
+          <!-- Valor do Item -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Valor da Conversão (R$)</label>
+            <div style="position: relative; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px;">
+              <input type="text" id="modal-tt-value" value="${itemValue}" class="form-input" style="border: none; background: transparent; padding: 0; font-size: 14px; width: 100%;">
+              <div style="margin-top: 8px;">
+                <button type="button" class="btn-var-mini" onclick="FlowBuilder.insertVariableTo('modal-tt-value', '{comprovante.valor}')" title="Inserir valor do comprovante">&lt;&gt;</button>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 5px;">
+              Pode ser um número fixo (ex: 49.90) ou a variável {comprovante.valor} / {valor_atual}.
+            </div>
+          </div>
+
+          <!-- Moeda -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">Moeda</label>
+            <select class="form-select" id="modal-tt-currency">
+              <option value="BRL" ${currency === 'BRL' ? 'selected' : ''}>BRL - Real Brasileiro</option>
+              <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD - Dólar Americano</option>
+              <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>EUR - Euro</option>
+            </select>
+          </div>
+
+          <!-- Checkbox Disparar Sem Atribuição -->
+          <div style="margin-bottom: 16px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: #f1f5f9;">
+              <input type="checkbox" id="modal-tt-allow-organic" ${allowWithoutAttr ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: #fe2c55;">
+              <span>Disparar mesmo sem atribuição de campanha</span>
+            </label>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 5px; margin-left: 27px; line-height: 1.4;">
+              Se marcado, o evento será enviado para leads orgânicos usando apenas o telefone E.164 (SHA-256 Advanced Matching). Se desmarcado, o nó será ignorado caso o lead não tenha vindo de um link de anúncio TikTok.
+            </div>
+          </div>
+
+          <!-- Status de Teste -->
+          <div id="modal-tt-test-result" style="display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; font-size: 12px;"></div>
+
+          <!-- Footer -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="FlowBuilder.testTikTokPixelModal('${node.id}')" style="border-color: rgba(254,44,85,0.4); color: #fe2c55;">⚡ Testar Disparo</button>
+            <div style="display: flex; gap: 10px;">
+              <button type="button" class="btn btn-secondary" onclick="document.getElementById('node-config-modal').remove()">Cancelar</button>
+              <button type="button" class="btn btn-primary" style="background: #fe2c55; border-color: #fe2c55; padding: 8px 24px; font-weight: 700;" onclick="FlowBuilder.saveTikTokPixelModal('${node.id}')">Salvar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  },
+
+  saveTikTokPixelModal(nodeId) {
+    const node = this.currentFlow.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    if (!node.data) node.data = {};
+    const pixelSel = document.getElementById('modal-tt-pixel-id');
+    node.data.pixel_configurado_id = pixelSel ? pixelSel.value : '';
+    node.data.pixelName = pixelSel && pixelSel.selectedOptions[0] && pixelSel.value ? pixelSel.selectedOptions[0].text : 'Pixel TikTok';
+
+    const eventSel = document.getElementById('modal-tt-event');
+    node.data.tipo_evento = eventSel ? eventSel.value : 'CompletePayment';
+    node.data.eventType = node.data.tipo_evento;
+
+    node.data.valor = document.getElementById('modal-tt-value')?.value || '{comprovante.valor}';
+    node.data.value = node.data.valor;
+    node.data.moeda = document.getElementById('modal-tt-currency')?.value || 'BRL';
+    node.data.currency = node.data.moeda;
+    node.data.disparar_sem_atribuicao = document.getElementById('modal-tt-allow-organic')?.checked ?? true;
+
+    const el = document.getElementById(nodeId);
+    if (el) {
+      const inner = el.querySelector('.pixel-node-inner');
+      if (inner) {
+        inner.innerHTML = `
+          <div style="font-weight: 700; color: #fe2c55; font-size: 12px;">${node.data.pixelName}</div>
+          <div style="color: #cbd5e1; font-size: 10.5px; margin-top: 2px;">${node.data.tipo_evento} • ${node.data.valor} ${node.data.moeda}</div>
+        `;
+      }
+    }
+
+    document.getElementById('node-config-modal')?.remove();
+    showToast('Pixel TikTok configurado com sucesso!', 'success');
+  },
+
+  async testTikTokPixelModal(nodeId) {
+    const pixelCode = document.getElementById('modal-tt-pixel-id')?.value;
+    const eventName = document.getElementById('modal-tt-event')?.value || 'CompletePayment';
+    const value = document.getElementById('modal-tt-value')?.value || '49.90';
+    const resultBox = document.getElementById('modal-tt-test-result');
+
+    if (!pixelCode) {
+      if (resultBox) {
+        resultBox.style.display = 'block';
+        resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        resultBox.style.color = '#ef4444';
+        resultBox.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        resultBox.textContent = '❌ Selecione ou cadastre um pixel TikTok antes de testar.';
+      }
+      return;
+    }
+
+    if (resultBox) {
+      resultBox.style.display = 'block';
+      resultBox.style.background = 'rgba(234, 179, 8, 0.15)';
+      resultBox.style.color = '#eab308';
+      resultBox.style.border = '1px solid rgba(234, 179, 8, 0.3)';
+      resultBox.textContent = '⏳ Enviando evento de teste para TikTok Events API v1.3...';
+    }
+
+    try {
+      const res = await fetch('/api/tiktok/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixel_code: pixelCode,
+          event_name: eventName,
+          value: parseFloat(String(value).replace(',', '.')) || 49.90,
+          phone: '5511999998888'
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        resultBox.style.background = 'rgba(37, 211, 102, 0.15)';
+        resultBox.style.color = '#25d366';
+        resultBox.style.border = '1px solid rgba(37, 211, 102, 0.3)';
+        resultBox.textContent = `✓ Disparo TikTok aceito com sucesso! (Event ID: ${data.eventId || 'OK'})`;
+      } else {
+        resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        resultBox.style.color = '#ef4444';
+        resultBox.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        resultBox.textContent = `❌ Resposta TikTok: ${data.error || 'Erro na API'}`;
+      }
+    } catch (err) {
+      if (resultBox) {
+        resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        resultBox.style.color = '#ef4444';
+        resultBox.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        resultBox.textContent = `❌ Falha ao testar: ${err.message}`;
+      }
+    }
   },
 
   /**

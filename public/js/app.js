@@ -100,6 +100,7 @@ function handleRoute() {
     'flow-canvas': '🕸️ Editor Visual de Fluxo (n8n Canvas)',
     instances: '🔌 Conexões (Meta Cloud API)',
     pixels: '🎯 Facebook Pixels & Conversions API (CAPI)',
+    tiktok: '🎵 Atribuição TikTok Ads & Server-side CAPI',
     webhooks: '📡 Webhooks de Entrada',
     settings: '🤖 Inteligência Artificial & Checkouts',
     studio: '🎨 Estúdio de Calibração das Provas',
@@ -118,6 +119,7 @@ function handleRoute() {
   else if (route === 'flow-canvas') FlowBuilder.renderCanvas(container, params.get('id') || 'fluxo-espiao-foto');
   else if (route === 'instances') renderInstances();
   else if (route === 'pixels') renderPixels();
+  else if (route === 'tiktok') renderTikTokAttribution();
   else if (route === 'webhooks') renderWebhooks();
   else if (route === 'settings') renderSettings();
   else if (route === 'studio') renderStudio();
@@ -2077,5 +2079,853 @@ async function saveCheckoutSettings(e) {
 
   showToast('Checkouts e dados de pagamento atualizados com sucesso!');
 }
+
+/* =========================================================================
+   VIEW: ATRIBUIÇÃO DE TRÁFEGO PAGO (TIKTOK ADS) & SERVER-SIDE CAPI
+   ========================================================================= */
+
+state.activeTikTokTab = 'report';
+
+async function renderTikTokAttribution() {
+  const container = document.getElementById('view-container');
+  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados de atribuição TikTok...</div>';
+
+  try {
+    const [reportRes, campaignsRes, pixelsRes, logsRes] = await Promise.all([
+      fetch('/api/traffic/report').then(r => r.json()).catch(() => ({ kpis: {}, campaignGroups: [], recentAttributions: [] })),
+      fetch('/api/traffic/campaigns').then(r => r.json()).catch(() => []),
+      fetch('/api/tiktok/pixels').then(r => r.json()).catch(() => []),
+      fetch('/api/tiktok/logs').then(r => r.json()).catch(() => [])
+    ]);
+
+    const activeTab = state.activeTikTokTab || 'report';
+    const kpis = reportRes.kpis || {};
+    const campaignGroups = reportRes.campaignGroups || [];
+    const recentAttributions = reportRes.recentAttributions || [];
+
+    const html = `
+      <div style="max-width: 1300px; margin: 0 auto;">
+        <!-- Top Bar com Logo TikTok -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #fe2c55, #25f4ee); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; box-shadow: 0 4px 20px rgba(254, 44, 85, 0.4);">
+              🎵
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: 22px; font-weight: 800; font-family: 'Outfit', sans-serif; margin: 0;">Atribuição de Tráfego TikTok Ads</h2>
+                <span style="background: rgba(254, 44, 85, 0.15); color: #fe2c55; border: 1px solid rgba(254, 44, 85, 0.3); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;">Events API v1.3</span>
+              </div>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                Rastreamento ponta a ponta: Anúncio TikTok ➔ Link Curto /c/:slug ➔ Pressel ➔ WhatsApp ➔ Venda Kirvano com disparo Server-side.
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="renderTikTokAttribution()" title="Recarregar Dados">🔄 Atualizar</button>
+            <button class="btn btn-primary" style="background: linear-gradient(135deg, #fe2c55, #e11d48); border: none; font-weight: 700;" onclick="openCreateCampaignModal()">+ Novo Link de Campanha</button>
+          </div>
+        </div>
+
+        <!-- Navegação de Abas -->
+        <div style="display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; overflow-x: auto;">
+          <button class="flows-tab-btn ${activeTab === 'report' ? 'active' : ''}" onclick="switchTikTokTab('report')" style="${activeTab === 'report' ? 'background: #fe2c55; color: #fff;' : ''}">
+            📊 Relatório & ROI (${campaignGroups.length})
+          </button>
+          <button class="flows-tab-btn ${activeTab === 'links' ? 'active' : ''}" onclick="switchTikTokTab('links')" style="${activeTab === 'links' ? 'background: #fe2c55; color: #fff;' : ''}">
+            🔗 Links de Campanha (${campaignsRes.length})
+          </button>
+          <button class="flows-tab-btn ${activeTab === 'pixels' ? 'active' : ''}" onclick="switchTikTokTab('pixels')" style="${activeTab === 'pixels' ? 'background: #fe2c55; color: #fff;' : ''}">
+            🎵 Pixels TikTok (${pixelsRes.length})
+          </button>
+          <button class="flows-tab-btn ${activeTab === 'simulator' ? 'active' : ''}" onclick="switchTikTokTab('simulator')" style="${activeTab === 'simulator' ? 'background: #fe2c55; color: #fff;' : ''}">
+            🧪 Testar Cadeia Completa
+          </button>
+        </div>
+
+        <!-- ABA 1: RELATÓRIO & ROI -->
+        <div id="tab-tt-pane-report" style="display: ${activeTab === 'report' ? 'block' : 'none'};">
+          <!-- KPI Cards -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div class="card" style="padding: 18px; border-left: 4px solid #3b82f6;">
+              <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Cliques Recebidos (/c/)</div>
+              <div style="font-size: 26px; font-weight: 800; margin-top: 6px; color: #fff;">${kpis.totalClicks || 0}</div>
+              <div style="font-size: 11.5px; color: #60a5fa; margin-top: 4px;">Leads que clicaram no criativo</div>
+            </div>
+
+            <div class="card" style="padding: 18px; border-left: 4px solid #10b981;">
+              <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Leads no WhatsApp</div>
+              <div style="font-size: 26px; font-weight: 800; margin-top: 6px; color: #10b981;">${kpis.totalLeads || 0}</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Taxa Clique ➔ Zap: <strong style="color: #10b981;">${kpis.globalLeadRate || '0%'}</strong></div>
+            </div>
+
+            <div class="card" style="padding: 18px; border-left: 4px solid #fe2c55;">
+              <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Vendas Confirmadas</div>
+              <div style="font-size: 26px; font-weight: 800; margin-top: 6px; color: #fe2c55;">${kpis.totalSales || 0}</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Conversão no Zap: <strong style="color: #fe2c55;">${kpis.globalSaleRate || '0%'}</strong></div>
+            </div>
+
+            <div class="card" style="padding: 18px; border-left: 4px solid #eab308;">
+              <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Faturamento Rastreado</div>
+              <div style="font-size: 26px; font-weight: 800; margin-top: 6px; color: #fef08a;">R$ ${(parseFloat(kpis.totalRevenue) || 0).toFixed(2)}</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Conversão Geral Clique ➔ Venda: <strong>${kpis.clickToSaleRate || '0%'}</strong></div>
+            </div>
+          </div>
+
+          <!-- Tabela de Performance por Campanha & Criativo -->
+          <div class="card" style="padding: 20px; margin-bottom: 24px;">
+            <div class="card-header" style="margin-bottom: 16px;">
+              <div>
+                <h3 class="card-title" style="font-size: 16px;">🎯 Conversão por Campanha & Criativo (TikTok Ads)</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                  Granularidade real agrupada por <code>utm_campaign</code> e <code>utm_content</code> do anúncio.
+                </p>
+              </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="flows-table">
+                <thead>
+                  <tr>
+                    <th>Campanha (UTM Campaign)</th>
+                    <th>Criativo / Anúncio (UTM Content)</th>
+                    <th>Canal</th>
+                    <th style="text-align: center;">Cliques</th>
+                    <th style="text-align: center;">WhatsApp</th>
+                    <th style="text-align: center;">Vendas</th>
+                    <th style="text-align: center;">Tx. Conv. Zap</th>
+                    <th style="text-align: right;">Faturamento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${campaignGroups.length > 0 ? campaignGroups.map(g => `
+                    <tr>
+                      <td>
+                        <strong style="color: #fff; font-size: 13.5px;">${g.campaign}</strong>
+                      </td>
+                      <td>
+                        <span style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; color: #cbd5e1;">${g.content}</span>
+                      </td>
+                      <td><span style="color: #94a3b8; font-size: 12px;">${g.source}</span></td>
+                      <td style="text-align: center; font-weight: 700; color: #60a5fa;">${g.clicks}</td>
+                      <td style="text-align: center; font-weight: 700; color: #10b981;">${g.leads}</td>
+                      <td style="text-align: center; font-weight: 700; color: #fe2c55;">${g.sales}</td>
+                      <td style="text-align: center;">
+                        <span style="font-size: 12px; font-weight: 700; color: ${parseFloat(g.conversionRate) > 0 ? '#10b981' : '#94a3b8'};">
+                          ${g.conversionRate}
+                        </span>
+                      </td>
+                      <td style="text-align: right; font-weight: 800; color: #fef08a;">${g.revenueFormatted}</td>
+                    </tr>
+                  `).join('') : `
+                    <tr>
+                      <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        Nenhum clique de campanha registrado ainda. Crie seu primeiro link na aba "Links de Campanha" e use-o no criativo do TikTok Ads Manager!
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tabela de Últimas Atribuições & Códigos Gerados -->
+          <div class="card" style="padding: 20px;">
+            <div class="card-header" style="margin-bottom: 14px;">
+              <div>
+                <h3 class="card-title" style="font-size: 16px;">⏱️ Registros Recentes de Atribuição (Últimos Códigos)</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                  Histórico de leads que clicaram no anúncio e migraram para o WhatsApp (expiração de 48h).
+                </p>
+              </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="flows-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Telefone Vinculado</th>
+                    <th>Campanha / Origem</th>
+                    <th>ttclid</th>
+                    <th>_ttp Cookie</th>
+                    <th>Criado Em</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentAttributions.length > 0 ? recentAttributions.map(a => {
+                    const isSold = a.venda_confirmada;
+                    const hasPhone = !!a.telefone_vinculado;
+                    return `
+                      <tr>
+                        <td>
+                          <span style="background: rgba(254,44,85,0.15); border: 1px solid rgba(254,44,85,0.4); color: #fe2c55; font-weight: 800; font-family: monospace; font-size: 13px; padding: 2px 8px; border-radius: 4px;">
+                            ${a.codigo}
+                          </span>
+                        </td>
+                        <td>
+                          ${hasPhone ? `
+                            <span style="color: #10b981; font-weight: 600; font-size: 13px;">✓ +${a.telefone_vinculado}</span>
+                          ` : `
+                            <span style="color: var(--text-muted); font-size: 12px; font-style: italic;">Aguardando 1ª msg...</span>
+                          `}
+                        </td>
+                        <td>
+                          <div style="font-size: 12.5px; color: #fff;">${a.campanha_nome || a.utm_campaign || 'Direto'}</div>
+                          <div style="font-size: 11px; color: var(--text-muted);">${a.utm_content || a.utm_source || 'tiktok'}</div>
+                        </td>
+                        <td>
+                          <span style="font-size: 11px; font-family: monospace; color: #94a3b8; max-width: 140px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.ttclid || '-'}">
+                            ${a.ttclid || '-'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style="font-size: 11px; font-family: monospace; color: #94a3b8; max-width: 110px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.ttp || '-'}">
+                            ${a.ttp ? '✓ Presente' : 'Não capturado'}
+                          </span>
+                        </td>
+                        <td style="font-size: 12px; color: var(--text-secondary);">
+                          ${new Date(a.criado_em).toLocaleString('pt-BR')}
+                        </td>
+                        <td>
+                          ${isSold ? `
+                            <span style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">
+                              💰 VENDA R$ ${(parseFloat(a.venda_valor) || 49.90).toFixed(2)}
+                            </span>
+                          ` : hasPhone ? `
+                            <span style="background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">
+                              💬 NO ZAP
+                            </span>
+                          ` : `
+                            <span style="background: rgba(255,255,255,0.06); color: var(--text-muted); font-size: 11px; padding: 3px 8px; border-radius: 4px;">
+                              CLIQUE (PRESS)
+                            </span>
+                          `}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('') : `
+                    <tr>
+                      <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                        Nenhum lead ou clique registrado ainda.
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA 2: LINKS DE CAMPANHA -->
+        <div id="tab-tt-pane-links" style="display: ${activeTab === 'links' ? 'block' : 'none'};">
+          <!-- Card de Explicação -->
+          <div class="card" style="padding: 16px; margin-bottom: 20px; background: rgba(254, 44, 85, 0.05); border: 1px solid rgba(254, 44, 85, 0.2);">
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+              <span style="font-size: 20px;">💡</span>
+              <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+                <strong>Como funciona o Gerador de Link do TikTok Ads:</strong><br>
+                1. Cadastre a URL da sua <strong>Pressel</strong> e o <strong>WhatsApp</strong> de atendimento.<br>
+                2. O sistema gera uma URL única tipo <code>/c/seu-slug</code>. Cole essa URL no anúncio do TikTok Ads Manager.<br>
+                3. Quando o lead clica no anúncio, o endpoint captura <code>ttclid</code>, <code>_ttp</code> e UTMs, gera um código de 6 caracteres único (ex: <code>AB79KP</code>) e redireciona (302) para a pressel com <code>?codigo=AB79KP</code>.<br>
+                4. O botão do WhatsApp na pressel envia a mensagem <code>Oii vim pelo TikTok (código AB79KP)</code>, completando a atribuição instantânea!
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela de Campanhas -->
+          <div class="card" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 class="card-title" style="font-size: 16px;">Campanhas & Links Cadastrados</h3>
+              <button class="btn btn-primary" style="background: #fe2c55; border: none; font-size: 13px;" onclick="openCreateCampaignModal()">+ Criar Link de Campanha</button>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="flows-table">
+                <thead>
+                  <tr>
+                    <th>Campanha</th>
+                    <th>Link Anúncio TikTok (Criativo)</th>
+                    <th>Destino (Pressel)</th>
+                    <th>WhatsApp de Destino</th>
+                    <th>Template da Mensagem</th>
+                    <th style="text-align: right;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${campaignsRes.length > 0 ? campaignsRes.map(c => `
+                    <tr>
+                      <td>
+                        <strong style="color: #fff; font-size: 14px;">${c.name}</strong>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ID: ${c.id}</div>
+                      </td>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <input type="text" class="form-input" readonly value="${c.shortUrl}" style="font-size: 12px; padding: 4px 8px; width: 220px; font-family: monospace; background: rgba(0,0,0,0.3); border-color: rgba(254,44,85,0.4); color: #fe2c55;" id="camp-url-${c.id}">
+                          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="copyToClipboard('${c.shortUrl}', 'Link de anúncio copiado!')">📋 Copiar</button>
+                        </div>
+                      </td>
+                      <td>
+                        <div style="font-size: 12px; color: #60a5fa; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                          <a href="${c.presell_url}" target="_blank" style="color: #60a5fa; text-decoration: none;">${c.presell_url}</a>
+                        </div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Redireciona com ?codigo=XXXXXX</div>
+                      </td>
+                      <td>
+                        <span style="font-weight: 600; color: #10b981; font-size: 13px;">+${c.whatsapp_number}</span>
+                      </td>
+                      <td>
+                        <div style="font-size: 11.5px; color: #cbd5e1; max-width: 220px; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 4px;">
+                          ${c.message_template}
+                        </div>
+                      </td>
+                      <td style="text-align: right;">
+                        <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                          <a href="${c.shortUrl}?ttclid=teste_manual_clique&utm_source=tiktok&utm_campaign=teste" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" title="Testar Redirect">🚀 Testar</a>
+                          <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; color: var(--red);" onclick="handleDeleteCampaign('${c.id}')" title="Excluir">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('') : `
+                    <tr>
+                      <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        Nenhuma campanha cadastrada ainda. Clique no botão acima para criar o link do seu anúncio!
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA 3: PIXELS TIKTOK & AUDITORIA -->
+        <div id="tab-tt-pane-pixels" style="display: ${activeTab === 'pixels' ? 'block' : 'none'};">
+          <!-- Header de Pixels -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; align-items: start;">
+            <!-- Pixels Cadastrados -->
+            <div class="card" style="padding: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                  <h3 class="card-title" style="font-size: 16px;">Pixels do TikTok (Events API)</h3>
+                  <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                    Tokens de longa duração cadastrados manualmente do TikTok Ads Manager.
+                  </p>
+                </div>
+                <button class="btn btn-primary" style="background: #fe2c55; border: none; font-size: 12px;" onclick="openCreateTikTokPixelModal()">+ Cadastrar Pixel</button>
+              </div>
+
+              ${pixelsRes.length > 0 ? pixelsRes.map(p => `
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(254,44,85,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span style="font-size: 20px;">🎵</span>
+                      <div>
+                        <strong style="color: #fff; font-size: 14px;">${p.name}</strong>
+                        <div style="font-size: 12px; color: #fe2c55; font-family: monospace;">Pixel Code: ${p.pixel_code}</div>
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px; color: var(--red);" onclick="handleDeleteTikTokPixel('${p.id}')">Excluir</button>
+                  </div>
+
+                  <div style="margin-top: 10px; font-size: 11px; color: var(--text-muted); font-family: monospace; background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    Access Token: ${p.access_token ? p.access_token.substring(0, 15) + '••••••••••••••••••••' : 'Sem token'}
+                  </div>
+
+                  <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+                    <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="handleTestTikTokPixel('${p.pixel_code}', '${p.access_token}')">⚡ Testar Envio (CompletePayment)</button>
+                  </div>
+                </div>
+              `).join('') : `
+                <div style="text-align: center; padding: 30px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 10px;">
+                  <div style="font-size: 28px; margin-bottom: 8px;">🎵</div>
+                  <div style="font-size: 13px; color: #fff; font-weight: 600;">Nenhum Pixel TikTok cadastrado</div>
+                  <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; max-width: 320px; margin-left: auto; margin-right: auto;">
+                    Cadastre o <strong>pixel_code</strong> e o <strong>access_token</strong> gerados no TikTok Events API para habilitar disparos server-side.
+                  </div>
+                  <button class="btn btn-primary" style="background: #fe2c55; border: none; margin-top: 14px; font-size: 12px;" onclick="openCreateTikTokPixelModal()">Cadastrar Meu Pixel Agora</button>
+                </div>
+              `}
+            </div>
+
+            <!-- Como Gerar o Token no TikTok -->
+            <div class="card" style="padding: 20px; background: rgba(18, 24, 38, 0.5);">
+              <h3 class="card-title" style="font-size: 15px; margin-bottom: 12px; color: #fff;">📘 Onde encontro o Pixel Code e Access Token?</h3>
+              <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.7;">
+                1. Entre no <strong>TikTok Ads Manager</strong> (ads.tiktok.com).<br>
+                2. No menu superior, vá em <strong>Ferramentas (Assets) ➔ Eventos (Events) ➔ Web Events</strong>.<br>
+                3. Clique no seu Pixel e vá na aba <strong>Configurações (Settings)</strong>.<br>
+                4. Role até <strong>Events API</strong> e clique em <strong>Generate Access Token</strong>.<br>
+                5. Copie o <strong>Pixel Code</strong> e o <strong>Access Token</strong> e cole no formulário ao lado.
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela de Logs de Disparo da API TikTok -->
+          <div class="card" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <div>
+                <h3 class="card-title" style="font-size: 16px;">📜 Logs de Disparo Server-side (Auditoria & Debug)</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                  Registro de cada requisição enviada para a API <code>https://business-api.tiktok.com/open_api/v1.3/event/track/</code>.
+                </p>
+              </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="flows-table">
+                <thead>
+                  <tr>
+                    <th>Data / Hora</th>
+                    <th>Evento</th>
+                    <th>Pixel Code</th>
+                    <th>Telefone (SHA-256)</th>
+                    <th>ttclid / Ad Callback</th>
+                    <th>Status HTTP</th>
+                    <th>Resposta da API</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${logsRes.length > 0 ? logsRes.map(l => `
+                    <tr>
+                      <td style="font-size: 12px; color: var(--text-secondary);">
+                        ${new Date(l.timestamp).toLocaleString('pt-BR')}
+                      </td>
+                      <td>
+                        <strong style="color: #fe2c55; font-size: 13px;">${l.event}</strong>
+                      </td>
+                      <td><span style="font-family: monospace; font-size: 12px;">${l.pixel_code}</span></td>
+                      <td>
+                        <span style="font-family: monospace; font-size: 11px; color: #94a3b8;" title="${l.phone_hash || '-'}">
+                          ${l.phone_hash ? l.phone_hash.substring(0, 16) + '...' : '-'}
+                        </span>
+                      </td>
+                      <td>
+                        <span style="font-family: monospace; font-size: 11px; color: #60a5fa;" title="${l.ttclid || '-'}">
+                          ${l.ttclid || '(orgânico)'}
+                        </span>
+                      </td>
+                      <td>
+                        <span style="font-weight: 700; font-size: 12px; color: ${l.status >= 200 && l.status < 300 ? '#10b981' : '#ef4444'};">
+                          ● ${l.status || 500}
+                        </span>
+                      </td>
+                      <td>
+                        <div style="font-size: 11px; font-family: monospace; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${JSON.stringify(l.response || {})}">
+                          ${typeof l.response === 'object' ? JSON.stringify(l.response) : String(l.response || l.error || 'OK')}
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('') : `
+                    <tr>
+                      <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                        Nenhum log de disparo registrado ainda.
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA 4: SIMULADOR DE CADEIA COMPLETA -->
+        <div id="tab-tt-pane-simulator" style="display: ${activeTab === 'simulator' ? 'block' : 'none'};">
+          <div class="card" style="padding: 24px; max-width: 850px; margin: 0 auto;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <span style="font-size: 28px;">🧪</span>
+              <div>
+                <h3 class="card-title" style="font-size: 18px;">Simulador de Cadeia Completa (1-Click)</h3>
+                <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
+                  Valide todo o ciclo de atribuição instantaneamente sem precisar criar anúncio real no TikTok nem gastar saldo.
+                </p>
+              </div>
+            </div>
+
+            <form onsubmit="handleRunTestChain(event)" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label class="form-label">Telefone Simulado do Lead (E.164)</label>
+                  <input type="text" class="form-input" id="sim-tt-phone" value="5511998877665" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Valor da Venda Simulado (R$)</label>
+                  <input type="text" class="form-input" id="sim-tt-amount" value="49.90" required>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px;">
+                <div class="form-group">
+                  <label class="form-label">UTM Campaign (Campanha)</label>
+                  <input type="text" class="form-input" id="sim-tt-campaign" value="tiktok_ads_espiao_vsl">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">UTM Content (Criativo)</label>
+                  <input type="text" class="form-input" id="sim-tt-content" value="criativo_audio_zap_v1">
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="btn-run-sim" style="width: 100%; margin-top: 16px; background: linear-gradient(135deg, #fe2c55, #25f4ee); border: none; font-size: 14px; font-weight: 800; padding: 12px;">
+                🚀 Disparar e Validar Toda a Cadeia de Atribuição
+              </button>
+            </form>
+
+            <!-- Área de Resultados do Diagnóstico -->
+            <div id="sim-chain-output" style="display: none;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div style="color: var(--red); padding: 40px; text-align: center;">Erro ao carregar Atribuição TikTok: ${err.message}</div>`;
+  }
+}
+
+function switchTikTokTab(tabName) {
+  state.activeTikTokTab = tabName;
+  ['report', 'links', 'pixels', 'simulator'].forEach(t => {
+    const pane = document.getElementById(`tab-tt-pane-${t}`);
+    if (pane) pane.style.display = t === tabName ? 'block' : 'none';
+  });
+  renderTikTokAttribution();
+}
+
+/**
+ * MODAL: CRIAR LINK DE CAMPANHA
+ */
+function openCreateCampaignModal() {
+  const host = window.location.host || 'localhost:3000';
+  const proto = window.location.protocol || 'http:';
+
+  const modalHtml = `
+    <div class="node-modal-backdrop" id="campaign-modal">
+      <div class="card" style="width: 580px; max-width: 96%; background: #111827; border: 1px solid rgba(254, 44, 85, 0.4); border-radius: 14px; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.8);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: #fe2c55; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+              🔗
+            </div>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: #fff;">Novo Link de Campanha TikTok</h3>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Gera a URL curta para usar no anúncio do TikTok Ads</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="document.getElementById('campaign-modal').remove()" style="border: none; background: transparent; font-size: 18px;">✕</button>
+        </div>
+
+        <form onsubmit="handleCreateCampaign(event)">
+          <div class="form-group">
+            <label class="form-label">Nome da Campanha (Uso Interno) *</label>
+            <input type="text" class="form-input" id="camp-input-name" placeholder="Ex: Espião WhatsApp - VSL 01" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Slug da URL Curta (Opcional)</label>
+            <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding-left: 10px;">
+              <span style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${proto}//${host}/c/</span>
+              <input type="text" class="form-input" id="camp-input-slug" placeholder="espiao-vsl-01" style="border: none; background: transparent; font-family: monospace;">
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Deixe vazio para gerar automaticamente com base no nome.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">URL de Destino (A Pressel) *</label>
+            <input type="url" class="form-input" id="camp-input-presell" placeholder="https://minhapressel.com" value="https://minhapressel.com" required>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">O sistema redirecionará o lead para essa página adicionando <code>?codigo=XXXXXX</code></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Número de WhatsApp de Destino (DDI + DDD + Número) *</label>
+            <input type="text" class="form-input" id="camp-input-whatsapp" placeholder="5511999998888" value="5511999998888" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Template da Mensagem do WhatsApp *</label>
+            <textarea class="form-textarea" id="camp-input-template" style="min-height: 80px;" required>Oii vim pelo TikTok (código {codigo})</textarea>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">A tag <code>{codigo}</code> será substituída pelo código único de 6 caracteres na pressel.</div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('campaign-modal').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="background: #fe2c55; border: none; font-weight: 700; padding: 8px 22px;">Criar Link</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleCreateCampaign(e) {
+  e.preventDefault();
+  const name = document.getElementById('camp-input-name').value.trim();
+  const slug = document.getElementById('camp-input-slug').value.trim();
+  const presell_url = document.getElementById('camp-input-presell').value.trim();
+  const whatsapp_number = document.getElementById('camp-input-whatsapp').value.trim();
+  const message_template = document.getElementById('camp-input-template').value.trim();
+
+  try {
+    const res = await fetch('/api/traffic/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, slug, presell_url, whatsapp_number, message_template })
+    });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('campaign-modal')?.remove();
+    showToast('✓ Link de campanha criado com sucesso!', 'success');
+    state.activeTikTokTab = 'links';
+    renderTikTokAttribution();
+  } catch (err) {
+    showToast(`Erro ao criar campanha: ${err.message}`, 'error');
+  }
+}
+
+async function handleDeleteCampaign(id) {
+  if (!confirm('Deseja realmente excluir este link de campanha?')) return;
+  try {
+    await fetch(`/api/traffic/campaigns/${id}`, { method: 'DELETE' });
+    showToast('Campanha excluída com sucesso.');
+    renderTikTokAttribution();
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
+/**
+ * MODAL: CADASTRAR PIXEL TIKTOK
+ */
+function openCreateTikTokPixelModal() {
+  const modalHtml = `
+    <div class="node-modal-backdrop" id="pixel-tt-modal">
+      <div class="card" style="width: 580px; max-width: 96%; background: #111827; border: 1px solid rgba(254, 44, 85, 0.4); border-radius: 14px; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.8);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: #fe2c55; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+              🎵
+            </div>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: #fff;">Cadastrar Pixel TikTok (Events API)</h3>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Disparos server-side diretos no TikTok Ads Manager</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="document.getElementById('pixel-tt-modal').remove()" style="border: none; background: transparent; font-size: 18px;">✕</button>
+        </div>
+
+        <form onsubmit="handleCreateTikTokPixel(event)">
+          <div class="form-group">
+            <label class="form-label">Nome de Identificação (Ex: Pixel Principal TikTok)</label>
+            <input type="text" class="form-input" id="pix-tt-name" placeholder="Pixel Oficial TikTok Ads" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pixel Code (ID do Pixel) *</label>
+            <input type="text" class="form-input" id="pix-tt-code" placeholder="Ex: C0A1B2C3D4E5F6" style="font-family: monospace;" required>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Encontrado nas configurações do seu Pixel no TikTok Events Manager.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Access Token (Events API) *</label>
+            <textarea class="form-textarea" id="pix-tt-token" style="min-height: 90px; font-family: monospace; font-size: 12px;" placeholder="Cole aqui seu Access Token gerado em Events API > Generate Access Token" required></textarea>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Token seguro e de longa duração gerado no TikTok Ads Manager.</div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('pixel-tt-modal').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="background: #fe2c55; border: none; font-weight: 700; padding: 8px 22px;">Salvar Pixel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleCreateTikTokPixel(e) {
+  e.preventDefault();
+  const name = document.getElementById('pix-tt-name').value.trim();
+  const pixel_code = document.getElementById('pix-tt-code').value.trim();
+  const access_token = document.getElementById('pix-tt-token').value.trim();
+
+  try {
+    const res = await fetch('/api/tiktok/pixels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pixel_code, access_token })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('pixel-tt-modal')?.remove();
+    showToast('✓ Pixel TikTok salvo com sucesso!', 'success');
+    state.activeTikTokTab = 'pixels';
+    renderTikTokAttribution();
+  } catch (err) {
+    showToast(`Erro ao salvar pixel: ${err.message}`, 'error');
+  }
+}
+
+async function handleDeleteTikTokPixel(id) {
+  if (!confirm('Deseja excluir este Pixel TikTok?')) return;
+  try {
+    await fetch(`/api/tiktok/pixels/${id}`, { method: 'DELETE' });
+    showToast('Pixel excluído.');
+    renderTikTokAttribution();
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
+async function handleTestTikTokPixel(pixelCode, accessToken) {
+  showToast('Enviando evento de teste CompletePayment para TikTok Events API...');
+  try {
+    const res = await fetch('/api/tiktok/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixel_code: pixelCode,
+        access_token: accessToken,
+        event_name: 'CompletePayment',
+        phone: '5511999998888',
+        value: 49.90
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast('✓ Evento enviado com sucesso para a TikTok Events API v1.3!', 'success');
+    } else {
+      showToast(`Resposta do TikTok: ${data.error || 'Erro na API'}`, 'error');
+    }
+    renderTikTokAttribution();
+  } catch (err) {
+    showToast(`Erro no teste: ${err.message}`, 'error');
+  }
+}
+
+/**
+ * SIMULADOR DE CADEIA COMPLETA (TEST CHAIN)
+ */
+async function handleRunTestChain(e) {
+  e.preventDefault();
+  const phone = document.getElementById('sim-tt-phone').value.trim();
+  const amount = document.getElementById('sim-tt-amount').value.trim();
+  const campaign = document.getElementById('sim-tt-campaign').value.trim();
+  const content = document.getElementById('sim-tt-content').value.trim();
+
+  const output = document.getElementById('sim-chain-output');
+  const submitBtn = document.getElementById('btn-run-sim');
+
+  if (output) {
+    output.style.display = 'block';
+    output.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: #eab308;">
+        <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+        <div>Executando cadeia completa de validação...</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">(Clique ➔ Inbound WhatsApp ➔ Binding ➔ Venda Kirvano ➔ TikTok API)</div>
+      </div>
+    `;
+  }
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/tiktok/test-chain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, amount, utm_campaign: campaign, utm_content: content })
+    });
+    const data = await res.json();
+    const d = data.diagnostics || {};
+
+    const badgeSuccess = '<span style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">✓ APROVADO</span>';
+    const badgeFailed = '<span style="background: rgba(239,68,68,0.15); color: #ef4444; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">❌ FALHA</span>';
+
+    output.innerHTML = `
+      <div style="background: rgba(18, 24, 38, 0.9); border: 1px solid ${data.success ? 'rgba(37, 211, 102, 0.4)' : 'rgba(239, 68, 68, 0.4)'}; border-radius: 12px; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h4 style="font-size: 16px; font-weight: 700; color: #fff; margin: 0;">
+            ${data.success ? '🎉 Cadeia Completa Validada com Sucesso!' : '⚠️ Atenção nos Resultados da Cadeia'}
+          </h4>
+          <span style="font-size: 12px; color: var(--text-muted);">Código: <strong style="color: #fe2c55; font-family: monospace;">${d.summary?.code || '-'}</strong></span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Etapa 1 -->
+          <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>1. Clique no Anúncio & Geração do Código</strong>
+              ${d.step1_click?.status === 'success' ? badgeSuccess : badgeFailed}
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px;">
+              Código gerado: <code style="color: #fe2c55;">${d.step1_click?.code}</code> • ttclid: <code>${d.step1_click?.ttclid}</code> • Redirect: <code>${d.step1_click?.redirect_url}</code>
+            </div>
+          </div>
+
+          <!-- Etapa 2 -->
+          <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>2. Recebimento da Mensagem WhatsApp</strong>
+              ${d.step2_inbound_message?.status === 'success' ? badgeSuccess : badgeFailed}
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px;">
+              Mensagem recebida: <code style="color: #10b981;">"${d.step2_inbound_message?.messageSent}"</code> de <code>+${d.step2_inbound_message?.leadPhone}</code>
+            </div>
+          </div>
+
+          <!-- Etapa 3 -->
+          <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>3. Vinculação do Telefone E.164 no Banco</strong>
+              ${d.step3_phone_binding?.status === 'success' ? badgeSuccess : badgeFailed}
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px;">
+              ${d.step3_phone_binding?.message} (Telefone vinculado: <code>+${d.step3_phone_binding?.verifiedPhone}</code>)
+            </div>
+          </div>
+
+          <!-- Etapa 4 -->
+          <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>4. Confirmação da Venda & Disparo TikTok Events API</strong>
+              ${d.step4_sale_and_capi?.status === 'success' ? badgeSuccess : badgeFailed}
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px;">
+              Venda confirmada: <strong style="color: #25d366;">R$ ${d.step4_sale_and_capi?.venda_valor}</strong> • API Status: <code>${d.step4_sale_and_capi?.tiktok_api?.message || (d.step4_sale_and_capi?.tiktok_api?.success ? 'Disparo Server-side aceito pelo TikTok!' : 'Erro')}</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    showToast('✓ Simulação da cadeia completa finalizada!', 'success');
+  } catch (err) {
+    output.innerHTML = `<div style="color: #ef4444; padding: 20px;">Erro na simulação: ${err.message}</div>`;
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function copyToClipboard(text, msg = 'Copiado com sucesso!') {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast(msg, 'success'));
+  } else {
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+    showToast(msg, 'success');
+  }
+}
+
 
 

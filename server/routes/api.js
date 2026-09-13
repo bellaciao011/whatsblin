@@ -6,6 +6,7 @@ const db = require('../storage/db');
 const { composeProofImage } = require('../services/imageComposer');
 const { processIncomingMessage, lookupProfilePicture, eventBus } = require('../services/flowEngine');
 const metaService = require('../services/metaService');
+const tiktokService = require('../services/tiktokService');
 const authService = require('../services/authService');
 
 /**
@@ -394,11 +395,12 @@ router.all(['/generate-proof', '/gerar-foto'], async (req, res) => {
  * Simulador de Lead (Teste completo dentro do Dashboard)
  */
 router.post('/simulator/send', async (req, res) => {
-  const { instanceId, phone, message } = req.body;
-  if (!phone || !message) return res.status(400).json({ error: 'Telefone e mensagem são obrigatórios' });
+  const { instanceId, phone } = req.body;
+  const messageText = req.body.message || req.body.text;
+  if (!phone || !messageText) return res.status(400).json({ error: 'Telefone e mensagem são obrigatórios' });
 
   // Dispara a mesma lógica do webhook
-  processIncomingMessage(instanceId || 'inst_1', phone, message);
+  await processIncomingMessage(instanceId || 'inst_1', phone, messageText);
   res.json({ success: true, message: 'Mensagem processada no funil' });
 });
 
@@ -804,8 +806,10 @@ router.post('/webhooks/payment', async (req, res) => {
       }
     }
 
-    // Se estiver aprovado, dispara evento Purchase no Pixel configurado
+    // Se estiver aprovado, confirma venda na atribuição de tráfego e dispara Pixels
     if (isApproved) {
+      db.confirmAttributionSale(cleanPhone, amount);
+
       const pixels = db.getPixels();
       if (pixels && pixels.length > 0) {
         const primaryPixel = pixels[0];
@@ -825,6 +829,24 @@ router.post('/webhooks/payment', async (req, res) => {
         } catch (pixErr) {
           console.warn('[Webhook Payment] Aviso disparando CAPI:', pixErr.message);
         }
+      }
+
+      // Disparo TikTok Events API v1.3
+      const ttPixels = db.getTikTokPixels();
+      if (ttPixels && ttPixels.length > 0) {
+        const attribution = db.getTrafficAttributionByPhone(cleanPhone);
+        tiktokService.sendTikTokEvent({
+          pixelCode: ttPixels[0].pixel_code,
+          accessToken: ttPixels[0].access_token,
+          eventName: 'CompletePayment',
+          phone: cleanPhone,
+          attribution,
+          value: amount,
+          currency: 'BRL',
+          eventId: `tt_sale_${cleanPhone}_${Date.now()}`
+        }).catch(ttErr => {
+          console.warn('[Webhook Payment] Aviso disparando TikTok Events API:', ttErr.message);
+        });
       }
     }
 
@@ -987,6 +1009,348 @@ router.post('/integrations/test', async (req, res) => {
       error: err.message,
       data: { error: err.message, code: 'FETCH_ERROR' }
     });
+  }
+});
+
+/**
+ * =========================================================================
+ * ATRIBUIÇÃO DE TRÁFEGO PAGO (TIKTOK ADS) & LINKS DE CAMPANHA
+ * =========================================================================
+ */
+
+// Listar campanhas de tráfego
+router.get('/traffic/campaigns', (req, res) => {
+  const campaigns = db.getTrafficCampaigns();
+  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.protocol || 'http';
+  const baseUrl = `${protocol}://${host}`;
+
+  const mapped = campaigns.map(c => ({
+    ...c,
+    shortUrl: `${baseUrl}/c/${c.slug}`,
+    targetPresellWithCodeSample: `${c.presell_url}${c.presell_url.includes('?') ? '&' : '?'}codigo=AB79KP`,
+    whatsappSample: `https://wa.me/${(c.whatsapp_number || '').replace(/\D/g, '')}?text=${encodeURIComponent((c.message_template || '').replace('{codigo}', 'AB79KP'))}`
+  }));
+
+  res.json(mapped);
+});
+
+// Criar nova campanha
+router.post('/traffic/campaigns', (req, res) => {
+  const { name, presell_url, whatsapp_number, message_template, slug } = req.body;
+
+  if (!name || !presell_url || !whatsapp_number) {
+    return res.status(400).json({ error: 'Nome, URL de destino (pressel) e WhatsApp são obrigatórios' });
+  }
+
+  const campaign = db.addTrafficCampaign({
+    name,
+    presell_url,
+    whatsapp_number,
+    message_template,
+    slug
+  });
+
+  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.protocol || 'http';
+  const baseUrl = `${protocol}://${host}`;
+
+  res.json({
+    success: true,
+    campaign: {
+      ...campaign,
+      shortUrl: `${baseUrl}/c/${campaign.slug}`
+    }
+  });
+});
+
+// Excluir campanha
+router.delete('/traffic/campaigns/:id', (req, res) => {
+  const ok = db.deleteTrafficCampaign(req.params.id);
+  res.json({ success: ok });
+});
+
+// Listar atribuições de tráfego (acessos brutos)
+router.get('/traffic/attributions', (req, res) => {
+  res.json(db.getTrafficAttributions());
+});
+
+// Relatório consolidado de tráfego agrupado por UTM Campaign / UTM Content
+router.get('/traffic/report', (req, res) => {
+  const attributions = db.getTrafficAttributions();
+  const totalClicks = attributions.length;
+  const totalLeads = attributions.filter(a => a.telefone_vinculado).length;
+  const totalSales = attributions.filter(a => a.venda_confirmada).length;
+  const totalRevenue = attributions.filter(a => a.venda_confirmada).reduce((acc, a) => acc + (parseFloat(a.venda_valor) || 0), 0);
+
+  const globalLeadRate = totalClicks > 0 ? ((totalLeads / totalClicks) * 100).toFixed(1) : '0.0';
+  const globalSaleRate = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(1) : '0.0';
+  const clickToSaleRate = totalClicks > 0 ? ((totalSales / totalClicks) * 100).toFixed(1) : '0.0';
+
+  // Agrupamento por UTM Campaign + UTM Content
+  const groups = {};
+  attributions.forEach(attr => {
+    const campKey = attr.campanha_nome || attr.utm_campaign || 'Orgânico / Direto';
+    const contentKey = attr.utm_content || '-';
+    const sourceKey = attr.utm_source || 'tiktok';
+    const groupKey = `${campKey}___${contentKey}___${sourceKey}`;
+
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        campaign: campKey,
+        content: contentKey,
+        source: sourceKey,
+        utm_medium: attr.utm_medium || '-',
+        clicks: 0,
+        leads: 0,
+        sales: 0,
+        revenue: 0,
+        recentAt: attr.criado_em
+      };
+    }
+
+    groups[groupKey].clicks += 1;
+    if (attr.telefone_vinculado) groups[groupKey].leads += 1;
+    if (attr.venda_confirmada) {
+      groups[groupKey].sales += 1;
+      groups[groupKey].revenue += (parseFloat(attr.venda_valor) || 0);
+    }
+  });
+
+  const groupedRows = Object.values(groups).map(g => ({
+    ...g,
+    revenueFormatted: `R$ ${g.revenue.toFixed(2)}`,
+    leadRate: g.clicks > 0 ? `${((g.leads / g.clicks) * 100).toFixed(1)}%` : '0.0%',
+    conversionRate: g.leads > 0 ? `${((g.sales / g.leads) * 100).toFixed(1)}%` : '0.0%',
+    clickToSaleRate: g.clicks > 0 ? `${((g.sales / g.clicks) * 100).toFixed(1)}%` : '0.0%'
+  })).sort((a, b) => b.sales - a.sales || b.clicks - a.clicks);
+
+  res.json({
+    kpis: {
+      totalClicks,
+      totalLeads,
+      totalSales,
+      totalRevenue: totalRevenue.toFixed(2),
+      globalLeadRate: `${globalLeadRate}%`,
+      globalSaleRate: `${globalSaleRate}%`,
+      clickToSaleRate: `${clickToSaleRate}%`
+    },
+    campaignGroups: groupedRows,
+    recentAttributions: attributions.slice(0, 50)
+  });
+});
+
+/**
+ * =========================================================================
+ * PIXELS TIKTOK (EVENTS API v1.3)
+ * =========================================================================
+ */
+
+// Listar pixels cadastrados
+router.get('/tiktok/pixels', (req, res) => {
+  res.json(db.getTikTokPixels());
+});
+
+// Cadastrar/atualizar pixel
+router.post('/tiktok/pixels', (req, res) => {
+  const { name, pixel_code, access_token } = req.body;
+  if (!pixel_code || !access_token) {
+    return res.status(400).json({ error: 'pixel_code e access_token são obrigatórios' });
+  }
+
+  const saved = db.addTikTokPixel({
+    name: name || 'Pixel TikTok',
+    pixel_code,
+    access_token
+  });
+
+  res.json({ success: true, pixel: saved });
+});
+
+// Excluir pixel
+router.delete('/tiktok/pixels/:id', (req, res) => {
+  const ok = db.deleteTikTokPixel(req.params.id);
+  res.json({ success: ok });
+});
+
+// Logs de disparo do TikTok
+router.get('/tiktok/logs', (req, res) => {
+  res.json(db.getTikTokLogs());
+});
+
+// Disparo de teste para o TikTok Pixel
+router.post('/tiktok/test', async (req, res) => {
+  try {
+    const { pixel_code, access_token, event_name, phone, value } = req.body;
+    let code = pixel_code;
+    let token = access_token;
+
+    if (!code || !token) {
+      const pixels = db.getTikTokPixels();
+      if (pixels.length > 0) {
+        code = code || pixels[0].pixel_code;
+        token = token || pixels[0].access_token;
+      }
+    }
+
+    if (!code || !token) {
+      return res.status(400).json({ success: false, error: 'Cadastre um Pixel TikTok com pixel_code e access_token antes de testar.' });
+    }
+
+    const testPhone = phone || '5511999998888';
+    const testEvent = event_name || 'CompletePayment';
+    const testValue = parseFloat(value) || 49.90;
+
+    const result = await tiktokService.sendTikTokEvent({
+      pixelCode: code,
+      accessToken: token,
+      eventName: testEvent,
+      phone: testPhone,
+      attribution: {
+        ttclid: 'TEST_TTCLID_MANUAL_' + Date.now(),
+        ttp: 'TEST_TTP_COOKIE_DEMO',
+        pressel_url: 'https://minhapressel.com'
+      },
+      value: testValue,
+      currency: 'BRL',
+      eventId: `tt_test_manual_${Date.now()}`
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * =========================================================================
+ * SIMULADOR DE CADEIA COMPLETA DE ATRIBUIÇÃO (TEST CHAIN)
+ * =========================================================================
+ * Requisito 7: Endpoint de teste que simula uma passagem completa:
+ * 1. Gera clique de anúncio TikTok com ttclid, utm_campaign, utm_content, _ttp e código único
+ * 2. Simula o lead enviando a mensagem no WhatsApp com o código
+ * 3. Valida se telefone_vinculado foi preenchido
+ * 4. Simula confirmação de venda e disparo da TikTok Events API
+ * 5. Retorna o diagnóstico detalhado de toda a cadeia
+ */
+router.post('/tiktok/test-chain', async (req, res) => {
+  try {
+    const testPhone = req.body.phone ? String(req.body.phone).replace(/\D/g, '') : `55119${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const testCampaign = req.body.utm_campaign || 'tiktok_ads_espiao_vsl';
+    const testContent = req.body.utm_content || 'criativo_audio_zap_v1';
+    const testAmount = parseFloat(req.body.amount) || 49.90;
+
+    const diagnostics = {
+      step1_click: { status: 'pending' },
+      step2_inbound_message: { status: 'pending' },
+      step3_phone_binding: { status: 'pending' },
+      step4_sale_and_capi: { status: 'pending' },
+      summary: {}
+    };
+
+    // ETAPA 1: Simular clique no link /c/ e gravação de atribuição
+    const code = db.generateUniqueAttributionCode();
+    const ttclid = 'ttclid_test_' + Date.now();
+    const ttp = 'ttp_cookie_test_' + Math.random().toString(36).substring(2, 10);
+
+    const attribution = db.addTrafficAttribution({
+      codigo: code,
+      ttclid,
+      ttp,
+      utm_source: 'tiktok',
+      utm_medium: 'paid_cpc',
+      utm_campaign: testCampaign,
+      utm_content: testContent,
+      utm_term: 'espiao_whatsapp',
+      campanha_nome: 'Campanha Teste TikTok Ads',
+      pressel_url: 'https://minhapressel.com/oferta'
+    });
+
+    diagnostics.step1_click = {
+      status: 'success',
+      code: code,
+      ttclid: ttclid,
+      ttp: ttp,
+      redirect_url: `https://minhapressel.com/oferta?codigo=${code}`,
+      attributionId: attribution.id
+    };
+
+    // ETAPA 2: Simular lead chegando no WhatsApp com o template de mensagem
+    const incomingText = `Oii vim pelo TikTok (código ${code})`;
+    // Executa a vinculação via processIncomingMessage
+    await processIncomingMessage('inst_1', testPhone, incomingText);
+
+    diagnostics.step2_inbound_message = {
+      status: 'success',
+      leadPhone: testPhone,
+      messageSent: incomingText
+    };
+
+    // ETAPA 3: Verificar vinculação no banco
+    const updatedAttr = db.getTrafficAttributionByCode(code);
+    const isBound = updatedAttr && updatedAttr.telefone_vinculado === testPhone;
+
+    diagnostics.step3_phone_binding = {
+      status: isBound ? 'success' : 'failed',
+      verifiedPhone: updatedAttr?.telefone_vinculado || null,
+      vinculado_em: updatedAttr?.vinculado_em || null,
+      message: isBound ? 'Telefone E.164 vinculado com sucesso à atribuição!' : 'Falha ao vincular telefone ao código.'
+    };
+
+    // ETAPA 4: Simular venda confirmada e disparo TikTok Events API
+    let tiktokDispatchResult = null;
+    const ttPixels = db.getTikTokPixels();
+    if (ttPixels && ttPixels.length > 0) {
+      tiktokDispatchResult = await tiktokService.sendTikTokEvent({
+        pixelCode: ttPixels[0].pixel_code,
+        accessToken: ttPixels[0].access_token,
+        eventName: 'CompletePayment',
+        phone: testPhone,
+        attribution: updatedAttr,
+        value: testAmount,
+        currency: 'BRL',
+        eventId: `sim_chain_${Date.now()}`
+      });
+    } else {
+      tiktokDispatchResult = {
+        success: true,
+        skipped: true,
+        message: 'Nenhum pixel TikTok cadastrado no painel. Venda confirmada no banco com sucesso.'
+      };
+    }
+
+    // Confirma a venda na atribuição
+    db.confirmAttributionSale(testPhone, testAmount);
+
+    const finalAttr = db.getTrafficAttributionByCode(code);
+
+    diagnostics.step4_sale_and_capi = {
+      status: finalAttr?.venda_confirmada ? 'success' : 'failed',
+      venda_confirmada: finalAttr?.venda_confirmada || false,
+      venda_valor: finalAttr?.venda_valor || testAmount,
+      confirmado_em: finalAttr?.confirmado_em || null,
+      tiktok_api: tiktokDispatchResult
+    };
+
+    diagnostics.summary = {
+      allStepsPassed: diagnostics.step1_click.status === 'success' &&
+                       diagnostics.step2_inbound_message.status === 'success' &&
+                       diagnostics.step3_phone_binding.status === 'success' &&
+                       diagnostics.step4_sale_and_capi.status === 'success',
+      code: code,
+      phone: testPhone,
+      campaign: testCampaign,
+      content: testContent,
+      saleConfirmed: finalAttr?.venda_confirmada || false
+    };
+
+    res.json({
+      success: diagnostics.summary.allStepsPassed,
+      diagnostics
+    });
+  } catch (err) {
+    console.error('[Test Chain Error]', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

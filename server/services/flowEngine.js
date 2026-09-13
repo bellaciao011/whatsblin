@@ -1,6 +1,7 @@
 const db = require('../storage/db');
 const { composeProofImage } = require('./imageComposer');
 const metaService = require('./metaService');
+const tiktokService = require('./tiktokService');
 const aiService = require('./aiService');
 const EventEmitter = require('events');
 const axios = require('axios');
@@ -141,6 +142,46 @@ async function executeIntegrationNode(integrationNode, chatData) {
   } catch (err) {
     console.warn('[FlowEngine] Falha na integração externa:', err.message);
     return { success: false, status: err.response?.status || 500, error: err.message };
+  }
+}
+
+/**
+ * Executa nó do tipo Pixel TikTok disparando evento server-side via TikTok Events API v1.3
+ */
+async function executeTikTokPixelNode(tiktokNode, chatData) {
+  const data = tiktokNode.data || {};
+  const ttPixels = db.getTikTokPixels();
+  let pixel = ttPixels.find(p => p.id === data.pixel_configurado_id || p.pixel_code === data.pixel_configurado_id);
+  if (!pixel && ttPixels.length > 0) pixel = ttPixels[0];
+
+  const eventName = data.tipo_evento || data.eventType || 'CompletePayment';
+  const rawVal = interpolateVariables(data.valor || data.itemValue || '{valor_atual}', chatData.variables);
+  const numVal = parseFloat(String(rawVal).replace(',', '.')) || 49.90;
+  const currency = data.moeda || data.currency || (chatData.flowLanguage === 'pt' ? 'BRL' : 'USD');
+  const allowWithoutAttribution = data.disparar_sem_atribuicao !== false;
+
+  // Busca atribuição vinculada a este telefone
+  const attribution = db.getTrafficAttributionByPhone(chatData.leadPhone);
+
+  if (!attribution && !allowWithoutAttribution) {
+    console.log(`[FlowEngine] ⏩ Pulando disparo TikTok para ${chatData.leadPhone}: lead sem atribuição de campanha e nó configurado para não disparar.`);
+    return { success: true, skipped: true };
+  }
+
+  if (pixel) {
+    return await tiktokService.sendTikTokEvent({
+      pixelCode: pixel.pixel_code,
+      accessToken: pixel.access_token,
+      eventName,
+      phone: chatData.leadPhone,
+      attribution,
+      value: numVal,
+      currency,
+      eventId: `tt_${chatData.leadPhone}_${Date.now()}`
+    });
+  } else {
+    console.warn('[FlowEngine] Nenhum pixel do TikTok cadastrado para disparar nó.');
+    return { success: false, error: 'Nenhum pixel TikTok cadastrado' };
   }
 }
 
@@ -345,6 +386,33 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         }
       }
 
+      // Se houver nós de Pixel TikTok no fluxo ativo, dispara evento CompletePayment
+      const ttNodes = activeFlow?.nodes?.filter(n => n.type === 'tiktok_pixel');
+      if (ttNodes && ttNodes.length > 0) {
+        for (const ttNode of ttNodes) {
+          executeTikTokPixelNode(ttNode, chatData).catch(err => {
+            console.warn('[FlowEngine] Aviso disparando nó TikTok Pixel:', err.message);
+          });
+        }
+      } else {
+        // Se houver pixel cadastrado e atribuição vinculada ao lead, efetua o disparo automático
+        const ttPixels = db.getTikTokPixels();
+        if (ttPixels && ttPixels.length > 0) {
+          const attribution = db.getTrafficAttributionByPhone(cleanPhone);
+          if (attribution) {
+            tiktokService.sendTikTokEvent({
+              pixelCode: ttPixels[0].pixel_code,
+              accessToken: ttPixels[0].access_token,
+              eventName: 'CompletePayment',
+              phone: cleanPhone,
+              attribution,
+              value: chatData.variables.valor_pago || 49.90,
+              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
+            }).catch(e => console.warn('[FlowEngine] Aviso disparo TikTok fallback:', e.message));
+          }
+        }
+      }
+
       const currentChats = db.getChats();
       currentChats[cleanPhone] = {
         ...currentChats[cleanPhone],
@@ -518,6 +586,22 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
   const instance = instances.find(i => i.id === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
   const cleanPhone = leadPhone.replace(/\D/g, '');
 
+  // 0. Atribuição de Tráfego Pago (TikTok Ads):
+  // Verifica se a mensagem contém o código gerado no link de campanha
+  // Padrão: (CÓDIGO) ex: (AB79KP) ou código AB79KP
+  if (messageText && typeof messageText === 'string') {
+    const codeMatch = messageText.match(/\(([A-Z0-9]{6})\)/i) || messageText.match(/(?:c[oó]digo\s*:?\s*)([A-Z0-9]{6})/i);
+    if (codeMatch && codeMatch[1]) {
+      const code = codeMatch[1].toUpperCase();
+      const linkedAttr = db.linkPhoneToAttribution(code, cleanPhone);
+      if (linkedAttr) {
+        console.log(`[FlowEngine] 🎯 TikTok Attribution vinculada com sucesso! Código: ${code} ➔ Lead: ${cleanPhone} (Campanha: ${linkedAttr.campanha_nome || linkedAttr.utm_campaign || 'N/A'})`);
+      } else {
+        console.log(`[FlowEngine] ℹ️ Código de campanha ${code} recebido de ${cleanPhone}, mas não encontrado ou já expirado.`);
+      }
+    }
+  }
+
   // 1. Registra mensagem de entrada do lead no banco com a instância correta
   const { newMessage } = db.addChatMessage(cleanPhone, {
     from: 'lead',
@@ -540,5 +624,6 @@ module.exports = {
   processIncomingMessage,
   lookupProfilePicture,
   executeFlowGraph,
+  executeTikTokPixelNode,
   eventBus
 };

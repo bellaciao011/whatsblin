@@ -1929,3 +1929,28 @@ body.theme-light .modal-integration-card {
   font-size: 18px;
 }
 
+/* TikTok Pixel Node & Modal Styles */
+.node-tiktok-pixel .pixel-node-inner {
+  background: rgba(254, 44, 85, 0.08);
+  border: 1px solid rgba(254, 44, 85, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.modal-tiktok-card {
+  width: 100%;
+  max-width: 600px;
+  background: #151c2e;
+  border: 1px solid rgba(254, 44, 85, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(254, 44, 85, 0.15);
+  padding: 24px;
+  color: #f1f5f9;
+  animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+body.theme-light .modal-tiktok-card {
+  background: #ffffff;
+  border-color: rgba(254, 44, 85, 0.3);
+  color: #0f172a;
+}
+
+

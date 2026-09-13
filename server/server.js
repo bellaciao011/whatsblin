@@ -6,6 +6,7 @@ const authService = require('./services/authService');
 
 const webhookRoutes = require('./routes/webhook');
 const apiRoutes = require('./routes/api');
+const campaignRoutes = require('./routes/campaignRoutes');
 
 const app = express();
 
@@ -19,10 +20,12 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // - /assets: Templates e mídias estáticas do sistema
 // - /css: Estilos compartilhados para a tela de login
 // - /webhook: Endpoint oficial da Meta WhatsApp Cloud API
+// - /c: Endpoint de links curtos de campanha do TikTok Ads
 app.use('/generated', express.static(path.join(__dirname, '../public/generated')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/css', express.static(path.join(__dirname, '../public/css')));
 app.use('/webhook', webhookRoutes);
+app.use('/c', campaignRoutes);
 
 // Rota da Tela de Login (se já estiver autenticado, vai direto para o dashboard)
 app.get(['/login', '/login.html'], (req, res) => {
@@ -37,13 +40,16 @@ app.get(['/login', '/login.html'], (req, res) => {
 // 2. MIDDLEWARE DE PROTEÇÃO POR SENHA (BARREIRA DE SEGURANÇA)
 app.use((req, res, next) => {
   // Rotas que dispensam autenticação:
+  // - /c/* (Links de campanha TikTok Ads)
   // - /api/auth/* (login e verificação)
   // - /api/generate-proof (utilizada pela Leona síncrona para gerar as provas)
   if (
+    req.path.startsWith('/c/') ||
     req.path.startsWith('/api/auth/') ||
     req.path.startsWith('/api/webhooks/') ||
     req.path.startsWith('/api/generate-proof') ||
     req.path.startsWith('/api/gerar-foto') ||
+    req.path.startsWith('/api/webhooks') ||
     req.path.startsWith('/generate-proof') ||
     req.path.startsWith('/gerar-foto') ||
     req.path === '/api/facebook/connect' ||
