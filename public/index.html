@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Automation Hub — Funil com Prova Dinâmica & Multi-Chip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <div class="brand-title">WhatsHub Pro</div>
+          <div class="brand-subtitle">Automação & Funil</div>
+        </div>
+      </div>
+
+      <div class="nav-section-title">PRINCIPAL</div>
+      <ul class="nav-list">
+        <li>
+          <a class="nav-item active" data-view="overview" href="#overview">
+            <span class="nav-icon">📊</span>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="inbox" href="#inbox">
+            <span class="nav-icon">💬</span>
+            <span>Chats ao vivo</span>
+            <span class="nav-badge" id="badge-leads">0</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="kanban" href="#kanban">
+            <span class="nav-icon">🗂️</span>
+            <span>Kanban</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="contacts" href="#contacts">
+            <span class="nav-icon">👥</span>
+            <span>Contatos</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="nav-section-title" style="margin-top: 10px;">OPERAÇÕES</div>
+      <ul class="nav-list">
+        <li>
+          <a class="nav-item" data-view="flows" href="#flows">
+            <span class="nav-icon">🔗</span>
+            <span>Fluxos (n8n Canvas)</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="instances" href="#instances">
+            <span class="nav-icon">🔌</span>
+            <span>Conexões (Chips)</span>
+            <span class="nav-badge" id="badge-chips">1</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="webhooks" href="#webhooks">
+            <span class="nav-icon">📡</span>
+            <span>Webhooks de entrada</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="settings" href="#settings">
+            <span class="nav-icon">📢</span>
+            <span>Facebook & IA</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="studio" href="#studio">
+            <span class="nav-icon">🎨</span>
+            <span>Estúdio do Print</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="simulator" href="#simulator">
+            <span class="nav-icon">🧪</span>
+            <span>Simulador de Lead</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="chip-status-mini">
+          <div class="status-dot"></div>
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">Sistema Online</div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="sidebar-active-chip">Chip Principal Ativo</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-viewport">
+      <header class="top-bar">
+        <div class="top-title" id="top-title">Visão Geral</div>
+        <div class="top-actions">
+          <button class="btn btn-secondary" onclick="window.location.hash = '#simulator'">
+            🧪 Simular Lead Agora
+          </button>
+          <button class="btn btn-primary" onclick="openAddChipModal()">
+            + Conectar Novo Chip
+          </button>
+        </div>
+      </header>
+
+      <div class="view-content" id="view-container">
+        <!-- Renderizado dinamicamente via app.js -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Modal Adicionar Chip -->
+  <div id="chip-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 999; align-items: center; justify-content: center;">
+    <div class="card" style="width: 520px; max-width: 90%; margin: 0; background: #111827; border: 1px solid var(--border-color);">
+      <div class="card-header">
+        <h3 class="card-title">📱 Conectar Instância da Meta (WhatsApp)</h3>
+        <button class="btn btn-secondary" onclick="closeAddChipModal()" style="padding: 6px 12px;">✕</button>
+      </div>
+      <form id="form-add-chip" onsubmit="saveNewChip(event)">
+        <div class="form-group">
+          <label class="form-label">Nome do Chip (Identificação)</label>
+          <input type="text" class="form-input" id="chip-name" placeholder="Ex: Chip de Vendas #02" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número de Telefone</label>
+          <input type="text" class="form-input" id="chip-phone" placeholder="Ex: +55 71 99999-8888" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number ID (Meta Graph API)</label>
+          <input type="text" class="form-input" id="chip-phone-id" placeholder="Ex: 108492049283741" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">WABA ID (WhatsApp Business Account ID)</label>
+          <input type="text" class="form-input" id="chip-waba-id" placeholder="Ex: 209384029384752">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Token de Acesso Permanente (Bearer Token)</label>
+          <input type="password" class="form-input" id="chip-token" placeholder="EAABwz..." required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar e Ativar Chip</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/flowBuilder.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

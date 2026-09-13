@@ -1,0 +1,57 @@
+{
+  "active": true,
+  "welcomeMessage": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova",
+  "reinforceNumberMessage": "Assim que enviar o número já ativo aqui 👍\n\nPreciso do WhatsApp da pessoa:\nDDD+9+número (ex: 11912345678)\n\nManda rápido.",
+  "analyzingMessage": "Aguarde um momento enquanto verificamos no sistema",
+  "analyzingDelaySeconds": 3,
+  "paymentRecipient": {
+    "name": "KIRVANO PAGAMENTOS LTDA",
+    "bank": "PICPAY"
+  },
+  "checkoutUrl": "https://pay.kirvano.com/checkout-49",
+  "upsellStages": {
+    "stage_49": {
+      "value": "49,90",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-49",
+      "offerText": "Link para pagamento via PIX R$49,90 👇\n{checkoutUrl}\n\nDados do pagamento: 🔒 Nome: KIRVANO PAGAMENTOS LTDA 🏦 Instituição: PICPAY",
+      "proofInstruction": "Assim que pagar, me envia o comprovante por aqui para liberar o acesso completo.",
+      "nextStage": "stage_100"
+    },
+    "stage_100": {
+      "value": "100",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-100",
+      "confirmText": "Pagamento de R$ 49,90 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 100 👇\n\n{checkoutUrl}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
+      "nextStage": "stage_200"
+    },
+    "stage_200": {
+      "value": "200",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-200",
+      "confirmText": "Pagamento de R$ 100 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 200 👇\n\n{checkoutUrl}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
+      "nextStage": "stage_400"
+    },
+    "stage_400": {
+      "value": "400",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-400",
+      "confirmText": "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
+      "nextStage": null
+    }
+  },
+  "objections": {
+    "why_pay": "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+    "refuse_or_random": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+    "already_paid_refuses_new": "O pagamento de R$ 49,90 libera a etapa inicial, mas para garantir o acesso completo ao sistema precisamos avançar com a próxima etapa. Assim que concluir o pagamento atual pelo link que te enviei, você terá tudo liberado para acompanhar.\n\nQuer que eu reenvie o link do pagamento de R$ {nextValue} para você?",
+    "denounce_or_scam": "Entendo sua decisão. Se quiser, posso te ajudar a usar melhor o sistema para aproveitar tudo que ele oferece.\n\nEnquanto isso, se mudar de ideia, é só finalizar a etapa atual pelo link e me enviar o comprovante para liberar seu acesso completo. Estou aqui para ajudar no que precisar.",
+    "what_is_tax": "O valor atual é referente à etapa necessária para liberar esse recurso do sistema.\n\nQuando você concluir o pagamento pelo link que te enviei, libera tudo para acompanhar direitinho.\n\nQuer que eu te envie o link para seguir agora?",
+    "when_get_photo_or_access": "Você já tem acesso inicial liberado pela etapa que pagou, mas o sistema libera funcionalidades completas conforme avançam as etapas.\n\nAssim que fizer o pagamento da etapa atual e me enviar o comprovante, você terá o acesso completo para acompanhar tudo no painel.\n\nQuer que eu mande o link da etapa atual para você finalizar?"
+  },
+  "receiptVerification": {
+    "no_receipt_image": "Não recebi nenhum comprovante na imagem que você enviou. Pode mandar uma foto ou print nítido do comprovante de pagamento do valor de R$ {currentValue}? Assim consigo verificar certinho para liberar o próximo passo.",
+    "said_paid_no_image": "Pode me enviar o comprovante do pagamento de R$ {currentValue} por favor? Assim já verifico e te libero o próximo passo.",
+    "unclear_or_cropped": "O pagamento não está totalmente visível para confirmar se foi concluído pelo sistema.\n\nPode enviar um print ou foto mais completa da tela de detalhes da transação, mostrando o status de pagamento aprovado? Assim consigo liberar o próximo passo para você."
+  },
+  "avatarCoordinates": {
+    "x": 139,
+    "y": 664,
+    "radius": 23
+  }
+}
