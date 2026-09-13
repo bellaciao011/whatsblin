@@ -178,9 +178,23 @@ function handleRoute() {
     item.classList.toggle('active', item.dataset.view === route);
   });
 
+  // Limpa timer de polling de domínios ao sair da tela
   if (window.domainPollingTimer && route !== 'dominios') {
     clearInterval(window.domainPollingTimer);
     window.domainPollingTimer = null;
+  }
+
+  // Limpa loops e timers do fluxo ao vivo ao sair da tela para liberar CPU e render thread
+  if (route !== 'fluxo-ao-vivo') {
+    if (liveFlowAnimationFrame) {
+      cancelAnimationFrame(liveFlowAnimationFrame);
+      liveFlowAnimationFrame = null;
+    }
+    if (liveFlowPollingInterval) {
+      clearInterval(liveFlowPollingInterval);
+      liveFlowPollingInterval = null;
+    }
+    liveParticles = [];
   }
 
   const titles = {
@@ -203,7 +217,10 @@ function handleRoute() {
   document.getElementById('top-title').textContent = titles[route] || 'WhatsHub Pro';
 
   const container = document.getElementById('view-container');
-  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados...</div>';
+  // Se o container estiver vazio na primeira carga, exibe o loading
+  if (!container.hasChildNodes() || container.innerHTML.trim() === '') {
+    container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados...</div>';
+  }
 
   if (route === 'overview') renderOverview();
   else if (route === 'fluxo-ao-vivo') renderLiveFlow();
@@ -222,26 +239,40 @@ function handleRoute() {
   else if (route === 'simulator') renderSimulator();
 }
 
-// Real-time Event Stream (SSE)
+// Real-time Event Stream (SSE) com reconexão segura e sem travar conexões HTTP
 function initRealtimeEvents() {
-  if (state.eventSource) state.eventSource.close();
-  state.eventSource = new EventSource('/api/events');
+  if (state.eventSource) {
+    try { state.eventSource.close(); } catch(e) {}
+    state.eventSource = null;
+  }
+  try {
+    state.eventSource = new EventSource('/api/events');
 
-  state.eventSource.onmessage = (e) => {
-    try {
-      const payload = JSON.parse(e.data);
-      if (payload.type === 'new_message' || payload.type === 'chat_updated') {
-        // Se estiver no Inbox, atualiza a tela
-        if (state.currentView === 'inbox') {
-          renderInbox(false); // sem loading
+    state.eventSource.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.type === 'new_message' || payload.type === 'chat_updated') {
+          // Se estiver no Inbox, atualiza a tela
+          if (state.currentView === 'inbox') {
+            renderInbox(false); // sem loading
+          }
+          // Atualiza contadores
+          updateBadges();
         }
-        // Atualiza contadores
-        updateBadges();
+      } catch (err) {
+        console.error(err);
       }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    };
+
+    state.eventSource.onerror = () => {
+      if (state.eventSource && state.eventSource.readyState === EventSource.CLOSED) {
+        state.eventSource.close();
+        state.eventSource = null;
+      }
+    };
+  } catch (err) {
+    console.warn('[SSE Warning]', err.message);
+  }
 }
 
 async function updateBadges() {
@@ -1026,6 +1057,14 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
     const pathEl = document.getElementById(`live-path-${edge.id}`);
     if (!pathEl) return;
 
+    let totalLen = 0;
+    try {
+      totalLen = pathEl.getTotalLength() || 100;
+    } catch (e) {
+      totalLen = 100;
+    }
+    if (totalLen <= 0) return;
+
     const count = edgeFlows[edge.id] || (edgeIdx % 3 === 0 ? 2 : 1);
     for (let i = 0; i < count; i++) {
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1047,6 +1086,7 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
         toNodeId: edge.to,
         pathEl: pathEl,
         element: circle,
+        totalLen: totalLen,
         progress: initialProgress % 1.0,
         // Velocidade suave e calma (4x a 5x mais devagar)
         speed: 0.0007 + (Math.random() * 0.0003),
@@ -1055,14 +1095,13 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
     }
   });
 
-  // Loop de Animação 60fps
+  // Loop de Animação 60fps de alta performance (sem recalcular comprimentos SVG)
   function animateFrame() {
     if (state.currentView !== 'fluxo-ao-vivo') return;
 
-    liveParticles.forEach(p => {
-      if (!p.pathEl) return;
-      const totalLen = p.pathEl.getTotalLength();
-      if (!totalLen || totalLen === 0) return;
+    for (let i = 0; i < liveParticles.length; i++) {
+      const p = liveParticles[i];
+      if (!p.pathEl || !p.totalLen) continue;
 
       p.progress += p.speed;
 
@@ -1071,12 +1110,12 @@ function initLiveParticleEngine(flow, edgeFlows = {}) {
         p.progress = 0;
       }
 
-      const dist = p.progress * totalLen;
+      const dist = p.progress * p.totalLen;
       const point = p.pathEl.getPointAtLength(dist);
 
       p.element.setAttribute('cx', point.x);
       p.element.setAttribute('cy', point.y);
-    });
+    }
 
     liveFlowAnimationFrame = requestAnimationFrame(animateFrame);
   }
