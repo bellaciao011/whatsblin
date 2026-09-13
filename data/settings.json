@@ -11,6 +11,7 @@
   },
   "facebook": {
     "appId": "1388636936143540",
-    "appSecret": "685e2fbf3c2abc844e99ba24b039c511"
+    "appSecret": "685e2fbf3c2abc844e99ba24b039c511",
+    "configId": "2204676673432561"
   }
 }

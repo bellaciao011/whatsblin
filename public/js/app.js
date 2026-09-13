@@ -995,7 +995,7 @@ async function handleRegisterWithMeta() {
 
   const coexistence = document.getElementById('conn-coexistence')?.checked ?? true;
   const appId = state.facebook?.appId || '1388636936143540';
-  const configId = state.facebook?.configId || '';
+  const configId = state.facebook?.configId || '2204676673432561';
   const btn = document.getElementById('btn-register-meta');
 
   if (btn) {
