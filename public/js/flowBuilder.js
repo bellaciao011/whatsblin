@@ -223,9 +223,9 @@ const FlowBuilder = {
 
   renderNodeHtml(node) {
     if (node.type === 'pixel') {
-      const pixelName = node.data?.pixelName || node.data?.pixelId || 'Catequese';
+      const pixelName = node.data?.pixelName || (node.data?.pixelId ? `Pixel ${node.data.pixelId}` : 'Nenhum pixel selecionado');
       const eventType = node.data?.eventName || node.data?.tipo_evento || 'Compra';
-      const val = node.data?.eventValue || node.data?.valor_item || 'NaN';
+      const val = node.data?.eventValue || node.data?.valor_item || '{comprovante.valor}';
       const currency = node.data?.currency || 'BRL';
       return `
         <div class="flow-node node-pixel" id="${node.id}" style="left: ${node.x}px; top: ${node.y}px;">
@@ -1355,7 +1355,7 @@ const FlowBuilder = {
 
     const selectedPixelId = node.data?.pixelId || (pixels[0] ? pixels[0].id : '');
     const selectedEvent = node.data?.eventName || node.data?.tipo_evento || 'Compra';
-    const pageId = node.data?.pageId || '1123948077469453';
+    const pageId = node.data?.pageId || '';
     const itemValue = node.data?.eventValue || node.data?.valor_item || '{comprovante.valor}';
     const currency = node.data?.currency || 'BRL';
 
@@ -1380,7 +1380,7 @@ const FlowBuilder = {
               ${pixels.length > 0 ? pixels.map(p => `
                 <option value="${p.id}" ${p.id === selectedPixelId ? 'selected' : ''}>${p.name || p.pixelId}</option>
               `).join('') : `
-                <option value="pixel_catequese" selected>Catequese</option>
+                <option value="" disabled selected>Nenhum pixel cadastrado ainda (cadastre em Pixels & CAPI)</option>
               `}
             </select>
             <div style="font-size: 11px; color: #60a5fa; margin-top: 5px; cursor: pointer;" onclick="document.getElementById('node-config-modal').remove(); window.location.hash='#pixels';">
@@ -1469,8 +1469,7 @@ const FlowBuilder = {
 
     if (!node.data) node.data = {};
     const pixelSel = document.getElementById('modal-pixel-id');
-    node.data.pixelId = pixelSel ? pixelSel.value : '';
-    node.data.pixelName = pixelSel && pixelSel.selectedOptions[0] ? pixelSel.selectedOptions[0].text : 'Catequese';
+    node.data.pixelName = pixelSel && pixelSel.selectedOptions[0] && pixelSel.value ? pixelSel.selectedOptions[0].text : 'Pixel';
     
     const eventSel = document.getElementById('modal-pixel-event');
     node.data.eventName = eventSel ? eventSel.value : 'Compra';
