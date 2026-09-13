@@ -42,6 +42,9 @@ app.use((req, res, next) => {
   if (
     req.path.startsWith('/api/auth/') ||
     req.path.startsWith('/api/generate-proof') ||
+    req.path.startsWith('/api/gerar-foto') ||
+    req.path.startsWith('/generate-proof') ||
+    req.path.startsWith('/gerar-foto') ||
     req.path === '/api/facebook/connect' ||
     req.path === '/favicon.ico'
   ) {

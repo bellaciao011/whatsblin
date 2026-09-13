@@ -324,11 +324,19 @@ router.post('/studio/preview', async (req, res) => {
  * Integração Externa Síncrona (Leona / Webhook HTTP Request):
  * Recebe o número alvo, busca a foto, gera a imagem e retorna { url: "https://..." }
  */
-router.all('/generate-proof', async (req, res) => {
+router.all(['/generate-proof', '/gerar-foto'], async (req, res) => {
   try {
-    const phone = req.body?.phone || req.query?.phone || req.body?.alvo || req.query?.alvo;
+    const phone = req.body?.numero || req.query?.numero ||
+                  req.body?.phone || req.query?.phone ||
+                  req.body?.alvo || req.query?.alvo ||
+                  req.body?.telefone || req.query?.telefone ||
+                  req.body?.targetPhone || req.query?.targetPhone;
+
     if (!phone) {
-      return res.status(400).json({ error: 'Parâmetro phone ou alvo obrigatório' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Parâmetro obrigatório ausente. Envie {"numero": "11999998888"} ou {"phone": "11999998888"}' 
+      });
     }
 
     const rawDigits = String(phone).replace(/\D/g, '');
@@ -354,13 +362,14 @@ router.all('/generate-proof', async (req, res) => {
 
     res.json({
       success: true,
+      url: fullUrl,
+      foto_url: fullUrl,
       phone: targetPhone,
-      hasPhoto: !!photoUrl,
-      url: fullUrl
+      hasPhoto: Boolean(photoUrl)
     });
   } catch (err) {
     console.error('[Generate Proof API Error]', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
