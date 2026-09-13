@@ -261,11 +261,84 @@ async function sendPixelConversion(pixelId, accessToken, eventName, leadPhone, c
   return res.data;
 }
 
+/**
+ * Troca o código temporário retornado pelo popup da Meta pelo token de acesso
+ */
+async function exchangeCodeForToken(code, redirectUri = '') {
+  const db = require('../storage/db');
+  const settings = db.getSettings();
+  const appId = settings.facebook?.appId || '1388636936143540';
+  const appSecret = settings.facebook?.appSecret || '685e2fbf3c2abc844e99ba24b039c511';
+
+  const params = {
+    client_id: appId,
+    client_secret: appSecret,
+    code: code
+  };
+  if (redirectUri) {
+    params.redirect_uri = redirectUri;
+  }
+
+  const res = await axios.get(`${GRAPH_API_BASE}/oauth/access_token`, { params });
+  return res.data;
+}
+
+/**
+ * Busca detalhes completos de um número de telefone na Cloud API
+ */
+async function getPhoneNumberDetails(phoneNumberId, accessToken) {
+  const res = await axios.get(`${GRAPH_API_BASE}/${phoneNumberId}`, {
+    params: {
+      fields: 'id,display_phone_number,verified_name,code_verification_status,quality_rating',
+      access_token: accessToken
+    }
+  });
+  return res.data;
+}
+
+/**
+ * Inscreve o aplicativo no WABA (WhatsApp Business Account) para receber webhooks de mensagens
+ */
+async function subscribeAppToWaba(wabaId, accessToken) {
+  try {
+    const res = await axios.post(`${GRAPH_API_BASE}/${wabaId}/subscribed_apps`, {}, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    return res.data;
+  } catch (err) {
+    console.warn('[Meta API] Aviso ao inscrever app no WABA:', err.response?.data?.error?.message || err.message);
+    return null;
+  }
+}
+
+/**
+ * Registra o número de telefone no WhatsApp Cloud API
+ */
+async function registerPhoneNumberOnCloudApi(phoneNumberId, accessToken, pin = '123456') {
+  try {
+    const res = await axios.post(`${GRAPH_API_BASE}/${phoneNumberId}/register`, {
+      messaging_product: 'whatsapp',
+      pin: pin
+    }, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    return res.data;
+  } catch (err) {
+    console.warn('[Meta API] Aviso no registro Cloud API do número:', err.response?.data?.error?.message || err.message);
+    return null;
+  }
+}
+
 module.exports = {
   sendTextMessage,
   uploadMedia,
   sendImageMessage,
   sendAudioMessage,
   validateAndFetchMetaDetails,
-  sendPixelConversion
+  sendPixelConversion,
+  exchangeCodeForToken,
+  getPhoneNumberDetails,
+  subscribeAppToWaba,
+  registerPhoneNumberOnCloudApi
 };
+

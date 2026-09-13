@@ -1391,5 +1391,187 @@ body {
   font-family: sans-serif;
 }
 
+/* =========================================================================
+   MODAL NOVA CONEXÃO (ESTILO LEONA FLOW / EMBEDDED SIGNUP)
+   ========================================================================= */
+.leona-modal {
+  background: #0f1422;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  width: 480px;
+  max-width: 95%;
+  padding: 24px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  color: #f8fafc;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.leona-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.leona-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.leona-icon-plug {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a78bfa;
+  font-size: 18px;
+}
+
+.leona-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 18px;
+}
+
+.leona-type-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.leona-type-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.leona-type-card.active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1px #6366f1, 0 4px 16px rgba(99, 102, 241, 0.25);
+}
+
+.leona-type-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.leona-type-icon.wa {
+  background: rgba(37, 211, 102, 0.15);
+  color: #25d366;
+  border: 1px solid rgba(37, 211, 102, 0.3);
+}
+
+.leona-type-icon.meta {
+  background: rgba(24, 119, 242, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.leona-info-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.leona-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 0.25s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.25s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #7c3aed;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.btn-meta-register {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.btn-meta-register:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.55);
+}
+
+
 
 

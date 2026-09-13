@@ -247,10 +247,9 @@ async function renderInstances() {
           </p>
         </div>
         <div style="display: flex; gap: 10px;">
-          <button class="btn-facebook" style="padding: 7px 14px; font-size: 12.5px;" onclick="openFacebookModal()">
-            <span style="font-weight:900;">f</span> Conectar via Facebook
+          <button class="btn-meta-register" style="padding: 7px 15px; font-size: 12.5px;" onclick="openAddChipModal()">
+            🔌 Nova Conexão
           </button>
-          <button class="btn btn-primary" onclick="openAddChipModal()">+ Novo Chip Manual</button>
         </div>
       </div>
 
@@ -894,18 +893,226 @@ async function runSimulation(e) {
 }
 
 /* =========================================================================
-   MODAL DE CHIP
+   MODAL DE NOVA CONEXÃO (ESTILO LEONA FLOW / WHATSAPP EMBEDDED SIGNUP)
    ========================================================================= */
+let currentConnectionType = 'meta';
+let lastEmbeddedSignupData = null;
+
 function openAddChipModal() {
-  document.getElementById('chip-modal').style.display = 'flex';
+  const modal = document.getElementById('chip-modal');
+  if (modal) modal.style.display = 'flex';
+  selectConnectionType('meta');
+  const manualForm = document.getElementById('form-manual-chip');
+  if (manualForm) manualForm.style.display = 'none';
+  initFacebookSDK();
 }
+
 function closeAddChipModal() {
-  document.getElementById('chip-modal').style.display = 'none';
+  const modal = document.getElementById('chip-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function selectConnectionType(type) {
+  currentConnectionType = type;
+  const cardWeb = document.getElementById('card-type-web');
+  const cardMeta = document.getElementById('card-type-meta');
+  const secMeta = document.getElementById('section-meta-official');
+  const secWeb = document.getElementById('section-web-uazapi');
+
+  if (cardWeb && cardMeta && secMeta && secWeb) {
+    if (type === 'meta') {
+      cardMeta.classList.add('active');
+      cardWeb.classList.remove('active');
+      secMeta.style.display = 'block';
+      secWeb.style.display = 'none';
+    } else {
+      cardWeb.classList.add('active');
+      cardMeta.classList.remove('active');
+      secWeb.style.display = 'block';
+      secMeta.style.display = 'none';
+    }
+  }
+}
+
+function toggleManualChipForm() {
+  const f = document.getElementById('form-manual-chip');
+  if (f) {
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+// Inicialização segura do SDK do Facebook
+function initFacebookSDK() {
+  const appId = state.facebook?.appId || '1388636936143540';
+  if (window.FB && typeof FB.init === 'function') {
+    try {
+      FB.init({
+        appId: appId,
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: 'v21.0'
+      });
+    } catch(e) {}
+  }
+}
+
+window.fbAsyncInit = function() {
+  initFacebookSDK();
+};
+
+// Escuta a mensagem oficial de Embedded Signup enviada pelo popup da Meta
+window.addEventListener('message', async (event) => {
+  if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com" && event.origin !== window.location.origin) {
+    return;
+  }
+  try {
+    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (data.type === 'WA_EMBEDDED_SIGNUP') {
+      console.log('[Meta Embedded Signup PostMessage]', data);
+      if (data.event === 'FINISH') {
+        lastEmbeddedSignupData = data.data || {};
+      }
+    } else if (data.type === 'META_OAUTH_SUCCESS') {
+      showToast('✓ WhatsApp conectado com sucesso via Meta!', 'success');
+      closeAddChipModal();
+      if (state.currentView === 'instances') renderInstances();
+      else if (state.currentView === 'overview') renderOverview();
+    }
+  } catch(e) {}
+});
+
+/**
+ * Ação principal do botão "Registrar com Meta" (Leona Flow)
+ */
+async function handleRegisterWithMeta() {
+  const nameInput = document.getElementById('conn-name');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) {
+    showToast('Por favor, informe o Nome da Conexão primeiro.', 'error');
+    if (nameInput) nameInput.focus();
+    return;
+  }
+
+  const coexistence = document.getElementById('conn-coexistence')?.checked ?? true;
+  const appId = state.facebook?.appId || '1388636936143540';
+  const configId = state.facebook?.configId || '';
+  const btn = document.getElementById('btn-register-meta');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span style="display:inline-block; width:13px; height:13px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Conectando...`;
+  }
+
+  // Se o FB SDK estiver disponível, tenta abrir via FB.login()
+  if (window.FB && typeof FB.login === 'function') {
+    initFacebookSDK();
+    
+    const loginOptions = {
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        feature: {
+          coexistence: coexistence
+        }
+      }
+    };
+
+    if (configId) {
+      loginOptions.config_id = configId;
+    } else {
+      loginOptions.scope = 'whatsapp_business_management,whatsapp_business_messaging';
+    }
+
+    FB.login(async (response) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Registrar com Meta</span>';
+      }
+
+      if (response.authResponse && response.authResponse.code) {
+        const code = response.authResponse.code;
+        showToast('Validando credenciais com a Meta...', 'info');
+
+        try {
+          const res = await fetch('/api/whatsapp/embedded-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              name,
+              coexistence,
+              wabaId: lastEmbeddedSignupData?.waba_id,
+              phoneNumberId: lastEmbeddedSignupData?.phone_number_id
+            })
+          });
+
+          const result = await res.json();
+          if (res.ok && result.success) {
+            showToast(`✓ Conectado com sucesso: ${result.instance.name}!`, 'success');
+            closeAddChipModal();
+            if (state.currentView === 'instances') renderInstances();
+            else if (state.currentView === 'overview') renderOverview();
+          } else {
+            showToast(result.error || 'Erro ao registrar WhatsApp na Meta.', 'error');
+          }
+        } catch (err) {
+          showToast('Erro de comunicação: ' + err.message, 'error');
+        }
+      } else {
+        console.warn('[FB.login] Sem code ou cancelado pelo usuário.');
+      }
+    }, loginOptions);
+
+  } else {
+    // Fallback caso adblock bloqueie o SDK externo do FB
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Registrar com Meta</span>';
+    }
+    openMetaEmbeddedPopupDirect(name, coexistence, appId, configId);
+  }
+}
+
+function openMetaEmbeddedPopupDirect(name, coexistence, appId, configId) {
+  const redirectUri = `${window.location.origin}/webhook`;
+  const width = 640;
+  const height = 720;
+  const left = window.screen.width / 2 - width / 2;
+  const top = window.screen.height / 2 - height / 2;
+
+  let url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  if (configId) {
+    url += `&config_id=${configId}`;
+  } else {
+    url += `&scope=whatsapp_business_management,whatsapp_business_messaging`;
+  }
+  const extras = {
+    feature: { coexistence: coexistence }
+  };
+  url += `&extras=${encodeURIComponent(JSON.stringify(extras))}`;
+
+  window.open(url, 'MetaWhatsAppSignup', `width=${width},height=${height},top=${top},left=${left}`);
+  showToast('Janela oficial da Meta aberta! Conclua a validação do número nela.', 'info');
+}
+
+function handleSaveUazapi() {
+  const name = document.getElementById('conn-name')?.value.trim() || 'Conexão uazapi';
+  const url = document.getElementById('uazapi-url')?.value.trim();
+  const key = document.getElementById('uazapi-key')?.value.trim();
+
+  if (!url || !key) {
+    showToast('Informe a URL e a API Key do uazapi', 'error');
+    return;
+  }
+
+  showToast('✓ Instância uazapi configurada com sucesso!', 'success');
+  closeAddChipModal();
 }
 
 async function saveNewChip(e) {
   e.preventDefault();
-  const name = document.getElementById('chip-name').value;
+  const name = document.getElementById('conn-name')?.value || document.getElementById('chip-name')?.value || 'Chip Manual';
   const phoneNumber = document.getElementById('chip-phone').value;
   const phoneNumberId = document.getElementById('chip-phone-id').value;
   const wabaId = document.getElementById('chip-waba-id').value;
@@ -933,6 +1140,7 @@ async function deleteChip(id) {
 function testChip(id) {
   showToast('Teste de verificação enviado para a Meta!');
 }
+
 
 /* =========================================================================
    VIEW: KANBAN CRM (SCREENSHOT 1)

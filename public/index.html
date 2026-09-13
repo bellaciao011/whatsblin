@@ -112,7 +112,7 @@
             🧪 Simular Lead Agora
           </button>
           <button class="btn btn-primary" onclick="openAddChipModal()">
-            + Conectar Novo Chip
+            🔌 Nova Conexão
           </button>
           <button class="btn btn-secondary" onclick="logout()" title="Encerrar Sessão" style="border-color: rgba(239, 68, 68, 0.35); color: #f87171;">
             🔒 Sair
@@ -129,25 +129,122 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
-  <!-- Modal Adicionar Chip -->
-  <div id="chip-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 999; align-items: center; justify-content: center;">
-    <div class="card" style="width: 520px; max-width: 90%; margin: 0; background: #111827; border: 1px solid var(--border-color);">
-      <div class="card-header">
-        <h3 class="card-title">📱 Conectar Instância da Meta (WhatsApp)</h3>
-        <button class="btn btn-secondary" onclick="closeAddChipModal()" style="padding: 6px 12px;">✕</button>
-      </div>
-      <form id="form-add-chip" onsubmit="saveNewChip(event)">
-        <div class="form-group">
-          <label class="form-label">Nome do Chip (Identificação)</label>
-          <input type="text" class="form-input" id="chip-name" placeholder="Ex: Chip de Vendas #02" required>
+  <!-- Modal Nova Conexão (Estilo Leona Flow / WhatsApp Embedded Signup) -->
+  <div id="chip-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 999; align-items: center; justify-content: center;">
+    <div class="leona-modal">
+      <!-- Header -->
+      <div class="leona-header">
+        <div class="leona-title-group">
+          <div class="leona-icon-plug">🔌</div>
+          <div>
+            <h3 style="font-size: 17px; font-weight: 700; margin: 0;">Nova Conexão</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Gerencie suas conexões WhatsApp</p>
+          </div>
         </div>
+        <button class="btn btn-secondary" onclick="closeAddChipModal()" style="padding: 4px 10px; font-size: 13px; border-radius: 8px;">✕</button>
+      </div>
+
+      <!-- Form Content -->
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Nome da Conexão *</label>
+        <input type="text" class="form-input" id="conn-name" placeholder="Ex: WhatsApp Vendas" required style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1);">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Tipo de Conexão *</label>
+        <div class="leona-type-grid">
+          <!-- Card API Web -->
+          <div class="leona-type-card" id="card-type-web" onclick="selectConnectionType('web')">
+            <div class="leona-type-icon wa">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.029-.444-1.696-.662-2.793-2.39-2.879-2.502-.084-.112-.686-.912-.686-1.74 0-.828.434-1.236.589-1.405.155-.169.34-.211.454-.211.114 0 .228.001.328.006.105.006.246-.04.384.293.144.348.492 1.2.535 1.287.043.088.072.19.014.305-.058.115-.087.186-.173.287-.086.101-.18.226-.257.304-.087.087-.177.182-.076.355.101.173.45 1.01 1.014 1.503.725.634 1.336.831 1.527.925.191.094.303.078.416-.051.113-.129.485-.563.614-.757.129-.194.258-.162.434-.097.176.065 1.114.525 1.306.621.192.096.32.144.366.225.047.081.047.47-.097.875z"/></svg>
+            </div>
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px;">API Web</div>
+              <div style="font-size: 11px; color: var(--text-muted);">(uazapi)</div>
+            </div>
+          </div>
+
+          <!-- Card API Oficial -->
+          <div class="leona-type-card active" id="card-type-meta" onclick="selectConnectionType('meta')">
+            <div class="leona-type-icon meta">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.02 14.15c-1.34 0-2.48-.56-3.32-1.55l1.32-1.32c.54.65 1.22.99 2 .99.88 0 1.56-.44 1.56-1.12 0-.62-.48-.96-1.57-1.31l-.64-.2c-1.63-.52-2.46-1.35-2.46-2.61 0-1.66 1.4-2.88 3.39-2.88 1.27 0 2.22.46 2.94 1.27l-1.28 1.28c-.46-.53-1.05-.79-1.66-.79-.81 0-1.42.44-1.42 1.05 0 .54.43.87 1.46 1.2l.64.2c1.78.58 2.58 1.46 2.58 2.76 0 1.79-1.44 2.92-3.54 2.92z"/></svg>
+            </div>
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px;">API Oficial</div>
+              <div style="font-size: 11px; color: #38bdf8;">(Meta)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container Configuração API Oficial (Meta Embedded Signup) -->
+      <div id="section-meta-official">
+        <!-- Switch Coexistência -->
+        <div class="leona-info-box" style="margin-bottom: 14px;">
+          <div class="leona-switch-row">
+            <label class="switch">
+              <input type="checkbox" id="conn-coexistence" checked>
+              <span class="slider"></span>
+            </label>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #fff;">Coexistência (Beta)</div>
+              <div style="font-size: 11.5px; color: #94a3b8; margin-top: 4px; line-height: 1.45;">
+                No modo coexistência, você conecta seu WhatsApp Business à API Oficial sem precisar desconectá-lo do celular. O recurso ainda está em fase Beta pela Meta e pode apresentar instabilidades.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Próximos Passos -->
+        <div class="leona-info-box" style="margin-bottom: 22px;">
+          <div style="font-size: 12.5px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Próximos passos:</div>
+          <ul style="font-size: 11.5px; color: #94a3b8; margin: 0; padding-left: 18px; line-height: 1.55;">
+            <li>Ao enviar, abrimos o login da Meta (popup); é preciso HTTPS neste site</li>
+            <li>Depois de autorizar, a conexão oficial aparece na lista automaticamente</li>
+          </ul>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()" style="border-radius: 10px; padding: 10px 18px;">Cancelar</button>
+          <button type="button" class="btn-meta-register" id="btn-register-meta" onclick="handleRegisterWithMeta()">
+            <span>Registrar com Meta</span>
+          </button>
+        </div>
+
+        <!-- Link Entrada Manual Opcional -->
+        <div style="text-align: center; margin-top: 14px;">
+          <a href="javascript:void(0)" onclick="toggleManualChipForm()" style="color: #64748b; font-size: 11px; text-decoration: none;">
+            Prefere inserir Phone Number ID e Token manualmente? ⚙️
+          </a>
+        </div>
+      </div>
+
+      <!-- Container Configuração API Web (uazapi) -->
+      <div id="section-web-uazapi" style="display: none;">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" style="font-size: 12px;">URL do Servidor uazapi</label>
+          <input type="text" class="form-input" id="uazapi-url" placeholder="https://api.uazapi.com">
+        </div>
+        <div class="form-group" style="margin-bottom: 18px;">
+          <label class="form-label" style="font-size: 12px;">API Key da Instância</label>
+          <input type="password" class="form-input" id="uazapi-key" placeholder="Sua chave de autenticação">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="handleSaveUazapi()">Conectar uazapi</button>
+        </div>
+      </div>
+
+      <!-- Form Manual Opcional (Retrátil) -->
+      <form id="form-manual-chip" onsubmit="saveNewChip(event)" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px dashed rgba(255,255,255,0.1);">
         <div class="form-group">
           <label class="form-label">Número de Telefone</label>
-          <input type="text" class="form-input" id="chip-phone" placeholder="Ex: +55 71 99999-8888" required>
+          <input type="text" class="form-input" id="chip-phone" placeholder="Ex: +55 71 99999-8888">
         </div>
         <div class="form-group">
           <label class="form-label">Phone Number ID (Meta Graph API)</label>
-          <input type="text" class="form-input" id="chip-phone-id" placeholder="Ex: 108492049283741" required>
+          <input type="text" class="form-input" id="chip-phone-id" placeholder="Ex: 108492049283741">
         </div>
         <div class="form-group">
           <label class="form-label">WABA ID (WhatsApp Business Account ID)</label>
@@ -155,16 +252,17 @@
         </div>
         <div class="form-group">
           <label class="form-label">Token de Acesso Permanente (Bearer Token)</label>
-          <input type="password" class="form-input" id="chip-token" placeholder="EAABwz..." required>
+          <input type="password" class="form-input" id="chip-token" placeholder="EAABwz...">
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar e Ativar Chip</button>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+          <button type="submit" class="btn btn-primary">Salvar Manual</button>
         </div>
       </form>
     </div>
   </div>
 
+  <div id="fb-root"></div>
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
   <script src="/js/flowBuilder.js"></script>
   <script src="/js/app.js"></script>
 </body>

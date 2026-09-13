@@ -419,9 +419,108 @@ router.get('/facebook/status', (req, res) => {
   res.json(fb);
 });
 
+/**
+ * WhatsApp Embedded Signup (Cadastro Incorporado oficial da Meta)
+ * Recebe o código temporário ou token retornado pelo popup da Meta e os dados do WABA e Phone Number
+ */
+router.post('/whatsapp/embedded-signup', async (req, res) => {
+  try {
+    const { code, accessToken, wabaId, phoneNumberId, name, coexistence, redirectUri } = req.body;
+    let finalToken = accessToken;
+
+    if (code) {
+      console.log('[Embedded Signup] Trocando código da Meta por access_token...');
+      const tokenRes = await metaService.exchangeCodeForToken(code, redirectUri);
+      finalToken = tokenRes.access_token;
+    }
+
+    if (!finalToken) {
+      return res.status(400).json({ error: 'Nenhum token ou código retornado pela Meta.' });
+    }
+
+    let phoneInfo = null;
+    let targetPhoneId = phoneNumberId;
+    let targetWabaId = wabaId;
+
+    if (targetPhoneId) {
+      try {
+        phoneInfo = await metaService.getPhoneNumberDetails(targetPhoneId, finalToken);
+      } catch (e) {
+        console.warn('[Embedded Signup] Não foi possível obter detalhes diretos do phoneId:', e.message);
+      }
+    }
+
+    // Se não veio phoneId nos dados de mensagem, busca nas WABAs acessíveis pelo token
+    if (!phoneInfo || !targetPhoneId) {
+      const metaDetails = await metaService.validateAndFetchMetaDetails(finalToken);
+      if (metaDetails.whatsappNumbers && metaDetails.whatsappNumbers.length > 0) {
+        const first = metaDetails.whatsappNumbers[0];
+        targetPhoneId = first.phoneNumberId;
+        targetWabaId = first.wabaId;
+        phoneInfo = {
+          display_phone_number: first.displayPhoneNumber,
+          verified_name: first.verifiedName
+        };
+      }
+    }
+
+    // Inscreve o webhook do app no WABA para que as mensagens cheguem
+    if (targetWabaId) {
+      await metaService.subscribeAppToWaba(targetWabaId, finalToken);
+    }
+
+    // Registra na Cloud API caso necessário
+    if (targetPhoneId) {
+      await metaService.registerPhoneNumberOnCloudApi(targetPhoneId, finalToken);
+    }
+
+    const instances = db.getInstances();
+    const newInstance = {
+      id: `inst_meta_${Date.now()}`,
+      name: name || phoneInfo?.verified_name || `WhatsApp Oficial ${phoneInfo?.display_phone_number || ''}`,
+      phoneNumber: phoneInfo?.display_phone_number || 'WhatsApp Oficial Conectado',
+      phoneNumberId: targetPhoneId || '',
+      wabaId: targetWabaId || '',
+      accessToken: finalToken,
+      type: 'official',
+      coexistence: Boolean(coexistence),
+      status: 'connected',
+      totalSent: 0,
+      totalReceived: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    // Atualiza se já existir ou adiciona
+    const existingIdx = instances.findIndex(i => i.phoneNumberId && i.phoneNumberId === targetPhoneId);
+    if (existingIdx >= 0) {
+      instances[existingIdx] = { ...instances[existingIdx], ...newInstance, id: instances[existingIdx].id };
+    } else {
+      instances.push(newInstance);
+    }
+    db.saveInstances(instances);
+
+    // Salva token nas configurações globais da Meta também
+    const settings = db.getSettings();
+    if (!settings.facebook) settings.facebook = {};
+    settings.facebook.connected = true;
+    settings.facebook.accessToken = finalToken;
+    db.saveSettings(settings);
+
+    console.log('[Embedded Signup] Sucesso! Instância registrada:', newInstance.name);
+    res.json({ success: true, instance: newInstance });
+  } catch (err) {
+    console.error('[Embedded Signup Error]', err);
+    res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+  }
+});
+
 router.post('/facebook/connect', async (req, res) => {
   try {
-    const { accessToken, appId, appSecret } = req.body;
+    let { accessToken, code, appId, appSecret, redirectUri } = req.body;
+    if (!accessToken && code) {
+      const tokenRes = await metaService.exchangeCodeForToken(code, redirectUri);
+      accessToken = tokenRes.access_token;
+    }
     if (!accessToken) {
       return res.status(400).json({ error: 'Token de acesso da Meta é obrigatório' });
     }

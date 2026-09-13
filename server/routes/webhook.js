@@ -70,41 +70,49 @@ router.get('/', (req, res) => {
   <script>
     (async function processOAuth() {
       const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token') || new URLSearchParams(window.location.search).get('access_token');
+      const hashParams = new URLSearchParams(hash);
+      const searchParams = new URLSearchParams(window.location.search);
 
-      if (!accessToken) {
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const code = hashParams.get('code') || searchParams.get('code');
+
+      if (!accessToken && !code) {
         document.getElementById('spinner').style.display = 'none';
-        document.getElementById('title').textContent = '⚠️ Nenhum token recebido';
+        document.getElementById('title').textContent = '⚠️ Nenhum token ou código recebido';
         document.getElementById('msg').textContent = 'A autenticação foi cancelada ou expirou.';
         return;
       }
 
-      document.getElementById('msg').textContent = 'Sincronizando contas e WhatsApp...';
+      document.getElementById('msg').textContent = 'Sincronizando WhatsApp e contas comerciais da Meta...';
 
       try {
-        const res = await fetch('/api/facebook/connect', {
+        // Envia para o endpoint de embedded-signup ou facebook connect
+        const redirectUri = window.location.origin + '/webhook';
+        const res = await fetch('/api/whatsapp/embedded-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ accessToken })
+          body: JSON.stringify({ accessToken, code, redirectUri })
         });
 
         const data = await res.json();
 
         if (res.ok && data.success) {
           document.getElementById('spinner').style.display = 'none';
-          document.getElementById('title').textContent = '✅ Conectado com Sucesso!';
-          document.getElementById('msg').textContent = 'Usuário: ' + (data.facebook?.userName || 'Meta Business') + '. Atualizando o painel...';
+          document.getElementById('title').textContent = '✅ WhatsApp Conectado com Sucesso!';
+          document.getElementById('msg').textContent = 'Instância: ' + (data.instance?.name || 'Oficial Meta') + '. Atualizando o painel...';
           
           if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage({ type: 'META_OAUTH_SUCCESS', data }, '*');
+            } catch(e) {}
             window.opener.location.reload();
           }
           setTimeout(() => window.close(), 1200);
         } else {
           document.getElementById('spinner').style.display = 'none';
           document.getElementById('title').textContent = 'Erro na conexão';
-          document.getElementById('msg').textContent = data.error || 'Falha ao validar token na Meta.';
+          document.getElementById('msg').textContent = data.error || 'Falha ao validar na Meta.';
         }
       } catch (err) {
         document.getElementById('spinner').style.display = 'none';
