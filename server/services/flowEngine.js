@@ -56,7 +56,8 @@ function interpolateVariables(text, variables) {
     .replace(/\{checkoutUrl400\}/gi, variables.checkoutUrl400 || 'https://pay.kirvano.com/checkout-400')
     .replace(/\{link_pagamento\}/gi, variables.checkoutUrl || 'https://pay.kirvano.com/checkout-49')
     .replace(/\{valor_atual\}/gi, variables.valor_atual || '49,90')
-    .replace(/\{proximo_valor\}/gi, variables.proximo_valor || '100');
+    .replace(/\{proximo_valor\}/gi, variables.proximo_valor || '100')
+    .replace(/\{valor_pago\}/gi, variables.valor_pago || '0');
 }
 
 /**
@@ -72,12 +73,19 @@ function getCurrentStageInfo(stageKey, funnel) {
 
   const next = stages[current.nextStage] || { value: '100' };
 
+  let paidValue = '0';
+  if (stageKey === 'stage_49') paidValue = '0';
+  else if (stageKey === 'stage_100') paidValue = '49,90';
+  else if (stageKey === 'stage_200') paidValue = '100';
+  else if (stageKey === 'stage_400') paidValue = '200';
+
   return {
     stage: stageKey,
     value: current.value,
     checkoutUrl: current.checkoutUrl,
     nextStage: current.nextStage,
-    nextValue: next.value
+    nextValue: next.value,
+    paidValue: paidValue
   };
 }
 
@@ -120,6 +128,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   
   chatData.variables.checkoutUrl = stageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
   chatData.variables.valor_atual = stageInfo.value;
+  chatData.variables.valor_pago = stageInfo.paidValue;
   chatData.variables.proximo_valor = stageInfo.nextValue;
 
   // =========================================================================
@@ -147,6 +156,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         chatData.upsellStage = 'stage_100';
         chatData.variables.checkoutUrl = funnel.upsellStages?.stage_100?.checkoutUrl || 'https://pay.kirvano.com/checkout-100';
         chatData.variables.valor_atual = '100';
+        chatData.variables.valor_pago = '49,90';
         chatData.variables.proximo_valor = '200';
 
         const upsellText = funnel.upsellStages?.stage_100?.confirmText || "Pagamento de R$ 49,90 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 100 👇\n\n{checkoutUrl100}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
@@ -158,6 +168,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         chatData.upsellStage = 'stage_200';
         chatData.variables.checkoutUrl = funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200';
         chatData.variables.valor_atual = '200';
+        chatData.variables.valor_pago = '100';
         chatData.variables.proximo_valor = '400';
 
         const upsellText = funnel.upsellStages?.stage_200?.confirmText || "Pagamento de R$ 100 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 200 👇\n\n{checkoutUrl200}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
@@ -169,6 +180,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         chatData.upsellStage = 'stage_400';
         chatData.variables.checkoutUrl = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
         chatData.variables.valor_atual = '400';
+        chatData.variables.valor_pago = '200';
         chatData.variables.proximo_valor = 'Finalizado';
 
         const upsellText = funnel.upsellStages?.stage_400?.confirmText || "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl400}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
@@ -176,10 +188,22 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
         db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: instance.id });
         await metaService.sendTextMessage(instance.phoneNumberId, instance.accessToken, cleanPhone, finalText);
+      } else if (chatData.upsellStage === 'stage_400') {
+        chatData.upsellStage = 'stage_finalizado';
+        chatData.state = 'FINALIZADO';
+        const finalText = "Pagamento de R$ 400 recebido com sucesso ✅\n\nSeu acesso completo e irrestrito ao painel foi liberado! Acesse seu painel e aproveite todas as ferramentas.";
+        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: instance.id });
+        await metaService.sendTextMessage(instance.phoneNumberId, instance.accessToken, cleanPhone, finalText);
       }
 
-      chats[cleanPhone] = chatData;
-      db.saveChats(chats);
+      const currentChats = db.getChats();
+      currentChats[cleanPhone] = {
+        ...currentChats[cleanPhone],
+        upsellStage: chatData.upsellStage,
+        state: chatData.state,
+        variables: chatData.variables
+      };
+      db.saveChats(currentChats);
       eventBus.emit('chat_updated', { phone: cleanPhone });
       return;
     }

@@ -71,27 +71,52 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
   const apiKey = settings.openaiApiKey;
 
   const currentValue = currentStageInfo.value || '49,90';
+  let paidValue = currentStageInfo.paidValue;
+  if (!paidValue) {
+    if (currentValue === '49,90') paidValue = '0';
+    else if (currentValue === '100') paidValue = '49,90';
+    else if (currentValue === '200') paidValue = '100';
+    else if (currentValue === '400') paidValue = '200';
+    else paidValue = '0';
+  }
   const nextValue = currentStageInfo.nextValue || '100';
+  const checkoutUrl = currentStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
 
-  // Regras e textos oficiais da Mavrol Empresarial
+  const formatText = (template) => {
+    if (!template) return '';
+    return template
+      .replace(/\{paidValue\}/gi, paidValue)
+      .replace(/\{currentValue\}/gi, currentValue)
+      .replace(/\{nextValue\}/gi, nextValue)
+      .replace(/\{checkoutUrl\}/gi, checkoutUrl)
+      .replace(/\{link_pagamento\}/gi, checkoutUrl);
+  };
+
+  // Regras e textos oficiais da Mavrol Empresarial universalizados para todas as etapas
+  const defaultAlreadyPaidText = currentValue === '49,90'
+    ? "Para liberar a busca inicial e o painel das conversas no sistema, é necessário concluir a ativação de R$ 49,90.\n\nQuer que eu te reenvie o link para finalizar?"
+    : "O pagamento anterior de R$ {paidValue} liberou a etapa, mas para garantir o acesso completo ao sistema precisamos avançar com a etapa de R$ {currentValue}. Assim que concluir o pagamento atual pelo link que te enviei, você terá tudo liberado para acompanhar.\n\nQuer que eu reenvie o link do pagamento de R$ {currentValue} para você?";
+
   const objectionTexts = {
-    why_pay: funnel.objections?.why_pay || "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+    why_pay: formatText(funnel.objections?.why_pay || "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual de R$ {currentValue} pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?"),
     
-    refuse_or_random: funnel.objections?.refuse_or_random || "Tranquilo, qualquer coisa é só chamar 🙂 \n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+    refuse_or_random: formatText(funnel.objections?.refuse_or_random || "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!"),
     
-    already_paid_refuses_new: (funnel.objections?.already_paid_refuses_new || "O pagamento de R$ 49,90 libera a etapa inicial, mas para garantir o acesso completo ao sistema precisamos avançar com a próxima etapa. Assim que concluir o pagamento atual pelo link que te enviei, você terá tudo liberado para acompanhar.\n\nQuer que eu reenvie o link do pagamento de R$ {nextValue} para você?").replace(/\{nextValue\}/g, nextValue),
+    already_paid_refuses_new: formatText(funnel.objections?.already_paid_refuses_new || defaultAlreadyPaidText),
     
-    denounce_or_scam: funnel.objections?.denounce_or_scam || "Entendo sua decisão. Se quiser, posso te ajudar a usar melhor o sistema para aproveitar tudo que ele oferece.\n\nEnquanto isso, se mudar de ideia, é só finalizar a etapa atual pelo link e me enviar o comprovante para liberar seu acesso completo. Estou aqui para ajudar no que precisar.",
+    denounce_or_scam: formatText(funnel.objections?.denounce_or_scam || "Entendo sua decisão. Se quiser, posso te ajudar a usar melhor o sistema para aproveitar tudo que ele oferece.\n\nEnquanto isso, se mudar de ideia, é só finalizar a etapa atual de R$ {currentValue} pelo link e me enviar o comprovante para liberar seu acesso completo. Estou aqui para ajudar no que precisar."),
     
-    what_is_tax: (funnel.objections?.what_is_tax || "O valor atual é referente à etapa necessária para liberar esse recurso do sistema.\n\nQuando você concluir o pagamento pelo link que te enviei, libera tudo para acompanhar direitinho.\n\nQuer que eu te envie o link para seguir agora?"),
+    what_is_tax: formatText(funnel.objections?.what_is_tax || "O valor de R$ {currentValue} é referente à etapa necessária para liberar esse recurso do sistema.\n\nQuando você concluir o pagamento pelo link que te enviei, libera tudo para acompanhar direitinho.\n\nQuer que eu te envie o link de R$ {currentValue} para seguir agora?"),
     
-    when_get_photo_or_access: funnel.objections?.when_get_photo_or_access || "Você já tem acesso inicial liberado pela etapa que pagou, mas o sistema libera funcionalidades completas conforme avançam as etapas.\n\nAssim que fizer o pagamento da etapa atual e me enviar o comprovante, você terá o acesso completo para acompanhar tudo no painel.\n\nQuer que eu mande o link da etapa atual para você finalizar?",
+    when_get_photo_or_access: formatText(funnel.objections?.when_get_photo_or_access || "Você já tem acesso inicial liberado pela etapa que pagou, mas o sistema libera funcionalidades completas conforme avançam as etapas.\n\nAssim que fizer o pagamento da etapa de R$ {currentValue} e me enviar o comprovante, você terá o acesso completo para acompanhar tudo no painel.\n\nQuer que eu mande o link da etapa de R$ {currentValue} para você finalizar?"),
 
-    said_paid_no_image: (funnel.receiptVerification?.said_paid_no_image || "Pode me enviar o comprovante do pagamento de R$ {currentValue} por favor? Assim já verifico e te libero o próximo passo.").replace(/\{currentValue\}/g, currentValue),
+    send_link: formatText("Segue o link para você concluir o pagamento da etapa de R$ {currentValue}:\n{checkoutUrl}\n\nAssim que finalizar, só me mandar o comprovante por aqui!"),
 
-    no_receipt_image: (funnel.receiptVerification?.no_receipt_image || "Não recebi nenhum comprovante na imagem que você enviou. Pode mandar uma foto ou print nítido do comprovante de pagamento do valor de R$ {currentValue}? Assim consigo verificar certinho para liberar o próximo passo.").replace(/\{currentValue\}/g, currentValue),
+    said_paid_no_image: formatText(funnel.receiptVerification?.said_paid_no_image || "Pode me enviar o comprovante do pagamento de R$ {currentValue} por favor? Assim já verifico e te libero o próximo passo."),
 
-    unclear_or_cropped: funnel.receiptVerification?.unclear_or_cropped || "O pagamento não está totalmente visível para confirmar se foi concluído pelo sistema.\n\nPode enviar um print ou foto mais completa da tela de detalhes da transação, mostrando o status de pagamento aprovado? Assim consigo liberar o próximo passo para você."
+    no_receipt_image: formatText(funnel.receiptVerification?.no_receipt_image || "Não recebi nenhum comprovante na imagem que você enviou. Pode mandar uma foto ou print nítido do comprovante de pagamento do valor de R$ {currentValue}? Assim consigo verificar certinho para liberar o próximo passo."),
+
+    unclear_or_cropped: formatText(funnel.receiptVerification?.unclear_or_cropped || "O pagamento não está totalmente visível para confirmar se foi concluído pelo sistema.\n\nPode enviar um print ou foto mais completa da tela de detalhes da transação, mostrando o status de pagamento aprovado? Assim consigo liberar o próximo passo para você.")
   };
 
   let classification = null;
@@ -107,14 +132,15 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
             {
               role: 'system',
               content: `Você é a inteligência oficial de suporte da Mavrol Empresarial Ltda no WhatsApp.
-O lead está na etapa de pagamento de R$ ${currentValue} (próxima etapa: R$ ${nextValue}).
+O lead está na etapa de pagamento de R$ ${currentValue}${paidValue !== '0' ? ` (já concluiu a etapa anterior de R$ ${paidValue})` : ''}.
 Analise a mensagem do cliente, independentemente de gírias, erros de digitação ou variações linguísticas, e classifique com precisão em UMA das opções:
 
-- WHY_PAY: O cliente pergunta por que tem que pagar, por que é pago ou por que cobra (ex: "Pq tenho q pagar?", "Pq cobram?", "Nao era gratis?", "Tem que pagar?", "Qual o motivo da cobranca?").
-- ALREADY_PAID_REFUSES_NEW: O cliente reclama que já pagou o valor anterior (R$ 49,90 ou etapa passada) e que não vai pagar o novo valor de R$ ${nextValue} (ex: "Ja paguei o de 49", "Ja paguei e tao cobrando de novo", "Nao vou pagar mais 100", "Ja paguei o anterior").
+- WHY_PAY: O cliente pergunta por que tem que pagar, por que é pago ou por que cobra essa etapa de R$ ${currentValue} (ex: "Pq tenho q pagar?", "Pq cobram?", "Nao era gratis?", "Tem que pagar?", "Qual o motivo da cobranca?").
+- ALREADY_PAID_REFUSES_NEW: O cliente reclama que já pagou a etapa anterior (R$ ${paidValue}) e questiona ou se recusa a pagar o novo valor de R$ ${currentValue} (ex: "Ja paguei o de ${paidValue}", "Ja paguei e tao cobrando de novo", "Nao vou pagar mais ${currentValue}", "Ja paguei o anterior").
 - DENOUNCE_OR_SCAM: O cliente ameaça denúncia, chama de golpe, fraude, fala em polícia, procon, advogado, estorno ou processo (ex: "Golpistas", "Vou denunciar", "Quero meu estorno", "Vou chamar a policia", "Isso e fraude", "Procon").
-- WHAT_IS_TAX: O cliente pergunta do que se trata a taxa atual ou para que serve (ex: "Que taxa de ${nextValue} e essa?", "Do que se trata esse valor?", "Para que serve essa taxa?").
+- WHAT_IS_TAX: O cliente pergunta do que se trata a taxa atual de R$ ${currentValue} ou para que serve (ex: "Que taxa de ${currentValue} e essa?", "Do que se trata esse valor?", "Para que serve essa taxa?").
 - WHEN_GET_PHOTO_OR_ACCESS: O cliente pergunta quando vai ver as mensagens, fotos, conversas ou ter o painel liberado (ex: "Quando recebo?", "Cade o acesso?", "Onde vejo?", "Quando libera tudo?").
+- SEND_LINK: O cliente pede o link de pagamento ou a chave pix para pagar (ex: "Manda o link", "Onde pago?", "Cade o link?", "Passa o pix", "Link de novo").
 - SAID_PAID: O cliente afirma por texto que já pagou ou transferiu, mas sem anexar imagem (ex: "Ja paguei", "Ta pago", "Fiz o pix", "Mandei o dinheiro", "Acabei de pagar").
 - REFUSE_OR_RANDOM: O cliente se recusa a pagar, desiste, manda frase curta ou fala algo aleatório (ex: "Nao vou pagar", "Deixa quieto", "Nem a pau", "Valeu", "Falou", qualquer frase solta).`
             },
@@ -136,10 +162,10 @@ Analise a mensagem do cliente, independentemente de gírias, erros de digitaçã
       console.log(`[AI Classifier (OpenAI)] Mensagem "${userMessage}" classificada como: ${classification}`);
     } catch (err) {
       console.warn('[AI Classifier Error] Usando classificador local de regras:', err.message);
-      classification = localClassifier(userMessage);
+      classification = localClassifier(userMessage, currentStageInfo);
     }
   } else {
-    classification = localClassifier(userMessage);
+    classification = localClassifier(userMessage, currentStageInfo);
   }
 
   // Mapeamento direto para as respostas oficiais do script
@@ -148,6 +174,7 @@ Analise a mensagem do cliente, independentemente de gírias, erros de digitaçã
   if (classification.includes('DENOUNCE_OR_SCAM')) return objectionTexts.denounce_or_scam;
   if (classification.includes('WHAT_IS_TAX')) return objectionTexts.what_is_tax;
   if (classification.includes('WHEN_GET_PHOTO_OR_ACCESS')) return objectionTexts.when_get_photo_or_access;
+  if (classification.includes('SEND_LINK')) return objectionTexts.send_link;
   if (classification.includes('SAID_PAID')) return objectionTexts.said_paid_no_image;
 
   return objectionTexts.refuse_or_random;
@@ -156,7 +183,7 @@ Analise a mensagem do cliente, independentemente de gírias, erros de digitaçã
 /**
  * Classificador local semântico e fonético para fallback ultra-resiliente
  */
-function localClassifier(text) {
+function localClassifier(text, currentStageInfo = {}) {
   const lower = (text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   // 1. Falou de denúncia, golpe, polícia, reembolso
@@ -164,47 +191,58 @@ function localClassifier(text) {
     lower.includes('golpe') || lower.includes('denuncia') || lower.includes('policia') ||
     lower.includes('reembolso') || lower.includes('estorno') || lower.includes('procon') ||
     lower.includes('ladrao') || lower.includes('crime') || lower.includes('process') ||
-    lower.includes('advogado') || lower.includes('delegacia')
+    lower.includes('advogado') || lower.includes('delegacia') || lower.includes('picareta') ||
+    lower.includes('fraude') || lower.includes('estelionato')
   ) {
     return 'DENOUNCE_OR_SCAM';
   }
 
-  // 2. Reclamação de já ter pago o anterior e recusar o novo
+  // 2. Reclamação de já ter pago o anterior e questionar/recusar o novo
   if (
-    (lower.includes('ja paguei') || lower.includes('paguei o')) &&
-    (lower.includes('novo') || lower.includes('100') || lower.includes('200') || lower.includes('400') || lower.includes('outro') || lower.includes('esse') || lower.includes('denovo') || lower.includes('de novo'))
+    (lower.includes('ja paguei') || lower.includes('paguei o') || lower.includes('ja pague') || lower.includes('ja fiz o') || lower.includes('paguei')) &&
+    (lower.includes('novo') || lower.includes('100') || lower.includes('200') || lower.includes('400') || lower.includes('49') || lower.includes('outro') || lower.includes('esse') || lower.includes('denovo') || lower.includes('de novo') || lower.includes('mais') || lower.includes('novamente') || lower.includes('outra'))
   ) {
     return 'ALREADY_PAID_REFUSES_NEW';
   }
 
-  // 3. Afirmou que pagou
+  // 3. Pediu o link ou pix
+  if (
+    (lower.includes('link') || lower.includes('pix') || lower.includes('pagar') || lower.includes('onde pago') || lower.includes('passa o') || lower.includes('manda o')) &&
+    (lower.includes('manda') || lower.includes('envia') || lower.includes('cade') || lower.includes('qual') || lower.includes('passa') || lower.includes('onde'))
+  ) {
+    return 'SEND_LINK';
+  }
+
+  // 4. Afirmou que pagou
   if (
     lower.includes('ja paguei') || lower.includes('ta pago') || lower.includes('paguei') ||
     lower.includes('mandei o pix') || lower.includes('fiz o pix') || lower.includes('transferi') ||
-    lower.includes('acabei de pagar') || lower.includes('ja fiz')
+    lower.includes('acabei de pagar') || lower.includes('ja fiz') || lower.includes('pix feito')
   ) {
     return 'SAID_PAID';
   }
 
-  // 4. Pergunta por que tem que pagar
+  // 5. Pergunta por que tem que pagar
   if (
-    (lower.includes('por que') || lower.includes('pq') || lower.includes('porque')) &&
-    (lower.includes('pagar') || lower.includes('pago') || lower.includes('cobra') || lower.includes('gratis') || lower.includes('valor') || lower.includes('preco'))
+    (lower.includes('por que') || lower.includes('pq') || lower.includes('porque') || lower.includes('motivo') || lower.includes('pra que')) &&
+    (lower.includes('pagar') || lower.includes('pago') || lower.includes('cobra') || lower.includes('gratis') || lower.includes('valor') || lower.includes('preco') || lower.includes('custo') || lower.includes('dinheiro'))
   ) {
     return 'WHY_PAY';
   }
 
-  // 5. Pergunta do que se trata a taxa de 100 ou taxa atual
+  // 6. Pergunta do que se trata a taxa atual (49, 100, 200, 400 ou genérico)
   if (
-    lower.includes('taxa de 100') || lower.includes('taxa de cem') || lower.includes('taxa de 200') || lower.includes('taxa de 400') ||
-    lower.includes('que taxa') || lower.includes('do que se trata essa taxa') || lower.includes('pra que essa taxa') || lower.includes('essa taxa')
+    lower.includes('taxa de 100') || lower.includes('taxa de cem') || lower.includes('taxa de 200') || lower.includes('taxa de 400') || lower.includes('taxa de 49') ||
+    lower.includes('que taxa') || lower.includes('do que se trata essa taxa') || lower.includes('pra que essa taxa') || lower.includes('essa taxa') ||
+    lower.includes('qual taxa') || lower.includes('taxa do que') || lower.includes('taxa para')
   ) {
     return 'WHAT_IS_TAX';
   }
 
-  // 6. Pergunta sobre acesso, quando vai ver tudo ou receber a foto
+  // 7. Pergunta sobre acesso, quando vai ver tudo ou receber a foto
   if (
-    lower.includes('quando') && (lower.includes('recebo') || lower.includes('foto') || lower.includes('acesso') || lower.includes('ver tudo') || lower.includes('mensagens') || lower.includes('painel') || lower.includes('libera'))
+    (lower.includes('quando') || lower.includes('cade') || lower.includes('como faco')) &&
+    (lower.includes('recebo') || lower.includes('foto') || lower.includes('acesso') || lower.includes('ver tudo') || lower.includes('mensagens') || lower.includes('painel') || lower.includes('libera') || lower.includes('conversas'))
   ) {
     return 'WHEN_GET_PHOTO_OR_ACCESS';
   }

@@ -4,8 +4,8 @@
     "name": "Funil Oficial - Mavrol Empresarial (Com Foto & Upsells)",
     "description": "Funil completo com verificação de foto na API, Kirvano/PicPay, quebra de objeções por IA e escala de upsells (49,90 -> 100 -> 200 -> 400)",
     "status": "ativo",
-    "blocksCount": 19,
-    "updatedAt": "2026-09-12T23:36:27.312Z",
+    "blocksCount": 26,
+    "updatedAt": "2026-09-13T15:22:00.000Z",
     "nodes": [
       {
         "id": "node-start",
@@ -197,13 +197,13 @@
       {
         "id": "node-ai-sentiment",
         "type": "ai",
-        "label": "GPT: Quebra de Objeções (Mavrol)",
+        "label": "GPT: Objeções Oferta R$ 49,90",
         "icon": "🤖",
         "color": "emerald",
         "x": 3180,
         "y": 440,
         "data": {
-          "prompt": "Classificar objeções: Por que pagar, Recusa, Reclamação 49,90, Denúncia/Golpe, Taxa 100, Acesso"
+          "prompt": "Classificar objeções: Por que pagar, Recusa, Denúncia/Golpe, O que é a taxa, Acesso, Enviar link"
         }
       },
       {
@@ -212,11 +212,35 @@
         "label": "Upsell 1: R$ 100,00",
         "icon": "💳",
         "color": "purple",
-        "x": 3460,
+        "x": 3500,
         "y": 440,
         "data": {
           "text": "Pagamento de R$ 49,90 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 100 👇\n\n{checkoutUrl100}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
           "amount": "100"
+        }
+      },
+      {
+        "id": "node-wait-upsell-100",
+        "type": "wait",
+        "label": "Aguarda Comprovante R$ 100",
+        "icon": "⏳",
+        "color": "orange",
+        "x": 3760,
+        "y": 440,
+        "data": {
+          "timeout": "Aguardando comprovante ou dúvidas sobre a taxa de R$ 100..."
+        }
+      },
+      {
+        "id": "node-ai-objection-100",
+        "type": "ai",
+        "label": "GPT: Objeções Taxa R$ 100",
+        "icon": "🤖",
+        "color": "emerald",
+        "x": 4020,
+        "y": 440,
+        "data": {
+          "prompt": "Classificar objeções Taxa R$ 100: Já pagou 49,90 e recusa 100, Por que pagar taxa 100, Denúncia/Golpe, Taxa 100, Acesso, Enviar link"
         }
       },
       {
@@ -225,11 +249,35 @@
         "label": "Upsell 2: R$ 200,00",
         "icon": "💳",
         "color": "purple",
-        "x": 3740,
+        "x": 4340,
         "y": 440,
         "data": {
           "text": "Pagamento de R$ 100 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 200 👇\n\n{checkoutUrl200}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
           "amount": "200"
+        }
+      },
+      {
+        "id": "node-wait-upsell-200",
+        "type": "wait",
+        "label": "Aguarda Comprovante R$ 200",
+        "icon": "⏳",
+        "color": "orange",
+        "x": 4600,
+        "y": 440,
+        "data": {
+          "timeout": "Aguardando comprovante ou dúvidas sobre a taxa de R$ 200..."
+        }
+      },
+      {
+        "id": "node-ai-objection-200",
+        "type": "ai",
+        "label": "GPT: Objeções Taxa R$ 200",
+        "icon": "🤖",
+        "color": "emerald",
+        "x": 4860,
+        "y": 440,
+        "data": {
+          "prompt": "Classificar objeções Taxa R$ 200: Já pagou 100 e recusa 200, Por que pagar taxa 200, Denúncia/Golpe, Taxa 200, Acesso, Enviar link"
         }
       },
       {
@@ -238,11 +286,47 @@
         "label": "Upsell 3: R$ 400,00",
         "icon": "💳",
         "color": "purple",
-        "x": 4020,
+        "x": 5180,
         "y": 440,
         "data": {
           "text": "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl400}\n\nPode seguir e me enviar o comprovante assim que finalizar!",
           "amount": "400"
+        }
+      },
+      {
+        "id": "node-wait-upsell-400",
+        "type": "wait",
+        "label": "Aguarda Comprovante R$ 400",
+        "icon": "⏳",
+        "color": "orange",
+        "x": 5440,
+        "y": 440,
+        "data": {
+          "timeout": "Aguardando comprovante ou dúvidas sobre a taxa de R$ 400..."
+        }
+      },
+      {
+        "id": "node-ai-objection-400",
+        "type": "ai",
+        "label": "GPT: Objeções Taxa R$ 400",
+        "icon": "🤖",
+        "color": "emerald",
+        "x": 5700,
+        "y": 440,
+        "data": {
+          "prompt": "Classificar objeções Taxa R$ 400: Já pagou 200 e recusa 400, Por que pagar taxa 400, Denúncia/Golpe, Taxa 400, Acesso, Enviar link"
+        }
+      },
+      {
+        "id": "node-access-released",
+        "type": "message",
+        "label": "Acesso Master Liberado 🎉",
+        "icon": "🔓",
+        "color": "green",
+        "x": 6020,
+        "y": 440,
+        "data": {
+          "text": "Pagamento de R$ 400 recebido com sucesso ✅\n\nSeu acesso completo e irrestrito ao painel foi liberado! Acesse seu painel e aproveite todas as ferramentas."
         }
       }
     ],
@@ -340,7 +424,14 @@
       {
         "id": "e18",
         "from": "node-wait-reaction",
-        "to": "node-ai-sentiment"
+        "to": "node-ai-sentiment",
+        "label": "Dúvidas / Objeções R$ 49,90"
+      },
+      {
+        "id": "e18_loop",
+        "from": "node-ai-sentiment",
+        "to": "node-wait-reaction",
+        "label": "🔄 Dúvida Respondida"
       },
       {
         "id": "e19",
@@ -351,14 +442,71 @@
       {
         "id": "e20",
         "from": "node-upsell-100",
+        "to": "node-wait-upsell-100"
+      },
+      {
+        "id": "e21",
+        "from": "node-wait-upsell-100",
+        "to": "node-ai-objection-100",
+        "label": "Dúvidas / Objeções R$ 100"
+      },
+      {
+        "id": "e21_loop",
+        "from": "node-ai-objection-100",
+        "to": "node-wait-upsell-100",
+        "label": "🔄 Dúvida Respondida"
+      },
+      {
+        "id": "e22",
+        "from": "node-ai-objection-100",
         "to": "node-upsell-200",
         "label": "✅ Comprovante R$ 100 Aprovado"
       },
       {
-        "id": "e21",
+        "id": "e23",
         "from": "node-upsell-200",
+        "to": "node-wait-upsell-200"
+      },
+      {
+        "id": "e24",
+        "from": "node-wait-upsell-200",
+        "to": "node-ai-objection-200",
+        "label": "Dúvidas / Objeções R$ 200"
+      },
+      {
+        "id": "e24_loop",
+        "from": "node-ai-objection-200",
+        "to": "node-wait-upsell-200",
+        "label": "🔄 Dúvida Respondida"
+      },
+      {
+        "id": "e25",
+        "from": "node-ai-objection-200",
         "to": "node-upsell-400",
         "label": "✅ Comprovante R$ 200 Aprovado"
+      },
+      {
+        "id": "e26",
+        "from": "node-upsell-400",
+        "to": "node-wait-upsell-400"
+      },
+      {
+        "id": "e27",
+        "from": "node-wait-upsell-400",
+        "to": "node-ai-objection-400",
+        "label": "Dúvidas / Objeções R$ 400"
+      },
+      {
+        "id": "e27_loop",
+        "from": "node-ai-objection-400",
+        "to": "node-wait-upsell-400",
+        "label": "🔄 Dúvida Respondida"
+      },
+      {
+        "id": "e28",
+        "from": "node-ai-objection-400",
+        "to": "node-access-released",
+        "label": "✅ Comprovante R$ 400 Aprovado"
       }
     ]
   }

@@ -599,7 +599,7 @@ const FlowBuilder = {
     const content = document.getElementById('minimap-content');
     if (!content || !this.currentFlow) return;
 
-    const scale = 220 / 3800;
+    const scale = 220 / 6400;
     let html = this.currentFlow.nodes.map(n => `
       <div class="minimap-node" style="left: ${n.x * scale}px; top: ${n.y * scale * 0.5}px; width: ${210 * scale}px; height: 12px; background: ${this.getNodeColorHex(n.color)};"></div>
     `).join('');
@@ -689,7 +689,7 @@ const FlowBuilder = {
       case 'media':
         return { template: 'template_com_foto.png', mediaType: 'proof', caption: 'Segue a verificação solicitada' };
       case 'ai':
-        return { prompt: 'Classificar objeções: Por que pagar, Recusa, Reclamação 49,90, Denúncia/Golpe, Taxa 100, Acesso' };
+        return { prompt: 'Classificar objeções: Por que pagar, Recusa, Denúncia/Golpe, O que é a taxa, Acesso, Enviar link' };
       case 'pix':
         return { pixKey: 'contato@seusite.com', amount: '49,90', description: 'Liberação de acesso' };
       case 'payment':
@@ -859,8 +859,8 @@ const FlowBuilder = {
               <div>Responde amigavelmente: "Tranquilo, qualquer coisa é só chamar 🙂 Se quiser, pode seguir pelo link..."</div>
             </div>
             <div style="padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
-              <strong style="color: #6ee7b7;">3. Já paguei 49,90 e recusa novo pagamento:</strong>
-              <div>Esclarece que 49,90 liberou a etapa inicial e oferece o próximo valor (R$ 100, 200 ou 400).</div>
+              <strong style="color: #6ee7b7;">3. Já paguei o anterior e recusa novo pagamento:</strong>
+              <div>Esclarece dinamicamente que o pagamento anterior liberou a etapa correspondente e incentiva o avanço para a etapa atual (R$ 100, R$ 200 ou R$ 400).</div>
             </div>
             <div style="padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
               <strong style="color: #6ee7b7;">4. Denúncia, golpe ou polícia:</strong>
