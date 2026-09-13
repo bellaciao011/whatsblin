@@ -88,11 +88,23 @@ router.get('/', (req, res) => {
       try {
         // Envia para o endpoint de embedded-signup ou facebook connect
         const redirectUri = window.location.origin + '/webhook';
+        let pendingName = '';
+        let pendingCoexistence = true;
+        try {
+          if (window.opener && window.opener._pendingConnectionName) {
+            pendingName = window.opener._pendingConnectionName;
+            pendingCoexistence = window.opener._pendingCoexistence;
+          } else if (sessionStorage.getItem('pending_connection_name')) {
+            pendingName = sessionStorage.getItem('pending_connection_name');
+            pendingCoexistence = sessionStorage.getItem('pending_coexistence') === 'true';
+          }
+        } catch(e) {}
+
         const res = await fetch('/api/whatsapp/embedded-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ accessToken, code, redirectUri })
+          body: JSON.stringify({ accessToken, code, redirectUri, name: pendingName, coexistence: pendingCoexistence })
         });
 
         const data = await res.json();

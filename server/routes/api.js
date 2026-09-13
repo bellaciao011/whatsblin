@@ -499,11 +499,37 @@ router.post('/whatsapp/embedded-signup', async (req, res) => {
     }
     db.saveInstances(instances);
 
-    // Salva token nas configurações globais da Meta também
+    // Salva token e dados do usuário nas configurações globais da Meta
     const settings = db.getSettings();
     if (!settings.facebook) settings.facebook = {};
     settings.facebook.connected = true;
     settings.facebook.accessToken = finalToken;
+
+    try {
+      const metaDetails = await metaService.validateAndFetchMetaDetails(finalToken);
+      if (metaDetails.user) {
+        settings.facebook.userId = metaDetails.user.id;
+        settings.facebook.userName = metaDetails.user.name;
+        settings.facebook.userEmail = metaDetails.user.email;
+      }
+      if (metaDetails.adAccounts && metaDetails.adAccounts.length > 0) {
+        settings.facebook.adAccounts = metaDetails.adAccounts;
+        if (!settings.facebook.adAccountId) {
+          settings.facebook.adAccountId = metaDetails.adAccounts[0].id;
+          settings.facebook.adAccountName = metaDetails.adAccounts[0].name;
+        }
+      }
+      if (metaDetails.pixels && metaDetails.pixels.length > 0) {
+        settings.facebook.pixels = metaDetails.pixels;
+        if (!settings.facebook.pixelId) {
+          settings.facebook.pixelId = metaDetails.pixels[0].id;
+          settings.facebook.pixelName = metaDetails.pixels[0].name;
+        }
+      }
+    } catch(e) {
+      console.warn('[Embedded Signup] Aviso buscando detalhes da conta:', e.message);
+    }
+
     db.saveSettings(settings);
 
     console.log('[Embedded Signup] Sucesso! Instância registrada:', newInstance.name);

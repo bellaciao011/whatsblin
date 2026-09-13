@@ -984,7 +984,7 @@ window.addEventListener('message', async (event) => {
 /**
  * Ação principal do botão "Registrar com Meta" (Leona Flow)
  */
-async function handleRegisterWithMeta() {
+function handleRegisterWithMeta() {
   const nameInput = document.getElementById('conn-name');
   const name = nameInput ? nameInput.value.trim() : '';
   if (!name) {
@@ -996,81 +996,31 @@ async function handleRegisterWithMeta() {
   const coexistence = document.getElementById('conn-coexistence')?.checked ?? true;
   const appId = state.facebook?.appId || '1388636936143540';
   const configId = state.facebook?.configId || '2204676673432561';
-  const btn = document.getElementById('btn-register-meta');
 
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<span style="display:inline-block; width:13px; height:13px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Conectando...`;
-  }
+  // Guarda dados da conexão para associar após o retorno da Meta
+  window._pendingConnectionName = name;
+  window._pendingCoexistence = coexistence;
+  try {
+    sessionStorage.setItem('pending_connection_name', name);
+    sessionStorage.setItem('pending_coexistence', coexistence ? 'true' : 'false');
+  } catch(e) {}
 
-  // Se o FB SDK estiver disponível, tenta abrir via FB.login()
-  if (window.FB && typeof FB.login === 'function') {
-    initFacebookSDK();
-    
-    const loginOptions = {
-      response_type: 'code',
-      override_default_response_type: true,
-      extras: {
-        setup: {},
-        feature: {
-          coexistence: coexistence
-        }
-      }
-    };
+  const redirectUri = encodeURIComponent(`${window.location.origin}/webhook`);
+  
+  // URL Oficial do WhatsApp Embedded Signup da Meta com o config_id
+  const oauthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&config_id=${configId}&response_type=code`;
 
-    if (configId) {
-      loginOptions.config_id = configId;
-    } else {
-      loginOptions.scope = 'whatsapp_business_management,whatsapp_business_messaging';
-    }
+  const width = 640;
+  const height = 750;
+  const left = (window.innerWidth - width) / 2;
+  const top = (window.innerHeight - height) / 2;
 
-    FB.login(async (response) => {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<span>Registrar com Meta</span>';
-      }
+  const popup = window.open(oauthUrl, 'MetaWhatsAppSignup', `width=${width},height=${height},top=${top},left=${left}`);
 
-      if (response.authResponse && response.authResponse.code) {
-        const code = response.authResponse.code;
-        showToast('Validando credenciais com a Meta...', 'info');
-
-        try {
-          const res = await fetch('/api/whatsapp/embedded-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              name,
-              coexistence,
-              wabaId: lastEmbeddedSignupData?.waba_id,
-              phoneNumberId: lastEmbeddedSignupData?.phone_number_id
-            })
-          });
-
-          const result = await res.json();
-          if (res.ok && result.success) {
-            showToast(`✓ Conectado com sucesso: ${result.instance.name}!`, 'success');
-            closeAddChipModal();
-            if (state.currentView === 'instances') renderInstances();
-            else if (state.currentView === 'overview') renderOverview();
-          } else {
-            showToast(result.error || 'Erro ao registrar WhatsApp na Meta.', 'error');
-          }
-        } catch (err) {
-          showToast('Erro de comunicação: ' + err.message, 'error');
-        }
-      } else {
-        console.warn('[FB.login] Sem code ou cancelado pelo usuário.');
-      }
-    }, loginOptions);
-
+  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+    showToast('⚠️ Pop-up bloqueado pelo navegador! Por favor, clique na barra de endereços e permita pop-ups para este site.', 'error');
   } else {
-    // Fallback caso adblock bloqueie o SDK externo do FB
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<span>Registrar com Meta</span>';
-    }
-    openMetaEmbeddedPopupDirect(name, coexistence, appId, configId);
+    showToast('Janela oficial do WhatsApp da Meta aberta! Complete o cadastro do chip nela.', 'info');
   }
 }
 
