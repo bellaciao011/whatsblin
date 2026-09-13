@@ -1,4 +1,24 @@
 // WhatsHub Pro - Frontend Application State & Router
+// Interceptor global para redirecionar se a sessão expirar (401)
+const originalFetch = window.fetch;
+window.fetch = async function(...args) {
+  const res = await originalFetch(...args);
+  if (res.status === 401 && !window.location.pathname.includes('login')) {
+    window.location.href = '/login';
+  }
+  return res;
+};
+
+// Função para encerrar sessão e limpar estado
+async function logout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (err) {}
+  localStorage.removeItem('hub_auth_user');
+  localStorage.removeItem('hub_token');
+  window.location.href = '/login';
+}
+
 const state = {
   currentView: 'overview',
   stats: {},

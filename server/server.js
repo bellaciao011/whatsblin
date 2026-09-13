@@ -2,38 +2,92 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./storage/db');
+const authService = require('./services/authService');
 
 const webhookRoutes = require('./routes/webhook');
 const apiRoutes = require('./routes/api');
 
 const app = express();
 
-// Middlewares
+// Middlewares globais
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Servir frontend e mídias estáticas
-app.use(express.static(path.join(__dirname, '../public')));
+// 1. RECURSOS PÚBLICOS CRÍTICOS (NUNCA EXIGEM AUTENTICAÇÃO)
+// - /generated: Fotos geradas baixadas pelo WhatsApp e Leona
+// - /assets: Templates e mídias estáticas do sistema
+// - /css: Estilos compartilhados para a tela de login
+// - /webhook: Endpoint oficial da Meta WhatsApp Cloud API
+app.use('/generated', express.static(path.join(__dirname, '../public/generated')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
-
-// Rotas
+app.use('/css', express.static(path.join(__dirname, '../public/css')));
 app.use('/webhook', webhookRoutes);
+
+// Rota da Tela de Login (se já estiver autenticado, vai direto para o dashboard)
+app.get(['/login', '/login.html'], (req, res) => {
+  const cookies = authService.parseCookies(req);
+  const token = cookies.auth_token;
+  if (authService.verifyToken(token)) {
+    return res.redirect('/');
+  }
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+// 2. MIDDLEWARE DE PROTEÇÃO POR SENHA (BARREIRA DE SEGURANÇA)
+app.use((req, res, next) => {
+  // Rotas que dispensam autenticação:
+  // - /api/auth/* (login e verificação)
+  // - /api/generate-proof (utilizada pela Leona síncrona para gerar as provas)
+  if (
+    req.path.startsWith('/api/auth/') ||
+    req.path.startsWith('/api/generate-proof') ||
+    req.path === '/favicon.ico'
+  ) {
+    return next();
+  }
+
+  // Extrai token do cookie auth_token ou do header Authorization Bearer
+  const cookies = authService.parseCookies(req);
+  const token = cookies.auth_token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
+  const session = authService.verifyToken(token);
+
+  if (session) {
+    req.user = session;
+    return next();
+  }
+
+  // Caso NÃO esteja autenticado:
+  // 1) Se for chamada de API: retorna 401 JSON
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Acesso restrito. Faça login para continuar.' });
+  }
+
+  // 2) Se for acesso via navegador (HTML/página): redireciona para a tela de login
+  return res.redirect('/login');
+});
+
+// 3. ROTAS PROTEGIDAS (DISPONÍVEIS APENAS APÓS LOGIN)
 app.use('/api', apiRoutes);
 
-// Fallback SPA
+// Servir frontend do dashboard e scripts protegidos
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Fallback SPA protegido
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Inicialização
+// Inicialização do servidor
 const settings = db.getSettings();
 const PORT = process.env.PORT || settings.serverPort || 3000;
 
 app.listen(PORT, () => {
   console.log('====================================================');
   console.log(`🚀 WHATSAPP AUTOMATION HUB RODANDO COM SUCESSO!`);
-  console.log(`🌐 Dashboard: http://localhost:${PORT}`);
-  console.log(`📡 Webhook Meta: http://localhost:${PORT}/webhook`);
+  console.log(`🌐 Dashboard (Protegido): http://localhost:${PORT}`);
+  console.log(`🔐 Login: http://localhost:${PORT}/login`);
+  console.log(`📡 Webhook Meta (Público): http://localhost:${PORT}/webhook`);
+  console.log(`⚡ API Leona (Público): http://localhost:${PORT}/api/generate-proof`);
   console.log('====================================================');
 });

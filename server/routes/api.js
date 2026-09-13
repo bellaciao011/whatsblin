@@ -6,6 +6,60 @@ const db = require('../storage/db');
 const { composeProofImage } = require('../services/imageComposer');
 const { processIncomingMessage, lookupProfilePicture, eventBus } = require('../services/flowEngine');
 const metaService = require('../services/metaService');
+const authService = require('../services/authService');
+
+/**
+ * =========================================================================
+ * AUTENTICAÇÃO DO PAINEL
+ * =========================================================================
+ */
+router.post('/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Usuário e senha são obrigatórios' });
+  }
+
+  const isValid = authService.validateCredentials(username, password);
+  if (!isValid) {
+    return res.status(401).json({ success: false, error: 'Usuário ou senha incorretos' });
+  }
+
+  const token = authService.generateToken(username);
+  
+  // Define o cookie auth_token HttpOnly seguro por 7 dias
+  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
+
+  res.json({
+    success: true,
+    token,
+    user: { username }
+  });
+});
+
+router.get('/auth/check', (req, res) => {
+  const cookies = authService.parseCookies(req);
+  const token = cookies.auth_token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
+  const session = authService.verifyToken(token);
+
+  if (session) {
+    return res.json({ authenticated: true, username: session.username });
+  }
+  res.json({ authenticated: false });
+});
+
+router.post('/auth/logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'auth_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.json({ success: true });
+});
+
+router.post('/auth/change-credentials', (req, res) => {
+  const { newUsername, newPassword } = req.body;
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: 'A nova senha deve ter no mínimo 4 caracteres' });
+  }
+  const updated = authService.updateCredentials(newUsername, newPassword);
+  res.json({ success: true, message: 'Credenciais atualizadas com sucesso', username: updated.username });
+});
 
 /**
  * Estatísticas Gerais (Visão Geral)
