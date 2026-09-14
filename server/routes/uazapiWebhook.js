@@ -102,22 +102,8 @@ router.post('/uazapi', async (req, res) => {
           continue;
         }
 
-        // Ignorar mensagens enviadas pelo próprio usuário (aparelho do chip)
-        if (msg.fromMe === true || msg.key?.fromMe === true) {
-          continue;
-        }
-
         // Ignorar mensagens de grupos (o funil é 1:1 privado)
         if (msg.isGroup === true || (msg.chatid && msg.chatid.endsWith('@g.us'))) {
-          continue;
-        }
-
-        // Extrai o número do remetente
-        const rawSender = msg.chatid || msg.sender || msg.from || msg.key?.remoteJid || '';
-        const cleanPhone = rawSender.replace(/@.*$/, '').replace(/\D/g, '');
-
-        if (!cleanPhone || cleanPhone.length < 8) {
-          console.warn(`[uazapi Webhook] Número de remetente inválido: "${rawSender}"`);
           continue;
         }
 
@@ -147,6 +133,37 @@ router.post('/uazapi', async (req, res) => {
             url: msg.fileURL || msg.mediaUrl || null,
             type: msg.messageType || 'image'
           };
+        }
+
+        const isFromMe = msg.fromMe === true || msg.key?.fromMe === true;
+
+        // Extrai o número do interlocutor (lead)
+        const rawTarget = msg.chatid || (isFromMe ? (msg.to || msg.key?.remoteJid) : (msg.sender || msg.from || msg.key?.remoteJid)) || '';
+        const cleanPhone = String(rawTarget).replace(/@.*$/, '').replace(/\D/g, '');
+
+        if (!cleanPhone || cleanPhone.length < 8) {
+          console.warn(`[uazapi Webhook] Número de contato inválido: "${rawTarget}"`);
+          continue;
+        }
+
+        // Mensagens enviadas pelo próprio usuário (aparelho do chip)
+        if (isFromMe) {
+          console.log(`[uazapi Webhook] 📤 Mensagem enviada pelo operador para ${cleanPhone}: "${textBody || '[Mídia]'}"`);
+          try {
+            db.addChatMessage(cleanPhone, {
+              id: msg.id || msg.messageid || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              timestamp: new Date().toISOString(),
+              from: 'agent',
+              text: textBody || '[Mídia]',
+              mediaUrl: mediaAttachment?.url || null,
+              mediaType: mediaAttachment?.type || null,
+              instanceId: instance?.id || 'inst_1'
+            });
+            eventBus.emit('chat_updated', { phone: cleanPhone });
+          } catch (e) {
+            console.warn('[uazapi Webhook] Erro ao registrar mensagem de saída:', e.message);
+          }
+          continue;
         }
 
         console.log(`[uazapi Webhook] 📩 Mensagem de ${cleanPhone} (Chip: ${instLogName}): "${textBody || '[Mídia]'}"`);

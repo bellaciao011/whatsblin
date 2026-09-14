@@ -249,6 +249,8 @@ async function syncUazapiInstanceData(inst, req = null) {
 
       if (!wasConnected) {
         eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
+        // Auto-sincroniza conversas existentes ao conectar
+        syncChatsFromUazapi(inst).catch(cErr => console.warn('[uazapi Chat Sync Auto Error]', cErr.message));
       }
       return true;
     } else if (statusRes?.instance?.status === 'disconnected' && inst.status === 'connected') {
@@ -261,6 +263,14 @@ async function syncUazapiInstanceData(inst, req = null) {
     console.warn(`[uazapi Sync Error] Falha ao consultar uazapi para ${inst.name}:`, err.message);
   }
   return false;
+}
+
+function parseUazapiTimestamp(ts) {
+  if (!ts) return new Date().toISOString();
+  const num = Number(ts);
+  if (isNaN(num)) return new Date().toISOString();
+  const ms = num > 1e11 ? num : num * 1000;
+  return new Date(ms).toISOString();
 }
 
 /**
@@ -290,7 +300,7 @@ async function syncChatsFromUazapi(inst) {
           leadName,
           instanceId: inst.id,
           state: 'NOVO',
-          lastMessageTime: c.wa_lastMsgTimestamp ? new Date(c.wa_lastMsgTimestamp * 1000).toISOString() : new Date().toISOString(),
+          lastMessageTime: parseUazapiTimestamp(c.wa_lastMsgTimestamp),
           messages: []
         };
         importedChats++;
@@ -301,14 +311,14 @@ async function syncChatsFromUazapi(inst) {
       // Busca mensagens recentes desta conversa se vazia
       if (allChats[cleanPhone].messages.length === 0) {
         try {
-          const msgs = await uazapiService.findMessages(inst.url_servidor, decToken, c.wa_chatid, 10);
+          const msgs = await uazapiService.findMessages(inst.url_servidor, decToken, c.wa_chatid, 15);
           if (Array.isArray(msgs)) {
             for (const m of msgs) {
-              const text = (m.text || m.body || m.content || m.message?.conversation || '').trim();
+              const text = (m.text || m.body || m.content?.text || (typeof m.content === 'string' ? m.content : '') || m.message?.conversation || '').trim();
               if (text || m.fileURL) {
                 allChats[cleanPhone].messages.push({
-                  id: m.id || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                  timestamp: m.timestamp ? new Date(m.timestamp * 1000).toISOString() : new Date().toISOString(),
+                  id: m.id || m.messageid || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                  timestamp: parseUazapiTimestamp(m.messageTimestamp || m.timestamp),
                   from: m.fromMe ? 'agent' : 'lead',
                   text: text || '[Mídia]',
                   mediaUrl: m.fileURL || null,
@@ -746,7 +756,19 @@ router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
 /**
  * Live Chat (Inbox)
  */
-router.get('/chats', (req, res) => {
+router.get('/chats', async (req, res) => {
+  try {
+    const existing = db.getChats() || {};
+    if (Object.keys(existing).length === 0) {
+      const instances = db.getInstances();
+      const connectedInst = instances.find(i => i.tipo === 'uazapi' && i.status === 'connected' && i.instance_token);
+      if (connectedInst) {
+        await syncChatsFromUazapi(connectedInst);
+      }
+    }
+  } catch (e) {
+    console.warn('[Chats Sync on Fetch Warning]', e.message);
+  }
   res.json(db.getChats());
 });
 

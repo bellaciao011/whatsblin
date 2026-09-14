@@ -205,6 +205,7 @@ async function configureWebhook(serverUrl, instanceToken, webhookUrl) {
   }
 
   const payload = {
+    enabled: true,
     url: webhookUrl,
     events: ['messages', 'messages_update', 'connection', 'chats'],
     excludeMessages: ['wasSentByApi']
