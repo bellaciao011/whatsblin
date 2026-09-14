@@ -690,10 +690,161 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
   }
 }
 
+/**
+ * Dispara manualmente um fluxo ou etapa de automação para um contato pelo Chat ao Vivo
+ */
+async function triggerManualFlow(cleanPhone, options = {}) {
+  const phone = String(cleanPhone).replace(/\D/g, '');
+  if (!phone || phone.length < 8) {
+    throw new Error('Número de telefone inválido.');
+  }
+
+  const instances = db.getInstances();
+  const inst = (options.instanceId ? instances.find(i => i.id === options.instanceId) : null) ||
+               instances.find(i => i.tipo === 'uazapi' && i.status === 'connected') ||
+               instances.find(i => i.status === 'connected') ||
+               instances[0];
+
+  if (!inst) {
+    throw new Error('Nenhuma conexão ativa do WhatsApp disponível para envio.');
+  }
+
+  const flows = db.getFlows();
+  const targetFlowId = options.flowId || inst.assignedFlowId || 'fluxo-espiao-foto';
+  const activeFlow = flows.find(f => f.id === targetFlowId) || flows[0];
+  const flowLanguage = activeFlow?.language || (activeFlow?.id?.includes('-es') ? 'es' : (activeFlow?.id?.includes('-en') ? 'en' : 'pt'));
+  const funnel = db.getFunnel();
+  const chats = db.getChats();
+
+  let chatData = chats[phone];
+  if (!chatData) {
+    chatData = {
+      leadPhone: phone,
+      leadName: `Lead +${phone}`,
+      instanceId: inst.id,
+      assignedFlowId: activeFlow.id,
+      flowLanguage: flowLanguage,
+      state: 'NOVO',
+      currentNodeId: null,
+      upsellStage: 'stage_49',
+      variables: { phone },
+      lastMessageTime: new Date().toISOString(),
+      messages: []
+    };
+  }
+
+  chatData.instanceId = inst.id;
+  chatData.assignedFlowId = activeFlow.id;
+  chatData.flowLanguage = flowLanguage;
+  if (!chatData.variables) chatData.variables = {};
+  chatData.variables.phone = phone;
+
+  const step = options.step || 'start';
+  console.log(`[FlowEngine] ⚡ Disparo manual (${step}) para ${phone} via ${inst.name}...`);
+
+  const getNodeText = (nodeId, fallback) => {
+    const node = activeFlow?.nodes?.find(n => n.id === nodeId);
+    return node?.data?.text || fallback;
+  };
+
+  const interpolateVars = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.replace(/\{(\w+)\}/g, (match, key) => chatData.variables[key] || match);
+  };
+
+  if (step === 'proof' || step === 'send_proof') {
+    // 1. DISPARO MANUAL DE PROVA
+    const targetPhone = chatData.variables.alvo || phone;
+    const photoUrl = await lookupProfilePicture(targetPhone);
+    chatData.variables.photoUrl = photoUrl;
+
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates);
+    const proofsDir = path.join(__dirname, '../../public/generated');
+    fs.mkdirSync(proofsDir, { recursive: true });
+    const filename = `proof_${phone}_${Date.now()}.png`;
+    fs.writeFileSync(path.join(proofsDir, filename), imgBuffer);
+    const webProofUrl = `/generated/${filename}`;
+
+    const proofCaption = photoUrl
+      ? (flowLanguage === 'es' ? '✓ Prueba con foto en el audio' : (flowLanguage === 'en' ? '✓ Proof with profile photo on audio' : '✓ Prova com foto no áudio'))
+      : (flowLanguage === 'es' ? '🔒 Prueba con audio protegido por encriptación' : (flowLanguage === 'en' ? '🔒 Proof with encrypted audio' : '🔒 Prova com áudio protegido por criptografia'));
+
+    db.addChatMessage(phone, {
+      from: 'bot',
+      mediaType: 'image',
+      mediaUrl: webProofUrl,
+      text: proofCaption,
+      instanceId: inst.id
+    });
+    await sendOutgoingImageMessage(inst, phone, imgBuffer, filename, 'image/png', proofCaption);
+
+    // Envia oferta com link de checkout
+    const fallbackOffer = flowLanguage === 'es'
+      ? "Encontré conversaciones recientes y un audio de WhatsApp vinculado a este número.\n\nPara desbloquear el acceso completo al panel y escuchar el audio ahora, accede al enlace oficial:\n{checkoutUrl}"
+      : (flowLanguage === 'en'
+        ? "I found recent conversations and a WhatsApp audio linked to this number.\n\nTo unlock full access to the dashboard and listen to the audio now, access the official link:\n{checkoutUrl}"
+        : "Localizei conversas recentes e um áudio do WhatsApp vinculado a este número.\n\nPara liberar o acesso completo ao painel e ouvir o áudio agora, acesse o link oficial:\n{checkoutUrl}");
+
+    chatData.variables.checkoutUrl = funnel.upsellStages?.stage_49?.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
+    const offerTemplate = getNodeText('node-offer-checkout', fallbackOffer);
+    const offerMsg = interpolateVars(offerTemplate);
+
+    db.addChatMessage(phone, { from: 'bot', text: offerMsg, instanceId: inst.id }, 'OFERTA_ENVIADA');
+    await sendOutgoingTextMessage(inst, phone, offerMsg);
+
+    chatData.state = 'OFERTA_ENVIADA';
+    chats[phone] = chatData;
+    db.saveChats(chats);
+    eventBus.emit('chat_updated', { phone });
+    return { success: true, step: 'proof', state: 'OFERTA_ENVIADA' };
+  } else if (step === 'checkout' || step === 'send_checkout') {
+    // 2. DISPARO MANUAL DE LINK DE CHECKOUT
+    const stageInfo = getCurrentStageInfo(chatData.upsellStage || 'stage_49', funnel, flowLanguage);
+    const checkoutUrl = stageInfo.checkoutUrl || funnel.upsellStages?.stage_49?.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
+    chatData.variables.checkoutUrl = checkoutUrl;
+
+    const checkoutMsg = flowLanguage === 'es'
+      ? `Enlace seguro para desbloquear el informe completo (Valor: $ ${stageInfo.value}):\n👉 ${checkoutUrl}`
+      : (flowLanguage === 'en'
+        ? `Secure link to unlock the full report (Amount: $ ${stageInfo.value}):\n👉 ${checkoutUrl}`
+        : `Link seguro para liberação do relatório completo (Valor: R$ ${stageInfo.value}):\n👉 ${checkoutUrl}`);
+
+    db.addChatMessage(phone, { from: 'bot', text: checkoutMsg, instanceId: inst.id }, 'OFERTA_ENVIADA');
+    await sendOutgoingTextMessage(inst, phone, checkoutMsg);
+
+    chatData.state = 'OFERTA_ENVIADA';
+    chats[phone] = chatData;
+    db.saveChats(chats);
+    eventBus.emit('chat_updated', { phone });
+    return { success: true, step: 'checkout', state: 'OFERTA_ENVIADA' };
+  } else {
+    // 3. DISPARO INICIAL / BOAS-VINDAS DO FLUXO
+    const fallbackWelcome = flowLanguage === 'es'
+      ? "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
+      : (flowLanguage === 'en'
+        ? "Hello! Save my contact and send the person's phone number and I'll send you the proof right away."
+        : "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova");
+
+    const welcomeTemplate = getNodeText('node-welcome', fallbackWelcome);
+    const welcomeText = interpolateVars(welcomeTemplate);
+
+    chatData.state = 'AGUARDANDO_NUMERO';
+    chatData.upsellStage = 'stage_49';
+    chats[phone] = chatData;
+    db.saveChats(chats);
+
+    db.addChatMessage(phone, { from: 'bot', text: welcomeText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
+    await sendOutgoingTextMessage(inst, phone, welcomeText);
+    eventBus.emit('chat_updated', { phone });
+    return { success: true, step: 'start', message: welcomeText, state: 'AGUARDANDO_NUMERO' };
+  }
+}
+
 module.exports = {
   processIncomingMessage,
   lookupProfilePicture,
   executeFlowGraph,
   executeTikTokPixelNode,
+  triggerManualFlow,
   eventBus
 };

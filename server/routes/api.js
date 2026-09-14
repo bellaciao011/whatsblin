@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../storage/db');
 const { composeProofImage } = require('../services/imageComposer');
-const { processIncomingMessage, lookupProfilePicture, eventBus } = require('../services/flowEngine');
+const { processIncomingMessage, lookupProfilePicture, triggerManualFlow, eventBus } = require('../services/flowEngine');
 const metaService = require('../services/metaService');
 const tiktokService = require('../services/tiktokService');
 const authService = require('../services/authService');
@@ -788,7 +788,10 @@ router.post('/chats/:phone/send', async (req, res) => {
   if (!text) return res.status(400).json({ error: 'Texto obrigatório' });
 
   const instances = db.getInstances();
-  const instance = instances.find(i => i.id === chat?.instanceId) || instances[0] || {};
+  const instance = instances.find(i => i.id === chat?.instanceId) ||
+                   instances.find(i => i.tipo === 'uazapi' && i.status === 'connected') ||
+                   instances.find(i => i.status === 'connected') ||
+                   instances[0] || {};
 
   const { newMessage } = db.addChatMessage(phone, {
     from: 'agent',
@@ -810,6 +813,41 @@ router.post('/chats/:phone/send', async (req, res) => {
 
   eventBus.emit('new_message', { phone, message: newMessage });
   res.json({ success: true, message: newMessage });
+});
+
+/**
+ * Disparo manual de fluxo para um contato por dentro do Chat ao Vivo
+ */
+router.post('/chats/:phone/trigger-flow', async (req, res) => {
+  try {
+    const { flowId, step, instanceId } = req.body || {};
+    const phone = req.params.phone;
+    const result = await triggerManualFlow(phone, { flowId, step, instanceId });
+    res.json(result);
+  } catch (err) {
+    console.error('[Trigger Flow Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Reseta o estado de um lead para NOVO
+ */
+router.post('/chats/:phone/reset-state', async (req, res) => {
+  try {
+    const phone = req.params.phone;
+    const chats = db.getChats();
+    if (chats[phone]) {
+      chats[phone].state = 'NOVO';
+      chats[phone].upsellStage = 'stage_49';
+      chats[phone].currentNodeId = null;
+      db.saveChats(chats);
+      eventBus.emit('chat_updated', { phone });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /**

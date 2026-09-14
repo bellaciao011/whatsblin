@@ -1854,15 +1854,28 @@ async function renderInbox(showLoading = true) {
     document.getElementById('view-container').innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando conversas...</div>';
   }
 
-  const chats = await fetch('/api/chats').then(r => r.json());
-  state.chats = chats;
-  const phones = Object.keys(chats);
+  const [chats, flowsRes] = await Promise.all([
+    fetch('/api/chats').then(r => r.json()).catch(() => ({})),
+    fetch('/api/flows').then(r => r.json()).catch(() => ([]))
+  ]);
+  state.chats = chats || {};
+  state.flows = flowsRes || [];
+  const phones = Object.keys(state.chats);
 
   if (!state.activeChatPhone && phones.length > 0) {
     state.activeChatPhone = phones[0];
   }
 
   const activeChat = state.chats[state.activeChatPhone] || null;
+
+  const getStateBadgeClass = (s) => {
+    const st = (s || '').toLowerCase();
+    if (st.includes('novo')) return 'novo';
+    if (st.includes('aguardando') || st.includes('analisando')) return 'aguardando';
+    if (st.includes('oferta') || st.includes('negociacao')) return 'oferta';
+    if (st.includes('finalizado')) return 'finalizado';
+    return 'novo';
+  };
 
   const html = `
     <div class="inbox-container">
@@ -1884,8 +1897,8 @@ async function renderInbox(showLoading = true) {
               </button>
             </div>
           ` : phones.map(p => {
-            const c = chats[p];
-            const lastMsg = c.messages[c.messages.length - 1];
+            const c = state.chats[p];
+            const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
             const isActive = p === state.activeChatPhone;
             return `
               <div class="chat-item ${isActive ? 'active' : ''}" onclick="selectChat('${p}')">
@@ -1909,33 +1922,94 @@ async function renderInbox(showLoading = true) {
       <div class="inbox-view">
         ${activeChat ? `
           <div class="chat-header">
-            <div class="chat-avatar">
-              ${activeChat.targetPhotoUrl ? `<img src="${activeChat.targetPhotoUrl}" alt="">` : activeChat.leadPhone.slice(-2)}
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+              <div class="chat-avatar">
+                ${activeChat.targetPhotoUrl ? `<img src="${activeChat.targetPhotoUrl}" alt="">` : activeChat.leadPhone.slice(-2)}
+              </div>
+              <div style="min-width: 0;">
+                <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                  <span>+${activeChat.leadPhone}</span>
+                  <span class="chat-state-badge ${getStateBadgeClass(activeChat.state)}">${activeChat.state || 'NOVO'}</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                  ${activeChat.leadName || 'Contato do WhatsApp'} ${activeChat.upsellStage ? `• Etapa: ${activeChat.upsellStage}` : ''}
+                </div>
+              </div>
             </div>
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">+${activeChat.leadPhone}</div>
-              <div style="font-size: 11px; color: var(--wa-green);">Estado: ${activeChat.state}</div>
+
+            <!-- Disparo Manual de Fluxo e Automação -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <select id="inbox-flow-select" class="form-input" style="padding: 6px 10px; font-size: 11.5px; height: 34px; max-width: 190px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); border-radius: 8px;" title="Selecione o fluxo para disparar">
+                ${(state.flows || []).map(f => `<option value="${f.id}" ${f.id === (activeChat.assignedFlowId || 'fluxo-espiao-foto') ? 'selected' : ''}>${f.name}</option>`).join('')}
+              </select>
+
+              <button class="btn btn-primary" style="font-size: 11.5px; padding: 7px 12px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); display: flex; align-items: center; gap: 6px;" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')" title="Iniciar automação deste fluxo para o contato">
+                <span>⚡</span> <span>Disparar Fluxo</span>
+              </button>
+
+              <div style="position: relative; display: inline-block;">
+                <button class="btn btn-secondary" style="font-size: 12px; padding: 7px 10px; border-radius: 8px;" onclick="toggleFlowMenu('${activeChat.leadPhone}')" title="Mais opções de automação">
+                  <span>⋮</span>
+                </button>
+                <div id="flow-menu-${activeChat.leadPhone}" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); z-index: 100; min-width: 220px; overflow: hidden;">
+                  <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'welcome')">
+                    <span>👋</span> Reiniciar Boas-Vindas
+                  </button>
+                  <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'proof')">
+                    <span>🖼️</span> Gerar & Enviar Prova
+                  </button>
+                  <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'checkout')">
+                    <span>💳</span> Enviar Link de Checkout
+                  </button>
+                  <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                  <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #f87171; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'" onclick="resetLeadState('${activeChat.leadPhone}')">
+                    <span>🔄</span> Resetar Estado p/ NOVO
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="chat-messages" id="chat-messages-container">
-            ${activeChat.messages.map(m => `
+            ${(activeChat.messages || []).map(m => `
               <div class="msg-bubble ${m.from}">
-                ${m.mediaType === 'image' ? `
+                ${m.mediaType === 'image' && m.mediaUrl ? `
                   <img src="${m.mediaUrl}" class="msg-proof-img" onclick="window.open('${m.mediaUrl}', '_blank')" alt="Prova">
                 ` : ''}
                 ${m.text ? `<div>${m.text.replace(/\n/g, '<br>')}</div>` : ''}
-                <span class="msg-time">${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span class="msg-time">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
               </div>
             `).join('')}
           </div>
 
-          <form class="chat-footer" onsubmit="sendManualMessage(event)">
-            <input type="text" class="form-input" id="chat-reply-input" placeholder="Digite uma resposta manual para o cliente..." style="flex: 1; border-radius: 20px;">
-            <button type="submit" class="btn btn-primary" style="border-radius: 50%; width: 44px; height: 44px; padding: 0;">➔</button>
-          </form>
+          <div class="chat-footer">
+            <!-- Barra de Atalhos Rápidos -->
+            <div class="chat-quick-actions">
+              <span style="font-size: 11px; color: var(--text-muted); margin-right: 4px;">⚡ Ações:</span>
+              <button type="button" class="quick-action-pill" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')">
+                <span>⚡ Iniciar Automação</span>
+              </button>
+              <button type="button" class="quick-action-pill" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'proof')">
+                <span>🖼️ Mandar Prova</span>
+              </button>
+              <button type="button" class="quick-action-pill" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'checkout')">
+                <span>💳 Mandar Checkout</span>
+              </button>
+              <button type="button" class="quick-action-pill" onclick="resetLeadState('${activeChat.leadPhone}')">
+                <span>🔄 Resetar Lead</span>
+              </button>
+            </div>
+
+            <!-- Linha de Input de Mensagem Manual -->
+            <form class="chat-input-row" onsubmit="sendManualMessage(event)">
+              <input type="text" class="form-input" id="chat-reply-input" placeholder="Digite uma mensagem manual para +${activeChat.leadPhone}... (Pressione Enter)" style="flex: 1; border-radius: 20px; padding: 11px 18px; font-size: 13.5px;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendManualMessage(event);}">
+              <button type="submit" class="btn btn-primary" style="border-radius: 50%; width: 44px; height: 44px; min-width: 44px; padding: 0; background: #25d366; border: none; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.4); cursor: pointer;" title="Enviar mensagem manual">
+                ➤
+              </button>
+            </form>
+          </div>
         ` : `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px;">
             Nenhuma conversa selecionada
           </div>
         `}
@@ -1950,26 +2024,106 @@ async function renderInbox(showLoading = true) {
   if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
 }
 
-function selectChat(phone) {
+window.selectChat = function(phone) {
   state.activeChatPhone = phone;
   renderInbox(false);
-}
+};
 
-async function sendManualMessage(e) {
-  e.preventDefault();
+window.toggleFlowMenu = function(phone) {
+  const menu = document.getElementById(`flow-menu-${phone}`);
+  if (!menu) return;
+  const isHidden = menu.style.display === 'none' || !menu.style.display;
+  // Fecha outros menus
+  document.querySelectorAll('[id^="flow-menu-"]').forEach(m => m.style.display = 'none');
+  menu.style.display = isHidden ? 'block' : 'none';
+};
+
+// Fecha menu ao clicar fora
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[id^="flow-menu-"]') && !e.target.closest('button[onclick^="toggleFlowMenu"]')) {
+    document.querySelectorAll('[id^="flow-menu-"]').forEach(m => m.style.display = 'none');
+  }
+});
+
+window.sendManualMessage = async function(e) {
+  if (e) e.preventDefault();
   const input = document.getElementById('chat-reply-input');
+  if (!input) return;
   const text = input.value.trim();
-  if (!text || !state.activeChatPhone) return;
+  const phone = state.activeChatPhone;
+  if (!text || !phone) return;
 
   input.value = '';
-  await fetch(`/api/chats/${state.activeChatPhone}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
-  });
 
-  renderInbox(false);
-}
+  // Otimista: renderiza a bolha na tela na hora
+  const activeChat = state.chats[phone];
+  if (activeChat) {
+    if (!activeChat.messages) activeChat.messages = [];
+    activeChat.messages.push({
+      id: `tmp_${Date.now()}`,
+      from: 'agent',
+      text: text,
+      timestamp: new Date().toISOString()
+    });
+    renderInbox(false);
+  }
+
+  try {
+    const res = await fetch(`/api/chats/${phone}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showToast(data.error || 'Falha ao enviar mensagem', 'error');
+    }
+  } catch (err) {
+    showToast('Erro de conexão ao enviar mensagem', 'error');
+  }
+};
+
+window.triggerManualFlowForLead = async function(phone, step = 'start') {
+  const flowSelect = document.getElementById('inbox-flow-select');
+  const flowId = flowSelect ? flowSelect.value : null;
+
+  showToast('⚡ Disparando automação no WhatsApp...', 'info');
+
+  try {
+    const res = await fetch(`/api/chats/${phone}/trigger-flow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flowId, step })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Automação disparada com sucesso para +${phone}!`, 'success');
+      // Recarrega o chat
+      const updatedChats = await fetch('/api/chats').then(r => r.json());
+      state.chats = updatedChats;
+      renderInbox(false);
+    } else {
+      showToast(data.error || 'Erro ao disparar automação', 'error');
+    }
+  } catch (err) {
+    showToast('Falha ao comunicar com o servidor para disparar fluxo', 'error');
+  }
+};
+
+window.resetLeadState = async function(phone) {
+  try {
+    const res = await fetch(`/api/chats/${phone}/reset-state`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Estado de +${phone} resetado para NOVO!`, 'success');
+      const updatedChats = await fetch('/api/chats').then(r => r.json());
+      state.chats = updatedChats;
+      renderInbox(false);
+    }
+  } catch (err) {
+    showToast('Erro ao resetar estado do lead', 'error');
+  }
+};
 
 window.syncUazapiChats = async function() {
   showToast('🔄 Importando conversas do WhatsApp...', 'info');
