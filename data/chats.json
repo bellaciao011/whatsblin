@@ -1,1 +1,352 @@
-{}
+{
+  "557196774123": {
+    "leadPhone": "557196774123",
+    "leadName": ".",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T01:52:38.000Z",
+    "messages": [
+      {
+        "id": "557193768941:3EB0E23CA0C13732D94466",
+        "timestamp": "2026-09-14T01:52:38.000Z",
+        "from": "lead",
+        "text": ".",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB0AAEC2E2A3B2CF5B484",
+        "timestamp": "2026-09-14T01:08:28.000Z",
+        "from": "lead",
+        "text": ".",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB06C4F0F70A0BCF70C75",
+        "timestamp": "2026-09-14T00:18:28.000Z",
+        "from": "lead",
+        "text": "71993768941",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB07704F81452B7FBD4CE",
+        "timestamp": "2026-09-13T22:56:53.000Z",
+        "from": "agent",
+        "text": "Poxa, acho que você saiu 😅 Sem problema! Quando quiser, é só me mandar o número do WhatsApp do seu amor com DDD (ex: 11912345678) que eu preparo a prévia grátis 💙",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB039A231AC9D9704986B",
+        "timestamp": "2026-09-13T22:26:41.000Z",
+        "from": "agent",
+        "text": "Pode reenviar o número do WhatsApp do seu amor com DDD (ex: 11912345678)?",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB0DBEAEB671F4759FB5C",
+        "timestamp": "2026-09-13T22:26:29.000Z",
+        "from": "lead",
+        "text": "71996331602",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB06DE96E1D13784318E3",
+        "timestamp": "2026-09-13T22:26:07.000Z",
+        "from": "agent",
+        "text": "Pode reenviar o número do WhatsApp do seu amor com DDD (ex: 11912345678)?",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB0EAFC126E4FD319BAAB",
+        "timestamp": "2026-09-13T22:25:56.000Z",
+        "from": "lead",
+        "text": "7196331602",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB01A7CC3982982DE2609",
+        "timestamp": "2026-09-13T22:25:24.000Z",
+        "from": "agent",
+        "text": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova 😉",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB0B52E3A0F4EA7DF0C90",
+        "timestamp": "2026-09-13T22:24:54.000Z",
+        "from": "lead",
+        "text": "oi",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:A53CD224B3703343BCE00D7CBCCF8CD1",
+        "timestamp": "2026-09-13T22:24:46.000Z",
+        "from": "agent",
+        "text": "Oi",
+        "mediaUrl": null,
+        "mediaType": "Conversation",
+        "instanceId": "uaz_r6b42c61158e910"
+      }
+    ]
+  },
+  "551151285383": {
+    "leadPhone": "551151285383",
+    "leadName": "Lead +551151285383",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-09T18:39:12.000Z",
+    "messages": [
+      {
+        "id": "557193768941:2A24C5C866CCB96B36",
+        "timestamp": "2026-09-09T18:39:12.000Z",
+        "from": "lead",
+        "text": "Olá Eduardo👋\n\nHá um aviso importante relacionado ao seu TIM Controle.\n\nPara acessar as informações clique no botão abaixo👇",
+        "mediaUrl": null,
+        "mediaType": "TemplateMessage",
+        "instanceId": "uaz_r6b42c61158e910"
+      }
+    ]
+  },
+  "552120181195": {
+    "leadPhone": "552120181195",
+    "leadName": "Lead +552120181195",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-08-26T20:21:20.000Z",
+    "messages": []
+  },
+  "8618026253750": {
+    "leadPhone": "8618026253750",
+    "leadName": "Lead +8618026253750",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-07-15T04:29:14.000Z",
+    "messages": []
+  },
+  "552120181083": {
+    "leadPhone": "552120181083",
+    "leadName": "Lead +552120181083",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-07-02T21:17:24.000Z",
+    "messages": []
+  },
+  "447860098592": {
+    "leadPhone": "447860098592",
+    "leadName": "Lead +447860098592",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-06-27T22:53:48.000Z",
+    "messages": []
+  },
+  "447974905044": {
+    "leadPhone": "447974905044",
+    "leadName": "Lead +447974905044",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-06-06T02:44:29.000Z",
+    "messages": []
+  },
+  "553193604503": {
+    "leadPhone": "553193604503",
+    "leadName": "Lead +553193604503",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T17:45:05.000Z",
+    "messages": []
+  },
+  "556798384290": {
+    "leadPhone": "556798384290",
+    "leadName": "Lead +556798384290",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T17:43:08.000Z",
+    "messages": []
+  },
+  "554796454328": {
+    "leadPhone": "554796454328",
+    "leadName": "Lead +554796454328",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T16:57:31.000Z",
+    "messages": []
+  },
+  "556384332389": {
+    "leadPhone": "556384332389",
+    "leadName": "Lead +556384332389",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T16:38:35.000Z",
+    "messages": []
+  },
+  "554191043141": {
+    "leadPhone": "554191043141",
+    "leadName": "Lead +554191043141",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T16:10:05.000Z",
+    "messages": []
+  },
+  "558899846695": {
+    "leadPhone": "558899846695",
+    "leadName": "Lead +558899846695",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T14:37:04.000Z",
+    "messages": []
+  },
+  "558695024048": {
+    "leadPhone": "558695024048",
+    "leadName": "Lead +558695024048",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T14:22:59.000Z",
+    "messages": []
+  },
+  "555596287306": {
+    "leadPhone": "555596287306",
+    "leadName": "Lead +555596287306",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T14:22:53.000Z",
+    "messages": []
+  },
+  "5516997956583": {
+    "leadPhone": "5516997956583",
+    "leadName": "Lead +5516997956583",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T07:01:39.000Z",
+    "messages": []
+  },
+  "556182615172": {
+    "leadPhone": "556182615172",
+    "leadName": "Lead +556182615172",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T06:15:24.000Z",
+    "messages": []
+  },
+  "447710173736": {
+    "leadPhone": "447710173736",
+    "leadName": "Lead +447710173736",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-05-26T05:21:24.000Z",
+    "messages": []
+  },
+  "5511958100425": {
+    "leadPhone": "5511958100425",
+    "leadName": "teste c4",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:06.159Z",
+    "messages": []
+  },
+  "5511966126359": {
+    "leadPhone": "5511966126359",
+    "leadName": "Lead +5511966126359",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:06.350Z",
+    "messages": []
+  },
+  "5514998085421": {
+    "leadPhone": "5514998085421",
+    "leadName": "Lead +5514998085421",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:06.541Z",
+    "messages": []
+  },
+  "5514999098375": {
+    "leadPhone": "5514999098375",
+    "leadName": "Lead +5514999098375",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:06.732Z",
+    "messages": []
+  },
+  "5518981206783": {
+    "leadPhone": "5518981206783",
+    "leadName": "Lead +5518981206783",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:06.923Z",
+    "messages": []
+  },
+  "5518997038772": {
+    "leadPhone": "5518997038772",
+    "leadName": "Lead +5518997038772",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:07.114Z",
+    "messages": []
+  },
+  "5519983059703": {
+    "leadPhone": "5519983059703",
+    "leadName": "Q167",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:07.305Z",
+    "messages": []
+  },
+  "5519992698829": {
+    "leadPhone": "5519992698829",
+    "leadName": "Lead +5519992698829",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:07.496Z",
+    "messages": []
+  },
+  "5519995247732": {
+    "leadPhone": "5519995247732",
+    "leadName": "Lead +5519995247732",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:07.687Z",
+    "messages": []
+  },
+  "5519997967887": {
+    "leadPhone": "5519997967887",
+    "leadName": "Lead +5519997967887",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:07.878Z",
+    "messages": []
+  },
+  "5519998585877": {
+    "leadPhone": "5519998585877",
+    "leadName": "Lead +5519998585877",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:08.069Z",
+    "messages": []
+  },
+  "5521966868711": {
+    "leadPhone": "5521966868711",
+    "leadName": "Q174",
+    "instanceId": "uaz_r6b42c61158e910",
+    "state": "NOVO",
+    "lastMessageTime": "2026-09-14T02:16:08.260Z",
+    "messages": []
+  }
+}

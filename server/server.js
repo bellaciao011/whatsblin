@@ -130,4 +130,14 @@ app.listen(PORT, () => {
   console.log(`📡 Webhook Meta (Público): http://localhost:${PORT}/webhook`);
   console.log(`⚡ API Leona (Público): http://localhost:${PORT}/api/generate-proof`);
   console.log('====================================================');
+
+  // Auto-restaura conexão do WhatsApp com a uazapi no boot
+  if (typeof apiRoutes.autoRestoreUazapiInstances === 'function') {
+    apiRoutes.autoRestoreUazapiInstances().then(instances => {
+      const connected = (instances || []).find(i => i.status === 'connected');
+      if (connected) {
+        console.log(`[Boot] ✓ Conexão WhatsApp preservada e ativa: ${connected.name} (${connected.numero_conectado || connected.id})`);
+      }
+    }).catch(e => console.warn('[Boot] Aviso ao restaurar conexão:', e.message));
+  }
 });

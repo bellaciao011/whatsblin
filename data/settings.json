@@ -13,5 +13,9 @@
     "appId": "1388636936143540",
     "appSecret": "685e2fbf3c2abc844e99ba24b039c511",
     "configId": "2204676673432561"
+  },
+  "uazapi": {
+    "serverUrl": "https://whatsblin.uazapi.com",
+    "adminToken": "Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp"
   }
 }

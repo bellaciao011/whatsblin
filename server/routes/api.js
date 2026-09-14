@@ -343,11 +343,96 @@ async function syncChatsFromUazapi(inst) {
 }
 
 /**
+ * Restaura automaticamente conexões uazapi do servidor oficial caso a base local esteja vazia
+ */
+async function autoRestoreUazapiInstances(req = null) {
+  try {
+    const settings = db.getSettings();
+    const serverUrl = process.env.UAZAPI_SERVER_URL || settings?.uazapi?.serverUrl || 'https://whatsblin.uazapi.com';
+    const adminToken = process.env.UAZAPI_ADMIN_TOKEN || settings?.uazapi?.adminToken || 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
+
+    if (!adminToken) return db.getInstances();
+
+    const remoteInstances = await uazapiService.fetchAllInstances(serverUrl, adminToken);
+    if (!Array.isArray(remoteInstances) || remoteInstances.length === 0) return db.getInstances();
+
+    let restoredAny = false;
+    let localInstances = db.getInstances();
+
+    for (const rem of remoteInstances) {
+      if (!rem.token) continue;
+      // Ignora tentativas antigas de QR Code que expiraram sem nunca conectar
+      if (rem.status === 'disconnected' && !rem.owner && !rem.profileName) continue;
+
+      const cleanOwner = rem.owner ? String(rem.owner).replace(/@.*$/, '').replace(/\D/g, '') : '';
+      const existing = localInstances.find(i => i.instance_id === rem.id || i.id === `uaz_${rem.id}`);
+
+      if (!existing) {
+        console.log(`[Auto-Restore] 🔄 Restaurando instância uazapi "${rem.name || rem.id}" (${rem.status})...`);
+        const newInst = {
+          id: `uaz_${rem.id}`,
+          name: rem.name || '01',
+          tipo: 'uazapi',
+          url_servidor: serverUrl,
+          instance_id: rem.id,
+          instance_token: cryptoService.encrypt(rem.token),
+          phoneNumber: cleanOwner,
+          numero_conectado: cleanOwner,
+          status: rem.status || 'connected',
+          assignedFlowId: 'fluxo-espiao-foto',
+          totalSent: 0,
+          totalReceived: 0,
+          criado_em: rem.created || new Date().toISOString(),
+          createdAt: rem.created || new Date().toISOString(),
+          lastSyncedAt: new Date().toISOString()
+        };
+        db.saveInstance(newInst);
+        restoredAny = true;
+
+        if (rem.status === 'connected') {
+          try {
+            const webhookUrl = getPublicWebhookUrl(req, newInst.id);
+            await uazapiService.configureWebhook(serverUrl, rem.token, webhookUrl);
+            console.log(`[Auto-Restore] ✓ Webhook configurado: ${webhookUrl}`);
+          } catch (wErr) {
+            console.warn('[Auto-Restore] Aviso webhook:', wErr.message);
+          }
+          syncChatsFromUazapi(newInst).catch(() => {});
+        }
+      } else if (existing.status !== rem.status || (!existing.numero_conectado && cleanOwner)) {
+        existing.status = rem.status;
+        if (cleanOwner) {
+          existing.phoneNumber = cleanOwner;
+          existing.numero_conectado = cleanOwner;
+        }
+        existing.lastSyncedAt = new Date().toISOString();
+        db.saveInstance(existing);
+        restoredAny = true;
+      }
+    }
+
+    if (restoredAny) {
+      eventBus.emit('instances_updated', { restored: true });
+    }
+    return db.getInstances();
+  } catch (err) {
+    console.warn('[Auto-Restore Error]', err.message);
+    return db.getInstances();
+  }
+}
+
+/**
  * Instâncias / Chips (CRUD)
- * Sincroniza automaticamente instâncias uazapi pendentes em segundo plano
+ * Sincroniza e auto-restaura conexões uazapi para nunca perder status de conexão
  */
 router.get('/instances', async (req, res) => {
   let instances = db.getInstances();
+
+  // Se não há instâncias locais ou nenhuma conectada, auto-restaura da uazapi imediatamente
+  if (instances.length === 0 || !instances.some(i => i.status === 'connected')) {
+    instances = await autoRestoreUazapiInstances(req);
+  }
+
   let updatedAny = false;
 
   // Auto-sincroniza instâncias uazapi que estão 'connecting' ou com status desatualizado
@@ -2186,4 +2271,5 @@ router.post('/tiktok/test-chain', async (req, res) => {
   }
 });
 
+router.autoRestoreUazapiInstances = autoRestoreUazapiInstances;
 module.exports = router;

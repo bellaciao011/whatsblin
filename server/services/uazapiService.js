@@ -411,6 +411,28 @@ async function findMessages(serverUrl, instanceToken, chatId, limit = 20) {
   }
 }
 
+/**
+ * 10. Consulta todas as instâncias existentes no servidor uazapi via Token Mestre (admintoken)
+ * GET /instance/all
+ */
+async function fetchAllInstances(serverUrl, adminToken) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!adminToken) return [];
+  try {
+    const res = await axios.get(`${baseUrl}/instance/all`, {
+      headers: {
+        'admintoken': adminToken.trim()
+      },
+      timeout: 12000
+    });
+    return Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.warn(`[uazapiService] Aviso ao consultar instâncias via admintoken:`, parsed.message);
+    return [];
+  }
+}
+
 module.exports = {
   normalizeServerUrl,
   parseApiError,
@@ -422,6 +444,7 @@ module.exports = {
   sendMediaMessage,
   disconnectInstance,
   findChats,
-  findMessages
+  findMessages,
+  fetchAllInstances
 };
 
