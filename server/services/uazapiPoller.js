@@ -118,13 +118,15 @@ async function syncUazapiInstancesNow() {
           if (m.isGroup) continue;
 
           const msgId = m.id || m.messageid || `${cleanPhone}_${m.messageTimestamp}`;
-          const isAlreadyInChat = chat.messages.some(existing => existing.id === msgId);
-          if (isAlreadyInChat) continue;
-
-          // Extrai o texto
           const text = (m.text || m.body || m.content?.text || (typeof m.content === 'string' ? m.content : '') || m.message?.conversation || '').trim();
           const mediaUrl = m.fileURL || m.mediaUrl || null;
           const isFromMe = m.fromMe === true || m.key?.fromMe === true;
+
+          const isAlreadyInChat = chat.messages.some(existing =>
+            existing.id === msgId ||
+            (existing.from === (isFromMe ? 'agent' : 'lead') && existing.text === text && Math.abs(new Date(existing.timestamp).getTime() - new Date(parseTimestamp(m.messageTimestamp)).getTime()) < 120000)
+          );
+          if (isAlreadyInChat) continue;
 
           if (isFromMe) {
             // Mensagem de saída enviada pelo operador ou pelo bot
@@ -141,15 +143,15 @@ async function syncUazapiInstancesNow() {
             anyUpdate = true;
           } else {
             // 📩 MENSAGEM RECEBIDA DO LEAD!
-            // Se o lead mandou mensagem e ela não foi registrada ainda:
             console.log(`[uazapi Poller] 📩 Nova mensagem identificada de lead +${cleanPhone}: "${text || '[Mídia]'}"`);
 
-            // Executa processIncomingMessage para acionar o funil, verificação e respostas
+            // Executa processIncomingMessage passando msgId oficial para persistir
             await processIncomingMessage(
               inst.id,
               cleanPhone,
               text,
-              mediaUrl ? { url: mediaUrl, type: m.messageType || 'image' } : null
+              mediaUrl ? { url: mediaUrl, type: m.messageType || 'image' } : null,
+              msgId
             );
 
             anyUpdate = true;

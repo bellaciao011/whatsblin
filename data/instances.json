@@ -8,12 +8,12 @@
     "instance_token": "69a121712f7ef040896847d8:ed4407e7c31c3c42f4093ff466d0e1be:16a2c11556234f8dc8b674d37f89f5608d425ed05dfc3520b1854c2764758603503d4651",
     "phoneNumber": "557193768941",
     "numero_conectado": "557193768941",
-    "status": "connected",
+    "status": "disconnected",
     "assignedFlowId": "fluxo-espiao-foto",
     "totalSent": 0,
     "totalReceived": 0,
     "criado_em": "2026-09-14 01:49:26.736Z",
     "createdAt": "2026-09-14 01:49:26.736Z",
-    "lastSyncedAt": "2026-09-14T02:16:02.114Z"
+    "lastSyncedAt": "2026-09-14T03:50:59.281Z"
   }
 ]

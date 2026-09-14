@@ -955,13 +955,25 @@ router.post('/funnel', (req, res) => {
  * Configurações Gerais e Chaves
  */
 router.get('/settings', (req, res) => {
-  res.json(db.getSettings());
+  const settings = { ...db.getSettings() };
+  if (settings.openaiApiKey) {
+    settings.openaiApiKey = cryptoService.decrypt(settings.openaiApiKey);
+  }
+  res.json(settings);
 });
 
 router.post('/settings', (req, res) => {
-  const settings = { ...db.getSettings(), ...req.body };
+  const body = { ...req.body };
+  if (body.openaiApiKey && typeof body.openaiApiKey === 'string') {
+    body.openaiApiKey = cryptoService.encrypt(body.openaiApiKey.trim());
+  }
+  const settings = { ...db.getSettings(), ...body };
   db.saveSettings(settings);
-  res.json({ success: true, settings });
+  const returnedSettings = { ...settings };
+  if (returnedSettings.openaiApiKey) {
+    returnedSettings.openaiApiKey = cryptoService.decrypt(returnedSettings.openaiApiKey);
+  }
+  res.json({ success: true, settings: returnedSettings });
 });
 
 /**

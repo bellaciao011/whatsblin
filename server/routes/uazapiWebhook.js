@@ -209,7 +209,7 @@ router.post('/uazapi', async (req, res) => {
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
-        await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment);
+        await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment, msgId);
       } else {
         console.warn('[uazapi Webhook] Nenhuma instância ativa configurada para processar esta mensagem.');
       }
