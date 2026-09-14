@@ -57,29 +57,63 @@ function getTimestampMs(ts) {
 /**
  * Sincroniza conversas e novas mensagens de todas as instâncias uazapi conectadas
  */
+let pollCycleCount = 0;
+
 async function syncUazapiInstancesNow() {
   if (isPolling) return;
   isPolling = true;
+  pollCycleCount++;
 
   try {
-    const instances = db.getInstances();
+    let instances = db.getInstances();
 
-    // Auto-detecta e reconecta instâncias ativas na uazapi caso o status local esteja desatualizado
+    // A cada ~20 segundos (6 ciclos) ou se não houver instâncias conectadas locais, sincroniza com uazapi
+    const connectedLocals = instances.filter(i => (i.tipo === 'uazapi' || i.instance_id) && i.status === 'connected');
+    if (pollCycleCount % 6 === 0 || connectedLocals.length === 0) {
+      try {
+        const apiRoutes = require('../routes/api');
+        if (typeof apiRoutes.autoRestoreUazapiInstances === 'function') {
+          await apiRoutes.autoRestoreUazapiInstances();
+          instances = db.getInstances();
+        }
+      } catch (arErr) {}
+    }
+
+    // Auto-detecta status real de conexão e desconexão das instâncias uazapi
     for (const inst of instances) {
-      if ((inst.tipo === 'uazapi' || inst.instance_id) && inst.instance_token && inst.status !== 'connected') {
+      if ((inst.tipo === 'uazapi' || inst.instance_id) && inst.instance_token) {
         try {
           const decToken = cryptoService.decrypt(inst.instance_token);
           const serverUrl = inst.url_servidor || 'https://whatsblin.uazapi.com';
-          const statusRes = await uazapiService.getInstanceStatus(serverUrl, decToken);
-          if (statusRes?.status?.connected === true) {
-            console.log(`[uazapi Poller] Instância ${inst.name || inst.id} está conectada no uazapi! Atualizando status local para 'connected'...`);
-            inst.status = 'connected';
-            db.saveInstance(inst);
+
+          // Se estiver desconectado, tenta detectar reconexão a cada ciclo
+          if (inst.status !== 'connected') {
+            const statusRes = await uazapiService.getInstanceStatus(serverUrl, decToken);
+            if (statusRes?.status?.connected === true) {
+              console.log(`[uazapi Poller] Instância ${inst.name || inst.id} reconectada no uazapi! Atualizando status local para 'connected'...`);
+              inst.status = 'connected';
+              db.saveInstance(inst);
+              eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
+            }
+          } else if (pollCycleCount % 8 === 0) {
+            // Se estiver conectado, verifica periodicamente se o WhatsApp foi deslogado no celular
+            const statusRes = await uazapiService.getInstanceStatus(serverUrl, decToken);
+            const isAlive = (statusRes?.status?.connected === true || statusRes?.connected === true) &&
+                            statusRes?.instance?.status !== 'disconnected' && statusRes?.instance?.status !== 'close' &&
+                            statusRes?.status !== 'disconnected' && statusRes?.status !== 'close';
+            if (!isAlive) {
+              console.warn(`[uazapi Poller] ⚠️ Instância ${inst.name || inst.id} desconectada no celular/uazapi! Atualizando para 'disconnected'...`);
+              inst.status = 'disconnected';
+              db.saveInstance(inst);
+              eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
+            }
           }
         } catch (e) {
-          if (e.details?.status === 401 || e.message?.includes('401')) {
-            console.log(`[uazapi Poller] Instância ${inst.name || inst.id} não existe mais na uazapi (401). Limpando registro local.`);
-            db.deleteInstance(inst.id);
+          if (e.details?.status === 401 || e.message?.includes('401') || e.code === 'UNAUTHORIZED') {
+            console.log(`[uazapi Poller] Instância ${inst.name || inst.id} não autorizada ou expirada (401). Marcando como desconectada.`);
+            inst.status = 'disconnected';
+            db.saveInstance(inst);
+            eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
           }
         }
       }
@@ -106,7 +140,24 @@ async function syncUazapiInstancesNow() {
       const serverUrl = inst.url_servidor || 'https://whatsblin.uazapi.com';
 
       // 1. Busca conversas recentes
-      const chats = await uazapiService.findChats(serverUrl, decToken, 25);
+      let chats = [];
+      try {
+        chats = await uazapiService.findChats(serverUrl, decToken, 25);
+      } catch (chatErr) {
+        if (chatErr.status === 401 || chatErr.message?.includes('401') || chatErr.code === 'UNAUTHORIZED') {
+          console.warn(`[uazapi Poller] ⚠️ Instância ${inst.name || inst.id} token 401 ao buscar chats. Marcando como desconectada.`);
+          inst.status = 'disconnected';
+          db.saveInstance(inst);
+          eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
+          try {
+            const apiRoutes = require('../routes/api');
+            if (typeof apiRoutes.autoRestoreUazapiInstances === 'function') {
+              apiRoutes.autoRestoreUazapiInstances().catch(() => {});
+            }
+          } catch (rErr) {}
+        }
+        continue;
+      }
       if (!Array.isArray(chats) || chats.length === 0) continue;
 
       for (const c of chats) {

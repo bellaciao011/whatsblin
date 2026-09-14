@@ -1688,32 +1688,28 @@ async function renderInstances() {
     window.instancesConnectingPollInterval = null;
   }
 
-  // Se houver algum chip uazapi conectando, inicia auto-polling a cada 3s para atualizar automaticamente
-  const hasConnecting = instances.some(i => i.tipo === 'uazapi' && i.status === 'connecting');
-  if (hasConnecting) {
-    window.instancesConnectingPollInterval = setInterval(async () => {
-      if (state.currentView !== 'instances') {
-        clearInterval(window.instancesConnectingPollInterval);
-        window.instancesConnectingPollInterval = null;
-        return;
-      }
-      try {
-        const pollRes = await fetch('/api/instances');
-        const pollData = await pollRes.json();
-        if (Array.isArray(pollData)) {
-          const changed = pollData.length !== instances.length || pollData.some((p, idx) => {
-            const old = instances[idx];
-            return !old || old.status !== p.status || old.numero_conectado !== p.numero_conectado;
-          });
-          if (changed) {
-            clearInterval(window.instancesConnectingPollInterval);
-            window.instancesConnectingPollInterval = null;
-            await renderInstances();
-          }
+  // Auto-polling em tempo real na aba de conexões (a cada 3.5s) para refletir instantaneamente qualquer conexão ou desconexão
+  window.instancesConnectingPollInterval = setInterval(async () => {
+    if (state.currentView !== 'instances') {
+      clearInterval(window.instancesConnectingPollInterval);
+      window.instancesConnectingPollInterval = null;
+      return;
+    }
+    try {
+      const pollRes = await fetch('/api/instances');
+      const pollData = await pollRes.json();
+      if (Array.isArray(pollData)) {
+        const currentList = state.instances || [];
+        const changed = pollData.length !== currentList.length || pollData.some((p, idx) => {
+          const old = currentList[idx];
+          return !old || old.id !== p.id || old.status !== p.status || old.numero_conectado !== p.numero_conectado;
+        });
+        if (changed) {
+          await renderInstances();
         }
-      } catch (e) {}
-    }, 3000);
-  }
+      }
+    } catch (e) {}
+  }, 3500);
 
   const html = `
     <div class="card">

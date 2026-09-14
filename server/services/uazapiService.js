@@ -533,6 +533,12 @@ async function findChats(serverUrl, instanceToken, limit = 50) {
   } catch (err) {
     const parsed = parseApiError(err);
     console.warn(`[uazapiService] Aviso ao buscar chats:`, parsed.message);
+    if (parsed.status === 401) {
+      const authErr = new Error(parsed.message);
+      authErr.status = 401;
+      authErr.details = parsed;
+      throw authErr;
+    }
     return [];
   }
 }

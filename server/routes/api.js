@@ -206,9 +206,21 @@ function extractConnectedUser(statusRes, connectRes) {
 }
 
 function checkIsConnected(statusRes, connectRes) {
-  const instanceStatus = statusRes?.instance?.status || connectRes?.instance?.status;
-  const rawStatus = typeof statusRes?.status === 'string' ? statusRes.status : '';
+  if (!statusRes && !connectRes) return false;
+
+  const instanceStatus = String(statusRes?.instance?.status || connectRes?.instance?.status || '').toLowerCase();
+  const rawStatus = typeof statusRes?.status === 'string' ? statusRes.status.toLowerCase() : '';
   const objStatus = typeof statusRes?.status === 'object' ? statusRes.status : {};
+
+  // Se houver qualquer indicador explícito de desconexão, NÃO está conectado
+  if (
+    instanceStatus === 'disconnected' || instanceStatus === 'close' || instanceStatus === 'closed' ||
+    rawStatus === 'disconnected' || rawStatus === 'close' || rawStatus === 'closed' ||
+    objStatus?.connected === false || statusRes?.connected === false || connectRes?.connected === false ||
+    objStatus?.loggedIn === false || statusRes?.loggedIn === false
+  ) {
+    return false;
+  }
 
   return Boolean(
     instanceStatus === 'connected' ||
@@ -256,15 +268,36 @@ async function syncUazapiInstanceData(inst, req = null) {
         // Auto-sincroniza conversas existentes ao conectar
         syncChatsFromUazapi(inst).catch(cErr => console.warn('[uazapi Chat Sync Auto Error]', cErr.message));
       }
-      return true;
-    } else if (statusRes?.instance?.status === 'disconnected' && inst.status === 'connected') {
-      inst.status = 'disconnected';
+      return !wasConnected;
+    } else {
+      // NÃO está conectado
+      const isConnecting = statusRes?.status === 'connecting' || 
+                           statusRes?.instance?.status === 'connecting' || 
+                           Boolean(statusRes?.qrcode || statusRes?.status?.qrcode || statusRes?.paircode || statusRes?.status?.paircode);
+      const newStatus = isConnecting ? 'connecting' : 'disconnected';
+      const changed = inst.status !== newStatus;
+      inst.status = newStatus;
       db.saveInstance(inst);
-      eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
-      return true;
+      if (changed) {
+        console.log(`[uazapi Sync] ⚠️ Instância ${inst.name} (${inst.id}) atualizada para "${newStatus}".`);
+        eventBus.emit('instances_updated', { instanceId: inst.id, status: newStatus });
+      }
+      return changed;
     }
   } catch (err) {
     console.warn(`[uazapi Sync Error] Falha ao consultar uazapi para ${inst.name}:`, err.message);
+    const isAuthOrNotFound = err.details?.status === 401 || err.details?.status === 404 || 
+                             err.message?.includes('401') || err.message?.includes('404') ||
+                             err.code === 'UNAUTHORIZED' || err.code === 'NOT_FOUND';
+    if (isAuthOrNotFound) {
+      if (inst.status !== 'disconnected') {
+        console.log(`[uazapi Sync] ⚠️ Instância ${inst.name} (${inst.id}) com token inválido/expirado (401/404). Marcando como desconectada.`);
+        inst.status = 'disconnected';
+        db.saveInstance(inst);
+        eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -355,27 +388,43 @@ async function syncChatsFromUazapi(inst) {
 async function autoRestoreUazapiInstances(req = null) {
   try {
     const settings = db.getSettings();
-    const serverUrl = process.env.UAZAPI_SERVER_URL || settings?.uazapi?.serverUrl || 'https://whatsblin.uazapi.com';
-    const adminToken = process.env.UAZAPI_ADMIN_TOKEN || settings?.uazapi?.adminToken || 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
+    const serverUrl = process.env.UAZAPI_SERVER_URL || settings?.uazapi?.serverUrl || DEFAULT_UAZAPI_SERVER;
+    const adminToken = process.env.UAZAPI_ADMIN_TOKEN || settings?.uazapi?.adminToken || settings?.uazapiAdminToken || DEFAULT_UAZAPI_ADMIN_TOKEN;
 
     if (!adminToken) return db.getInstances();
 
     const remoteInstances = await uazapiService.fetchAllInstances(serverUrl, adminToken);
-    if (!Array.isArray(remoteInstances) || remoteInstances.length === 0) return db.getInstances();
+    if (!Array.isArray(remoteInstances)) return db.getInstances();
 
     let restoredAny = false;
     let localInstances = db.getInstances();
 
+    const remoteIdSet = new Set(remoteInstances.map(r => r.id));
+
+    // 1. Limpa instâncias locais uazapi que não existem mais remotamente na uazapi
+    for (const loc of localInstances) {
+      if (loc.tipo === 'uazapi' && loc.instance_id) {
+        if (!remoteIdSet.has(loc.instance_id)) {
+          console.log(`[Auto-Restore] 🗑️ Removendo instância local que não existe mais na uazapi: "${loc.name}" (${loc.id})`);
+          db.deleteInstance(loc.id);
+          restoredAny = true;
+        }
+      }
+    }
+
+    localInstances = db.getInstances();
+
+    // 2. Sincroniza instâncias remotas (novas ou existentes)
     for (const rem of remoteInstances) {
       if (!rem.token) continue;
-      // Ignora tentativas antigas de QR Code que expiraram sem nunca conectar
+      // Ignora tentativas antigas de QR Code que expiraram sem nunca conectar e sem nome/dono
       if (rem.status === 'disconnected' && !rem.owner && !rem.profileName) continue;
 
       const cleanOwner = rem.owner ? String(rem.owner).replace(/@.*$/, '').replace(/\D/g, '') : '';
       const existing = localInstances.find(i => i.instance_id === rem.id || i.id === `uaz_${rem.id}`);
 
       if (!existing) {
-        console.log(`[Auto-Restore] 🔄 Restaurando instância uazapi "${rem.name || rem.id}" (${rem.status})...`);
+        console.log(`[Auto-Restore] 🔄 Restaurando nova instância conectada da uazapi "${rem.name || rem.id}" (${rem.status})...`);
         const newInst = {
           id: `uaz_${rem.id}`,
           name: rem.name || '01',
@@ -400,21 +449,39 @@ async function autoRestoreUazapiInstances(req = null) {
           try {
             const webhookUrl = getPublicWebhookUrl(req, newInst.id);
             await uazapiService.configureWebhook(serverUrl, rem.token, webhookUrl);
-            console.log(`[Auto-Restore] ✓ Webhook configurado: ${webhookUrl}`);
+            console.log(`[Auto-Restore] ✓ Webhook configurado para ${newInst.name}: ${webhookUrl}`);
           } catch (wErr) {
             console.warn('[Auto-Restore] Aviso webhook:', wErr.message);
           }
           syncChatsFromUazapi(newInst).catch(() => {});
         }
-      } else if (existing.status !== rem.status || (!existing.numero_conectado && cleanOwner)) {
-        existing.status = rem.status;
-        if (cleanOwner) {
+      } else {
+        let changed = false;
+        const remStatus = rem.status || 'disconnected';
+        if (existing.status !== remStatus) {
+          existing.status = remStatus;
+          changed = true;
+        }
+        if (cleanOwner && existing.numero_conectado !== cleanOwner) {
           existing.phoneNumber = cleanOwner;
           existing.numero_conectado = cleanOwner;
+          changed = true;
         }
-        existing.lastSyncedAt = new Date().toISOString();
-        db.saveInstance(existing);
-        restoredAny = true;
+        if (rem.name && existing.name !== rem.name) {
+          existing.name = rem.name;
+          changed = true;
+        }
+        let currentDecToken = '';
+        try { currentDecToken = cryptoService.decrypt(existing.instance_token); } catch(e) {}
+        if (rem.token && currentDecToken !== rem.token) {
+          existing.instance_token = cryptoService.encrypt(rem.token);
+          changed = true;
+        }
+        if (changed) {
+          existing.lastSyncedAt = new Date().toISOString();
+          db.saveInstance(existing);
+          restoredAny = true;
+        }
       }
     }
 
@@ -433,19 +500,18 @@ async function autoRestoreUazapiInstances(req = null) {
  * Sincroniza e auto-restaura conexões uazapi para nunca perder status de conexão
  */
 router.get('/instances', async (req, res) => {
+  // 1. Sincroniza e auto-restaura com a uazapi em todas as requisições do painel
+  await autoRestoreUazapiInstances(req);
+
   let instances = db.getInstances();
   let updatedAny = false;
 
-  // Auto-sincroniza instâncias uazapi que estão 'connecting' ou com status desatualizado
+  // 2. Consulta o status live de cada chip uazapi
   for (let i = 0; i < instances.length; i++) {
     const inst = instances[i];
     if (inst.tipo === 'uazapi' && inst.instance_token) {
-      const isPending = inst.status === 'connecting';
-      const isStale = !inst.lastSyncedAt || (Date.now() - new Date(inst.lastSyncedAt).getTime() > 40000);
-      if (isPending || isStale) {
-        const changed = await syncUazapiInstanceData(inst, req);
-        if (changed) updatedAny = true;
-      }
+      const changed = await syncUazapiInstanceData(inst, req);
+      if (changed) updatedAny = true;
     }
   }
 
@@ -2353,4 +2419,5 @@ router.post('/tiktok/test-chain', async (req, res) => {
 });
 
 router.autoRestoreUazapiInstances = autoRestoreUazapiInstances;
+router.syncUazapiInstanceData = syncUazapiInstanceData;
 module.exports = router;
