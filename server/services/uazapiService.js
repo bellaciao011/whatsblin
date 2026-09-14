@@ -4,7 +4,7 @@ const axios = require('axios');
  * Normaliza URL do servidor uazapi removendo barras finais
  */
 function normalizeServerUrl(url) {
-  if (!url || typeof url !== 'string') return 'https://free.uazapi.com';
+  if (!url || typeof url !== 'string') return 'https://whatsblin.uazapi.com';
   let clean = url.trim().replace(/\/+$/, '');
   if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
     clean = 'https://' + clean;
@@ -16,7 +16,7 @@ function normalizeServerUrl(url) {
  * Trata erros de API da uazapi conforme especificação OpenAPI oficial
  * - 401: Token inválido/expirado
  * - 404: Instância não encontrada
- * - 429: Limite de conexões simultâneas atingido
+ * - 429: Limite de conexões simultâneas atingido ou limite de instâncias da conta
  * - 503: Capacidade temporariamente indisponível (com leitura de Retry-After)
  */
 function parseApiError(err) {
@@ -31,7 +31,8 @@ function parseApiError(err) {
   const status = err.response.status;
   const data = err.response.data || {};
   const headers = err.response.headers || {};
-  const rawMsg = data.error || data.message || data.msg || '';
+  const rawMsg = data.error || data.message || data.msg || data.info || '';
+  const fullPayloadStr = JSON.stringify(data).toLowerCase();
 
   if (status === 401) {
     return {
@@ -50,15 +51,21 @@ function parseApiError(err) {
   }
 
   if (status === 429) {
+    const isMaxInstances = fullPayloadStr.includes('maximum number of instances') ||
+                           fullPayloadStr.includes('cannot create more than') ||
+                           fullPayloadStr.includes('limit:');
     return {
       status: 429,
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Limite de conexões simultâneas ou requisições atingido (429). Aguarde alguns instantes antes de tentar novamente.'
+      code: isMaxInstances ? 'MAX_INSTANCES_REACHED' : 'RATE_LIMIT_EXCEEDED',
+      isMaxInstances,
+      data,
+      message: isMaxInstances
+        ? 'Limite de instâncias do plano atingido no servidor uazapi (429).'
+        : 'Limite de conexões simultâneas ou requisições atingido (429). Aguarde alguns instantes antes de tentar novamente.'
     };
   }
 
   if (status === 503) {
-    // A doc OpenAPI informa que vem o header Retry-After em segundos
     const retryAfterHeader = headers['retry-after'] || headers['Retry-After'];
     const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 5;
     return {
@@ -85,31 +92,88 @@ function parseApiError(err) {
 async function createInstance(serverUrl, adminToken, name) {
   const baseUrl = normalizeServerUrl(serverUrl);
   if (!adminToken) {
-    throw new Error('O Token Mestre (admintoken) não foi configurado. Defina UAZAPI_ADMIN_TOKEN no ambiente ou insira a chave da instância.');
+    throw new Error('O Token Mestre (admintoken) não foi configurado.');
   }
 
-  try {
-    console.log(`[uazapiService] Criando instância "${name}" em ${baseUrl}/instance/create...`);
-    const res = await axios.post(
-      `${baseUrl}/instance/create`,
-      { name: name.trim() },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'admintoken': adminToken.trim()
-        },
-        timeout: 15000
-      }
-    );
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      console.log(`[uazapiService] Criando instância "${name}" em ${baseUrl}/instance/create (tentativa ${attempts})...`);
+      const res = await axios.post(
+        `${baseUrl}/instance/create`,
+        { name: name.trim() },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'admintoken': adminToken.trim()
+          },
+          timeout: 15000
+        }
+      );
 
-    // Resposta padrão: { token: "...", instance: { id: "...", status: "disconnected", ... } }
+      return res.data;
+    } catch (err) {
+      const parsed = parseApiError(err);
+      if (parsed.status === 429 && !parsed.isMaxInstances && attempts < 2) {
+        console.warn(`[uazapiService] Rate limit temporário (429) em createInstance. Aguardando 2.5s para re-tentar...`);
+        await new Promise(r => setTimeout(r, 2500));
+        continue;
+      }
+      console.error(`[uazapiService] Erro ao criar instância:`, parsed);
+      const error = new Error(parsed.message);
+      error.details = parsed;
+      throw error;
+    }
+  }
+}
+
+/**
+ * Deleta uma instância na uazapi pelo token da instância
+ * DELETE /instance
+ */
+async function deleteInstance(serverUrl, instanceToken) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) return false;
+  try {
+    console.log(`[uazapiService] Deletando instância em ${baseUrl}/instance...`);
+    const res = await axios.delete(`${baseUrl}/instance`, {
+      headers: { 'token': instanceToken.trim() },
+      timeout: 10000
+    });
     return res.data;
   } catch (err) {
     const parsed = parseApiError(err);
-    console.error(`[uazapiService] Erro ao criar instância:`, parsed);
-    const error = new Error(parsed.message);
-    error.details = parsed;
-    throw error;
+    console.warn(`[uazapiService] Aviso ao deletar instância uazapi:`, parsed.message);
+    return false;
+  }
+}
+
+/**
+ * Atualiza o nome de uma instância existente na uazapi
+ * POST /instance/updateInstanceName
+ */
+async function updateInstanceName(serverUrl, instanceToken, newName) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken || !newName) return false;
+  try {
+    console.log(`[uazapiService] Atualizando nome da instância para "${newName}" em ${baseUrl}/instance/updateInstanceName...`);
+    const res = await axios.post(
+      `${baseUrl}/instance/updateInstanceName`,
+      { name: newName.trim() },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 10000
+      }
+    );
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.warn(`[uazapiService] Aviso ao atualizar nome da instância:`, parsed.message);
+    return false;
   }
 }
 
@@ -130,27 +194,37 @@ async function connectInstance(serverUrl, instanceToken, options = {}) {
     body.phone = String(options.phone).replace(/\D/g, '');
   }
 
-  try {
-    console.log(`[uazapiService] Solicitando conexão para a instância em ${baseUrl}/instance/connect...`);
-    const res = await axios.post(
-      `${baseUrl}/instance/connect`,
-      body,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'token': instanceToken.trim()
-        },
-        timeout: 15000
-      }
-    );
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      console.log(`[uazapiService] Solicitando conexão para a instância em ${baseUrl}/instance/connect (tentativa ${attempts})...`);
+      const res = await axios.post(
+        `${baseUrl}/instance/connect`,
+        body,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'token': instanceToken.trim()
+          },
+          timeout: 15000
+        }
+      );
 
-    return res.data;
-  } catch (err) {
-    const parsed = parseApiError(err);
-    console.error(`[uazapiService] Erro ao conectar instância:`, parsed);
-    const error = new Error(parsed.message);
-    error.details = parsed;
-    throw error;
+      return res.data;
+    } catch (err) {
+      const status = err.response?.status;
+      if ((status === 429 || status === 503) && attempts < 2) {
+        console.warn(`[uazapiService] Resposta ${status} ao conectar. Aguardando 2.5s para re-tentar...`);
+        await new Promise(r => setTimeout(r, 2500));
+        continue;
+      }
+      const parsed = parseApiError(err);
+      console.error(`[uazapiService] Erro ao conectar instância:`, parsed);
+      const error = new Error(parsed.message);
+      error.details = parsed;
+      throw error;
+    }
   }
 }
 
@@ -165,24 +239,33 @@ async function getInstanceStatus(serverUrl, instanceToken) {
     throw new Error('Token da instância não informado.');
   }
 
-  try {
-    const res = await axios.get(
-      `${baseUrl}/instance/status`,
-      {
-        headers: {
-          'token': instanceToken.trim()
-        },
-        timeout: 10000
-      }
-    );
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      const res = await axios.get(
+        `${baseUrl}/instance/status`,
+        {
+          headers: {
+            'token': instanceToken.trim()
+          },
+          timeout: 10000
+        }
+      );
 
-    return res.data;
-  } catch (err) {
-    const parsed = parseApiError(err);
-    console.error(`[uazapiService] Erro ao obter status da instância:`, parsed);
-    const error = new Error(parsed.message);
-    error.details = parsed;
-    throw error;
+      return res.data;
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 429 && attempts < 2) {
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      const parsed = parseApiError(err);
+      console.error(`[uazapiService] Erro ao obter status da instância:`, parsed);
+      const error = new Error(parsed.message);
+      error.details = parsed;
+      throw error;
+    }
   }
 }
 
@@ -518,6 +601,8 @@ module.exports = {
   sendTextMessage,
   sendMediaMessage,
   disconnectInstance,
+  deleteInstance,
+  updateInstanceName,
   findChats,
   findMessages,
   fetchAllInstances,

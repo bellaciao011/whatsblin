@@ -11,6 +11,10 @@ const authService = require('../services/authService');
 const uazapiService = require('../services/uazapiService');
 const cryptoService = require('../services/cryptoService');
 
+// Credenciais permanentes padrão do servidor uazapi
+const DEFAULT_UAZAPI_SERVER = 'https://whatsblin.uazapi.com';
+const DEFAULT_UAZAPI_ADMIN_TOKEN = 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
+
 /**
  * =========================================================================
  * AUTENTICAÇÃO DO PAINEL
@@ -526,14 +530,14 @@ router.delete('/instances/:id', async (req, res) => {
   if (target && target.tipo === 'uazapi' && target.instance_token) {
     try {
       const decToken = cryptoService.decrypt(target.instance_token);
-      await uazapiService.disconnectInstance(target.url_servidor, decToken);
+      await uazapiService.deleteInstance(target.url_servidor || DEFAULT_UAZAPI_SERVER, decToken);
+      console.log(`[Instances] Instância ${target.name} (${target.instance_id}) deletada da uazapi com sucesso.`);
     } catch (e) {
-      console.warn('[Instances] Aviso ao desconectar uazapi no delete:', e.message);
+      console.warn('[Instances] Aviso ao deletar uazapi no delete:', e.message);
     }
   }
 
-  instances = instances.filter(i => i.id !== req.params.id && i.instance_id !== req.params.id);
-  db.saveInstances(instances);
+  db.deleteInstance(req.params.id);
   res.json({ success: true });
 });
 
@@ -546,26 +550,30 @@ router.delete('/instances/:id', async (req, res) => {
 /**
  * 1. POST /api/uazapi/init-connect
  * Fluxo de inicialização de conexão uazapi:
- * - Se fornecida API Key (instanceKey), valida na uazapi com GET /instance/status
- * - Se não fornecida API Key, cria nova instância usando Token Mestre (admintoken)
+ * - Credenciais permanentes padrão: whatsblin.uazapi.com
+ * - Se fornecida API Key (instanceKey), valida na uazapi
+ * - Se não fornecida, busca instância existente ou cria nova
+ * - Trata e contorna limites 429 reaproveitando slots desconectados automaticamente
  * - Dispara POST /instance/connect para iniciar socket e geração de QR code
- * - Salva conexão no banco local (instances.json) com status 'connecting'
+ * - Salva conexão no banco local com status 'connecting'
  * - Retorna QR code, paircode e status real
  */
 router.post('/uazapi/init-connect', async (req, res) => {
   try {
     const { name, serverUrl, instanceKey, phone, assignedFlowId, adminToken: inputAdminToken } = req.body;
-    const cleanName = (name || 'Conexão uazapi').trim();
-    const cleanServerUrl = uazapiService.normalizeServerUrl(serverUrl || 'https://free.uazapi.com');
+    const cleanName = (name || 'NOVA').trim();
+    const settings = db.getSettings() || {};
+    const cleanServerUrl = uazapiService.normalizeServerUrl(serverUrl || settings.uazapi?.serverUrl || settings.uazapiServerUrl || DEFAULT_UAZAPI_SERVER);
     const cleanPhone = phone ? String(phone).replace(/\D/g, '') : null;
+    const adminToken = (inputAdminToken && String(inputAdminToken).trim()) || settings.uazapi?.adminToken || settings.uazapiAdminToken || process.env.UAZAPI_ADMIN_TOKEN || DEFAULT_UAZAPI_ADMIN_TOKEN;
 
     let instanceToken = '';
     let instanceId = '';
 
-    // 1. Identifica se usa uma API Key existente ou se precisa criar uma nova instância
+    // 1. Identifica se usa uma API Key existente ou se precisa resolver/criar na uazapi
     if (instanceKey && String(instanceKey).trim()) {
       instanceToken = String(instanceKey).trim();
-      console.log(`[uazapi Init] Validando API Key de instância informada pelo usuário em ${cleanServerUrl}...`);
+      console.log(`[uazapi Init] Validando API Key de instância informada em ${cleanServerUrl}...`);
       
       try {
         const checkStatus = await uazapiService.getInstanceStatus(cleanServerUrl, instanceToken);
@@ -579,30 +587,55 @@ router.post('/uazapi/init-connect', async (req, res) => {
         });
       }
     } else {
-      // Cria programaticamente com o Token Mestre (admintoken)
-      const settings = db.getSettings();
-      const adminToken = (inputAdminToken && String(inputAdminToken).trim()) || process.env.UAZAPI_ADMIN_TOKEN || settings.uazapiAdminToken;
+      // 2. Resolução inteligente de instância para EVITAR 429 e limites de plano
+      console.log(`[uazapi Init] Resolvendo instância para "${cleanName}" em ${cleanServerUrl}...`);
 
-      if (!adminToken) {
-        return res.status(400).json({
-          success: false,
-          error: 'Token Mestre do servidor (admintoken) não informado. Para criar uma nova instância na uazapi é obrigatório fornecer o admintoken da sua conta. Caso sua instância já exista, selecione a opção "Já Tenho Chave" e informe a API Key (token).',
-          code: 'MISSING_ADMIN_TOKEN'
-        });
+      let remoteInstances = [];
+      try {
+        remoteInstances = await uazapiService.fetchAllInstances(cleanServerUrl, adminToken);
+      } catch (e) {
+        console.warn('[uazapi Init] Aviso ao buscar instâncias remotas:', e.message);
       }
 
-      if (inputAdminToken && String(inputAdminToken).trim() && inputAdminToken !== settings.uazapiAdminToken) {
-        settings.uazapiAdminToken = String(inputAdminToken).trim();
-        db.saveSettings(settings);
-      }
+      // 2.1. Verifica se já existe instância com o mesmo nome na uazapi
+      const sameNameInst = remoteInstances.find(i => (i.name || '').trim().toLowerCase() === cleanName.toLowerCase());
+      if (sameNameInst && sameNameInst.token) {
+        console.log(`[uazapi Init] ✓ Instância "${cleanName}" já existe na uazapi (${sameNameInst.id}). Reutilizando com sucesso.`);
+        instanceToken = sameNameInst.token;
+        instanceId = sameNameInst.id;
+      } else {
+        // 2.2. Se não existe com o mesmo nome, tenta criar nova instância
+        let created = false;
+        try {
+          const createRes = await uazapiService.createInstance(cleanServerUrl, adminToken, cleanName);
+          instanceToken = createRes.token;
+          instanceId = createRes.instance?.id || `uaz_${Date.now()}`;
+          created = true;
+          console.log(`[uazapi Init] ✓ Nova instância criada com sucesso na uazapi! ID: ${instanceId}`);
+        } catch (createErr) {
+          console.warn(`[uazapi Init] Criação retornou: ${createErr.message}. Analisando reaproveitamento de slot para contornar limite 429...`);
 
-      const createRes = await uazapiService.createInstance(cleanServerUrl, adminToken, cleanName);
-      instanceToken = createRes.token;
-      instanceId = createRes.instance?.id || `uaz_${Date.now()}`;
-      console.log(`[uazapi Init] ✓ Instância criada na uazapi com sucesso! ID: ${instanceId}`);
+          // 2.3. Se deu erro de limite (429 / Max instances) ou qualquer restrição de criação:
+          // Localiza uma instância desconectada existente na conta para reaproveitar o slot
+          const disconnectedInst = remoteInstances.find(i => i.status === 'disconnected') || remoteInstances[0];
+          if (disconnectedInst && disconnectedInst.token) {
+            console.log(`[uazapi Init] ✓ Reutilizando slot da instância ${disconnectedInst.id} (anterior: "${disconnectedInst.name}") para eliminar o limite 429.`);
+            instanceToken = disconnectedInst.token;
+            instanceId = disconnectedInst.id;
+
+            // Renomeia a instância na uazapi para o nome solicitado
+            uazapiService.updateInstanceName(cleanServerUrl, instanceToken, cleanName).catch(renameErr => {
+              console.warn(`[uazapi Init] Aviso ao renomear instância: ${renameErr.message}`);
+            });
+          } else {
+            // Se nenhuma instância remota existe, propaga o erro
+            throw createErr;
+          }
+        }
+      }
     }
 
-    // 2. Dispara a conexão (inicia geração do QR code ou código de pareamento)
+    // 3. Dispara a conexão (inicia geração do QR code ou código de pareamento)
     console.log(`[uazapi Init] Chamando /instance/connect para ${instanceId}...`);
     const connectRes = await uazapiService.connectInstance(cleanServerUrl, instanceToken, { phone: cleanPhone });
 

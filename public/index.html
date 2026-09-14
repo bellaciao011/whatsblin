@@ -227,7 +227,7 @@
         <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Tipo de Conexão *</label>
         <div class="leona-type-grid">
           <!-- Card API Web -->
-          <div class="leona-type-card" id="card-type-web" onclick="selectConnectionType('web')">
+          <div class="leona-type-card active" id="card-type-web" onclick="selectConnectionType('web')">
             <div class="leona-type-icon wa">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.029-.444-1.696-.662-2.793-2.39-2.879-2.502-.084-.112-.686-.912-.686-1.74 0-.828.434-1.236.589-1.405.155-.169.34-.211.454-.211.114 0 .228.001.328.006.105.006.246-.04.384.293.144.348.492 1.2.535 1.287.043.088.072.19.014.305-.058.115-.087.186-.173.287-.086.101-.18.226-.257.304-.087.087-.177.182-.076.355.101.173.45 1.01 1.014 1.503.725.634 1.336.831 1.527.925.191.094.303.078.416-.051.113-.129.485-.563.614-.757.129-.194.258-.162.434-.097.176.065 1.114.525 1.306.621.192.096.32.144.366.225.047.081.047.47-.097.875z"/></svg>
             </div>
@@ -238,7 +238,7 @@
           </div>
 
           <!-- Card API Oficial -->
-          <div class="leona-type-card active" id="card-type-meta" onclick="selectConnectionType('meta')">
+          <div class="leona-type-card" id="card-type-meta" onclick="selectConnectionType('meta')">
             <div class="leona-type-icon meta">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.02 14.15c-1.34 0-2.48-.56-3.32-1.55l1.32-1.32c.54.65 1.22.99 2 .99.88 0 1.56-.44 1.56-1.12 0-.62-.48-.96-1.57-1.31l-.64-.2c-1.63-.52-2.46-1.35-2.46-2.61 0-1.66 1.4-2.88 3.39-2.88 1.27 0 2.22.46 2.94 1.27l-1.28 1.28c-.46-.53-1.05-.79-1.66-.79-.81 0-1.42.44-1.42 1.05 0 .54.43.87 1.46 1.2l.64.2c1.78.58 2.58 1.46 2.58 2.76 0 1.79-1.44 2.92-3.54 2.92z"/></svg>
             </div>
@@ -251,7 +251,7 @@
       </div>
 
       <!-- Container Configuração API Oficial (Meta Embedded Signup) -->
-      <div id="section-meta-official">
+      <div id="section-meta-official" style="display: none;">
         <!-- Switch Coexistência -->
         <div class="leona-info-box" style="margin-bottom: 14px;">
           <div class="leona-switch-row">
@@ -294,53 +294,28 @@
       </div>
 
       <!-- Container Configuração API Web (uazapi) -->
-      <div id="section-web-uazapi" style="display: none;">
+      <div id="section-web-uazapi" style="display: block;">
         <!-- Inputs de Configuração -->
         <div id="uazapi-form-inputs">
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label" style="font-size: 12px; display: flex; justify-content: space-between;">
-              <span>URL do Servidor uazapi *</span>
-              <span style="font-size: 11px; color: #38bdf8;">Padrão: free.uazapi.com</span>
-            </label>
-            <input type="text" class="form-input" id="uazapi-url" value="https://free.uazapi.com" placeholder="https://free.uazapi.com">
-          </div>
+          <!-- Servidor e Token Automáticos (Permanentes) -->
+          <input type="hidden" id="uazapi-url" value="https://whatsblin.uazapi.com">
+          <input type="hidden" id="uazapi-admintoken" value="Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp">
+          <input type="hidden" id="uazapi-key" value="">
+          <input type="hidden" name="uazapi-mode" value="create">
 
-          <!-- Tipo de Instância: Criar Nova vs Existente -->
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" style="font-size: 12px;">Origem da Instância</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
-                <input type="radio" name="uazapi-mode" id="uazapi-mode-create" value="create" checked onchange="toggleUazapiMode(this.value)">
-                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">Criar Nova</span>
-              </label>
-              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
-                <input type="radio" name="uazapi-mode" id="uazapi-mode-key" value="key" onchange="toggleUazapiMode(this.value)">
-                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">Já Tenho Chave</span>
-              </label>
+          <div class="leona-info-box" style="margin-bottom: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 15px;">⚡</span>
+              <span style="font-size: 13px; font-weight: 700; color: #34d399;">Servidor Dedicado Integrado</span>
             </div>
-          </div>
-
-          <!-- Campo Token Mestre (exibido se escolher "Criar Nova") -->
-          <div class="form-group" id="group-uazapi-admintoken" style="margin-bottom: 14px;">
-            <label class="form-label" style="font-size: 12px; display: flex; justify-content: space-between;">
-              <span>Token Mestre do Servidor (admintoken) *</span>
-              <span style="font-size: 10.5px; color: #f59e0b;">Exigido para criar instâncias</span>
-            </label>
-            <input type="password" class="form-input" id="uazapi-admintoken" placeholder="Insira o admintoken da sua conta uazapi">
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Necessário para criar uma instância do zero. Se a instância já existe no painel da uazapi, selecione <strong>"Já Tenho Chave"</strong> acima.
+            <div style="font-size: 11.5px; color: #94a3b8; margin-top: 4px; line-height: 1.45;">
+              Conexão direta com <strong>whatsblin.uazapi.com</strong>. Autenticação e servidor configurados automaticamente.
             </div>
-          </div>
-
-          <!-- Campo Chave da Instância (exibido apenas se escolher "Já Tenho Chave") -->
-          <div class="form-group" id="group-uazapi-key" style="display: none; margin-bottom: 14px;">
-            <label class="form-label" style="font-size: 12px;">API Key da Instância (token) *</label>
-            <input type="password" class="form-input" id="uazapi-key" placeholder="Chave da instância existente">
           </div>
 
           <!-- Método de Pareamento: QR Code vs Código por Telefone -->
           <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" style="font-size: 12px;">Método de Conexão</label>
+            <label class="form-label" style="font-size: 12px; font-weight: 600;">Método de Conexão</label>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
                 <input type="radio" name="uazapi-connect-type" id="uazapi-type-qr" value="qr" checked onchange="toggleUazapiConnectType(this.value)">
@@ -408,7 +383,7 @@
           <button type="button" class="btn btn-secondary" id="btn-uazapi-back" onclick="backToUazapiForm()" style="display: none; border-radius: 10px; padding: 10px 18px;">← Voltar</button>
           <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()" style="border-radius: 10px; padding: 10px 18px;">Fechar</button>
           <button type="button" class="btn btn-primary" id="btn-connect-uazapi" onclick="handleSaveUazapi()" style="border-radius: 10px; padding: 10px 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span id="btn-uazapi-text">Conectar uazapi</span>
+            <span id="btn-uazapi-text">Conectar WhatsApp (QR Code)</span>
           </button>
         </div>
       </div>

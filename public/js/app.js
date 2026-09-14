@@ -2747,7 +2747,7 @@ function resetUazapiModalState() {
     qrImg.style.display = 'block';
   }
   if (btnConnect) btnConnect.disabled = false;
-  if (btnText) btnText.textContent = 'Conectar uazapi';
+  if (btnText) btnText.textContent = 'Conectar WhatsApp (QR Code)';
 
   const statusBox = document.getElementById('uazapi-status-box');
   const statusSpinner = document.getElementById('uazapi-status-spinner');
@@ -2767,7 +2767,7 @@ function openAddChipModal() {
   const modal = document.getElementById('chip-modal');
   if (modal) modal.style.display = 'flex';
   resetUazapiModalState();
-  selectConnectionType('meta');
+  selectConnectionType('web');
   const manualForm = document.getElementById('form-manual-chip');
   if (manualForm) manualForm.style.display = 'none';
   initFacebookSDK();
@@ -3130,29 +3130,12 @@ async function handleSaveUazapi() {
     return;
   }
 
-  const serverUrl = document.getElementById('uazapi-url')?.value.trim() || 'https://free.uazapi.com';
-  const mode = document.querySelector('input[name="uazapi-mode"]:checked')?.value || 'create';
+  const serverUrl = 'https://whatsblin.uazapi.com';
+  const adminToken = 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
   const connectType = document.querySelector('input[name="uazapi-connect-type"]:checked')?.value || 'qr';
-  const adminToken = document.getElementById('uazapi-admintoken')?.value.trim() || '';
-  const instanceKey = mode === 'key' ? document.getElementById('uazapi-key')?.value.trim() : '';
+  const instanceKey = document.getElementById('uazapi-key')?.value.trim() || '';
   const phone = connectType === 'phone' ? document.getElementById('uazapi-phone-input')?.value.trim() : '';
   const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
-
-  if (mode === 'key' && !instanceKey) {
-    showToast('Informe a API Key da Instância existente', 'error');
-    document.getElementById('uazapi-key')?.focus();
-    return;
-  }
-
-  if (mode === 'create' && !adminToken) {
-    showToast('Para criar uma nova instância, informe o admintoken ou selecione "Já Tenho Chave".', 'warning');
-    const adminInput = document.getElementById('uazapi-admintoken');
-    if (adminInput) {
-      adminInput.focus();
-      adminInput.style.borderColor = '#f59e0b';
-    }
-    return;
-  }
 
   if (connectType === 'phone' && !phone) {
     showToast('Informe o número de telefone para pareamento com DDI e DDD', 'error');
