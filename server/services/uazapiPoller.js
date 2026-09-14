@@ -76,7 +76,12 @@ async function syncUazapiInstancesNow() {
             inst.status = 'connected';
             db.saveInstance(inst);
           }
-        } catch (e) {}
+        } catch (e) {
+          if (e.details?.status === 401 || e.message?.includes('401')) {
+            console.log(`[uazapi Poller] Instância ${inst.name || inst.id} não existe mais na uazapi (401). Limpando registro local.`);
+            db.deleteInstance(inst.id);
+          }
+        }
       }
     }
 

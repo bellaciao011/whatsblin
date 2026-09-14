@@ -473,15 +473,20 @@ async function renderOverview() {
               ${instRes.length === 0 ? `
                 <div style="font-size: 12.5px; color: var(--text-muted); text-align: center; padding: 12px;">Nenhum chip conectado ainda.</div>
               ` : instRes.map(i => `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <div class="dash-chip-row" data-chip-id="${i.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
                   <div style="display: flex; align-items: center; gap: 10px;">
-                    <span class="status-dot" style="background: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--amber)'};"></span>
+                    <span class="status-dot" style="background: ${i.status === 'connected' ? 'var(--wa-green)' : (i.status === 'connecting' ? 'var(--amber)' : 'var(--red)')};"></span>
                     <div>
                       <strong style="font-size: 13px;">${i.name}</strong>
-                      <div style="font-size: 11px; color: var(--text-muted);">${i.phoneNumber || 'Pronto para uso'}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">${i.numero_conectado || i.phoneNumber || (i.status === 'connected' ? 'Conectado' : 'Aguardando pareamento')}</div>
                     </div>
                   </div>
-                  <span style="font-size: 11px; color: var(--wa-green); font-weight: 600;">Ativo</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 11px; color: ${i.status === 'connected' ? 'var(--wa-green)' : (i.status === 'connecting' ? 'var(--amber)' : 'var(--red)')}; font-weight: 600;">
+                      ${i.status === 'connected' ? 'Ativo' : (i.status === 'connecting' ? 'Conectando' : 'Desconectado')}
+                    </span>
+                    <button class="btn btn-danger" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;" title="Remover chip" onclick="deleteChip('${i.id}')">Excluir</button>
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -1669,6 +1674,11 @@ async function renderInstances() {
   const badgeChips = document.getElementById('badge-chips');
   if (badgeChips) badgeChips.textContent = instances.length;
 
+  if (window.instancesConnectingPollInterval) {
+    clearInterval(window.instancesConnectingPollInterval);
+    window.instancesConnectingPollInterval = null;
+  }
+
   // Se houver algum chip uazapi conectando, inicia auto-polling a cada 3s para atualizar automaticamente
   const hasConnecting = instances.some(i => i.tipo === 'uazapi' && i.status === 'connecting');
   if (hasConnecting) {
@@ -1682,7 +1692,7 @@ async function renderInstances() {
         const pollRes = await fetch('/api/instances');
         const pollData = await pollRes.json();
         if (Array.isArray(pollData)) {
-          const changed = pollData.some((p, idx) => {
+          const changed = pollData.length !== instances.length || pollData.some((p, idx) => {
             const old = instances[idx];
             return !old || old.status !== p.status || old.numero_conectado !== p.numero_conectado;
           });
@@ -1693,7 +1703,7 @@ async function renderInstances() {
           }
         }
       } catch (e) {}
-    }, 3200);
+    }, 3000);
   }
 
   const html = `
@@ -1734,7 +1744,7 @@ async function renderInstances() {
               const isConnected = i.status === 'connected';
               const displayPhone = i.numero_conectado || i.phoneNumber || (isUazapi && isConnected ? '● Conectado' : 'Aguardando pareamento');
               return `
-              <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <div class="card" id="chip-card-${i.id}" data-chip-id="${i.id}" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
                   <div style="display: flex; align-items: center; gap: 10px;">
                     <div class="brand-icon" style="width: 36px; height: 36px; font-size: 18px; background: ${isUazapi ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)'}; border: 1px solid ${isUazapi ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'};">
@@ -3311,12 +3321,48 @@ async function saveNewChip(e) {
   else if (state.currentView === 'overview') renderOverview();
 }
 
-async function deleteChip(id) {
-  if (!confirm('Deseja realmente remover esta instância?')) return;
-  await fetch(`/api/instances/${id}`, { method: 'DELETE' });
-  showToast('Chip removido!');
-  renderInstances();
-}
+window.deleteChip = async function(id) {
+  if (!confirm('Deseja realmente remover esta conexão?')) return;
+
+  // Remove visualmente de qualquer lugar da interface imediatamente (chips e dash)
+  document.querySelectorAll(`[data-chip-id="${id}"]`).forEach(el => {
+    el.style.transition = 'all 0.25s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'scale(0.95)';
+    setTimeout(() => el.remove(), 250);
+  });
+
+  // Atualiza cache e badge imediatamente
+  state.instances = (state.instances || []).filter(i => i.id !== id && i.instance_id !== id);
+  const badgeChips = document.getElementById('badge-chips');
+  if (badgeChips) badgeChips.textContent = state.instances.length;
+
+  showToast('Removendo chip...', 'info');
+
+  try {
+    const res = await fetch(`/api/instances/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      showToast('✓ Chip removido com sucesso!', 'success');
+    } else {
+      showToast(data.error || 'Erro ao remover chip', 'error');
+    }
+  } catch (err) {
+    showToast('Erro de rede ao remover: ' + err.message, 'error');
+  } finally {
+    // Re-renderiza a tela ativa para refletir a remoção imediatamente
+    if (state.currentView === 'instances') {
+      await renderInstances();
+    } else if (state.currentView === 'overview') {
+      await renderOverview();
+    }
+  }
+};
+const deleteChip = window.deleteChip;
 
 function testChip(id) {
   showToast('Teste de verificação enviado para a Meta!');

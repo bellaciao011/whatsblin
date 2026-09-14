@@ -434,12 +434,6 @@ async function autoRestoreUazapiInstances(req = null) {
  */
 router.get('/instances', async (req, res) => {
   let instances = db.getInstances();
-
-  // Se não há instâncias locais ou nenhuma conectada, auto-restaura da uazapi imediatamente
-  if (instances.length === 0 || !instances.some(i => i.status === 'connected')) {
-    instances = await autoRestoreUazapiInstances(req);
-  }
-
   let updatedAny = false;
 
   // Auto-sincroniza instâncias uazapi que estão 'connecting' ou com status desatualizado
@@ -524,21 +518,54 @@ router.patch('/instances/:id/flow', (req, res) => {
 });
 
 router.delete('/instances/:id', async (req, res) => {
-  let instances = db.getInstances();
-  const target = instances.find(i => i.id === req.params.id || i.instance_id === req.params.id);
-  
-  if (target && target.tipo === 'uazapi' && target.instance_token) {
-    try {
-      const decToken = cryptoService.decrypt(target.instance_token);
-      await uazapiService.deleteInstance(target.url_servidor || DEFAULT_UAZAPI_SERVER, decToken);
-      console.log(`[Instances] Instância ${target.name} (${target.instance_id}) deletada da uazapi com sucesso.`);
-    } catch (e) {
-      console.warn('[Instances] Aviso ao deletar uazapi no delete:', e.message);
-    }
-  }
+  try {
+    const rawId = req.params.id;
+    let instances = db.getInstances();
+    const target = instances.find(i => i.id === rawId || i.instance_id === rawId || `uaz_${i.instance_id}` === rawId || i.name === rawId);
 
-  db.deleteInstance(req.params.id);
-  res.json({ success: true });
+    const settings = db.getSettings() || {};
+    const serverUrl = target?.url_servidor || settings?.uazapi?.serverUrl || DEFAULT_UAZAPI_SERVER;
+    const adminToken = settings?.uazapi?.adminToken || settings?.uazapiAdminToken || DEFAULT_UAZAPI_ADMIN_TOKEN;
+
+    // 1. Deletar na uazapi pelo token da instância se disponível
+    if (target && target.tipo === 'uazapi' && target.instance_token) {
+      try {
+        const decToken = cryptoService.decrypt(target.instance_token);
+        await uazapiService.deleteInstance(serverUrl, decToken);
+        console.log(`[Instances] Instância ${target.name} (${target.instance_id}) deletada da uazapi via token.`);
+      } catch (e) {
+        console.warn('[Instances] Aviso ao deletar uazapi via token:', e.message);
+      }
+    }
+
+    // 2. Garantia extra na nuvem uazapi: deleta instância remota correspondente
+    try {
+      const remoteList = await uazapiService.fetchAllInstances(serverUrl, adminToken);
+      const targetInstanceId = target?.instance_id || rawId.replace(/^uaz_/, '');
+      const matchingRemotes = remoteList.filter(r => r.id === targetInstanceId || (target?.name && r.name === target.name));
+      for (const rem of matchingRemotes) {
+        if (rem.token) {
+          console.log(`[Instances] Removendo instância remota ${rem.id} (${rem.name}) da uazapi...`);
+          await uazapiService.deleteInstance(serverUrl, rem.token);
+        }
+      }
+    } catch (remErr) {
+      console.warn('[Instances] Aviso ao verificar/remover na uazapi:', remErr.message);
+    }
+
+    // 3. Remove definitivamente do banco local (db.js / instances.json)
+    db.deleteInstance(rawId);
+    if (target) {
+      db.deleteInstance(target.id);
+      if (target.instance_id) db.deleteInstance(target.instance_id);
+    }
+
+    eventBus.emit('instances_updated', { deleted: true, id: rawId });
+    res.json({ success: true, message: 'Instância removida com sucesso' });
+  } catch (err) {
+    console.error('[Delete Instance Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /**
