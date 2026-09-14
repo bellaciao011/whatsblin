@@ -107,17 +107,25 @@ module.exports = {
         leadName: `Lead ${phone}`,
         instanceId: messageData.instanceId || 'inst_1',
         state: nextState || 'NOVO',
-        lastMessageTime: new Date().toISOString(),
+        lastMessageTime: messageData.timestamp || new Date().toISOString(),
         messages: []
       };
     }
     if (nextState) chats[phone].state = nextState;
-    chats[phone].lastMessageTime = new Date().toISOString();
+    chats[phone].lastMessageTime = messageData.timestamp || new Date().toISOString();
     
+    const msgId = messageData.id || ('msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
+    
+    // Evita duplicatas por ID se já foi registrada
+    const existingMsg = chats[phone].messages.find(m => m.id === msgId);
+    if (existingMsg) {
+      return { chat: chats[phone], newMessage: existingMsg };
+    }
+
     const msg = {
-      id: 'msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      timestamp: new Date().toISOString(),
-      ...messageData
+      ...messageData,
+      id: msgId,
+      timestamp: messageData.timestamp || new Date().toISOString()
     };
     chats[phone].messages.push(msg);
 

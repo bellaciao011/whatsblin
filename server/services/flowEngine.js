@@ -651,7 +651,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 /**
  * Ponto de entrada chamado quando uma nova mensagem chega do WhatsApp (Webhook ou Simulador)
  */
-async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null) {
+async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null, messageTimestamp = null) {
   const instances = db.getInstances();
   const instance = instances.find(i => i.id === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
   const cleanPhone = leadPhone.replace(/\D/g, '');
@@ -676,6 +676,7 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
   const msgId = messageId || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   const { newMessage } = db.addChatMessage(cleanPhone, {
     id: msgId,
+    timestamp: messageTimestamp || new Date().toISOString(),
     from: 'lead',
     text: messageText,
     mediaUrl: mediaAttachment?.url || null,

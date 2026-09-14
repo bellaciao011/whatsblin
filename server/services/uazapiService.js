@@ -237,6 +237,19 @@ async function configureWebhook(serverUrl, instanceToken, webhookUrl) {
 
 /**
  * 5. Envio de mensagem de texto
+let lastSendTimestamp = 0;
+
+async function throttleSend(minGapMs = 1500) {
+  const now = Date.now();
+  const elapsed = now - lastSendTimestamp;
+  if (elapsed < minGapMs) {
+    await new Promise(r => setTimeout(r, minGapMs - elapsed));
+  }
+  lastSendTimestamp = Date.now();
+}
+
+/**
+ * 5. Envio de mensagem de texto simples
  * POST /send/text
  * Body: { number: "5511999999999", text: "..." }
  */
@@ -247,30 +260,43 @@ async function sendTextMessage(serverUrl, instanceToken, number, text) {
   if (!text) throw new Error('Conteúdo da mensagem não informado.');
 
   const cleanNumber = String(number).replace(/\D/g, '');
+  await throttleSend(1500);
 
-  try {
-    const res = await axios.post(
-      `${baseUrl}/send/text`,
-      {
-        number: cleanNumber,
-        text: String(text)
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'token': instanceToken.trim()
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      const res = await axios.post(
+        `${baseUrl}/send/text`,
+        {
+          number: cleanNumber,
+          text: String(text)
         },
-        timeout: 15000
-      }
-    );
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'token': instanceToken.trim()
+          },
+          timeout: 15000
+        }
+      );
 
-    return res.data;
-  } catch (err) {
-    const parsed = parseApiError(err);
-    console.error(`[uazapiService] Erro ao enviar texto para ${cleanNumber}:`, parsed);
-    const error = new Error(parsed.message);
-    error.details = parsed;
-    throw error;
+      return res.data;
+    } catch (err) {
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.message || err.message || '';
+      const isCapacityError = status === 503 || status === 429 || errMsg.includes('Capacidade') || errMsg.includes('aguarde');
+      if (isCapacityError && attempts < 2) {
+        console.warn(`[uazapiService] Capacidade ocupada (503/429) no envio para ${cleanNumber}. Aguardando 4s para re-tentar...`);
+        await new Promise(r => setTimeout(r, 4000));
+        continue;
+      }
+      const parsed = parseApiError(err);
+      console.error(`[uazapiService] Erro ao enviar texto para ${cleanNumber}:`, parsed);
+      const error = new Error(parsed.message);
+      error.details = parsed;
+      throw error;
+    }
   }
 }
 
@@ -286,6 +312,7 @@ async function sendMediaMessage(serverUrl, instanceToken, number, mediaSource, c
   if (!mediaSource) throw new Error('Arquivo de mídia não informado.');
 
   const cleanNumber = String(number).replace(/\D/g, '');
+  await throttleSend(1500);
 
   const payload = {
     number: cleanNumber,
@@ -296,26 +323,38 @@ async function sendMediaMessage(serverUrl, instanceToken, number, mediaSource, c
   if (caption) payload.caption = caption;
   if (docName) payload.docName = docName;
 
-  try {
-    const res = await axios.post(
-      `${baseUrl}/send/media`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'token': instanceToken.trim()
-        },
-        timeout: 25000
-      }
-    );
+  let attempts = 0;
+  while (attempts < 2) {
+    attempts++;
+    try {
+      const res = await axios.post(
+        `${baseUrl}/send/media`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'token': instanceToken.trim()
+          },
+          timeout: 25000
+        }
+      );
 
-    return res.data;
-  } catch (err) {
-    const parsed = parseApiError(err);
-    console.error(`[uazapiService] Erro ao enviar mídia para ${cleanNumber}:`, parsed);
-    const error = new Error(parsed.message);
-    error.details = parsed;
-    throw error;
+      return res.data;
+    } catch (err) {
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.message || err.message || '';
+      const isCapacityError = status === 503 || status === 429 || errMsg.includes('Capacidade') || errMsg.includes('aguarde');
+      if (isCapacityError && attempts < 2) {
+        console.warn(`[uazapiService] Capacidade ocupada (503/429) no envio de mídia para ${cleanNumber}. Aguardando 4s para re-tentar...`);
+        await new Promise(r => setTimeout(r, 4000));
+        continue;
+      }
+      const parsed = parseApiError(err);
+      console.error(`[uazapiService] Erro ao enviar mídia para ${cleanNumber}:`, parsed);
+      const error = new Error(parsed.message);
+      error.details = parsed;
+      throw error;
+    }
   }
 }
 
