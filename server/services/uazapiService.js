@@ -591,6 +591,40 @@ async function fetchAllInstances(serverUrl, adminToken) {
   }
 }
 
+/**
+ * 11. Envia atualização de presença (composing = digitando, recording = gravando áudio, paused = pausado)
+ * POST /message/presence
+ * Body: { number: "5511999999999", presence: "composing", delay: 3000 }
+ */
+async function sendPresence(serverUrl, instanceToken, number, presence = 'composing', delayMs = 3000) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken || !number) return null;
+  const cleanNumber = String(number).replace(/\D/g, '');
+  if (!cleanNumber || cleanNumber.length < 8) return null;
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/message/presence`,
+      {
+        number: cleanNumber,
+        presence: presence || 'composing',
+        delay: Math.min(delayMs || 3000, 300000)
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 6000
+      }
+    );
+    return res.data;
+  } catch (err) {
+    // Presença é um aprimoramento estético não-bloqueante
+    return null;
+  }
+}
+
 module.exports = {
   normalizeServerUrl,
   parseApiError,
@@ -600,6 +634,7 @@ module.exports = {
   configureWebhook,
   sendTextMessage,
   sendMediaMessage,
+  sendPresence,
   disconnectInstance,
   deleteInstance,
   updateInstanceName,
@@ -610,4 +645,5 @@ module.exports = {
   resolvePhoneFromLid,
   lidToPhoneCache
 };
+
 

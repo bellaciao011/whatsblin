@@ -146,7 +146,8 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       send_link: "Segue o link para você concluir o pagamento da etapa de R$ {currentValue}:\n{checkoutUrl}\n\nAssim que finalizar, só me mandar o comprovante por aqui!",
       said_paid_no_image: "Pode me enviar o comprovante do pagamento de R$ {currentValue} por favor? Assim já verifico e te libero o próximo passo.",
       no_receipt_image: "Não recebi nenhum comprovante na imagem que você enviou. Pode mandar uma foto ou print nítido do comprovante de pagamento do valor de R$ {currentValue}? Assim consigo verificar certinho para liberar o próximo passo.",
-      unclear_or_cropped: "O pagamento não está totalmente visível para confirmar se foi concluído pelo sistema.\n\nPode enviar um print ou foto mais completa da tela de detalhes da transação, mostrando o status de pagamento aprovado? Assim consigo liberar o próximo passo para você."
+      unclear_or_cropped: "O pagamento não está totalmente visível para confirmar se foi concluído pelo sistema.\n\nPode enviar um print ou foto mais completa da tela de detalhes da transação, mostrando o status de pagamento aprovado? Assim consigo liberar o próximo passo para você.",
+      try_another_number: "Sim, com certeza você pode testar outro número! 😊 É só me enviar o novo número com DDD aqui que o sistema já faz a busca inicial e te envio a prévia agora mesmo."
     },
     es: {
       already_paid_refuses_new: currentValue === '49.90'
@@ -160,7 +161,8 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       send_link: "Aquí tienes el enlace para completar el pago de la etapa de $ {currentValue}:\n{checkoutUrl}\n\n¡En cuanto finalices, solo envíame el comprobante por aquí!",
       said_paid_no_image: "¿Podrías enviarme el comprobante del pago de $ {currentValue} por favor? Así lo verifico de inmediato y te habilito el siguiente paso.",
       no_receipt_image: "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ {currentValue}? Así puedo verificarlo para habilitar el siguiente paso.",
-      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el estado de pago aprobado? Así podré habilitar el siguiente paso para ti."
+      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el estado de pago aprobado? Así podré habilitar el siguiente paso para ti.",
+      try_another_number: "¡Sí, puedes probar con otro número sin ningún problema! 😊 Solo envíame el nuevo número con código de país aquí y de inmediato inicio la búsqueda para enviarte la previa."
     },
     en: {
       already_paid_refuses_new: currentValue === '49.90'
@@ -174,7 +176,8 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       send_link: "Here is the link for you to complete the payment for the $ {currentValue} stage:\n{checkoutUrl}\n\nAs soon as you finish, just send me the receipt right here!",
       said_paid_no_image: "Could you please send me the receipt for the $ {currentValue} payment? That way I can verify it immediately and unlock the next step for you.",
       no_receipt_image: "I didn't receive any receipt in the image you sent. Could you send a clear photo or screenshot of the payment receipt for $ {currentValue}? That way I can verify it and unlock the next step.",
-      unclear_or_cropped: "The payment details are not fully visible to confirm system approval.\n\nCould you send a complete screenshot showing the approved payment status? That way I can unlock the next step for you."
+      unclear_or_cropped: "The payment details are not fully visible to confirm system approval.\n\nCould you send a complete screenshot showing the approved payment status? That way I can unlock the next step for you.",
+      try_another_number: "Yes, you can definitely test another number! 😊 Just send me the new number with country code here and I'll immediately start the search and send you the preview."
     }
   };
 
@@ -211,7 +214,8 @@ Regras:
 4. Se disser que vai pagar ("vou pagar", "ok", "beleza"): Agradeça e instrua: "Perfeito! Fico no seu aguardo. Assim que concluir o pagamento pelo link oficial, me envia o comprovante aqui no chat que eu já ativo a sua liberação completa na hora! 🔒".
 5. Se pedir o link ou dados: Reenvie o link oficial ${checkoutUrl}.
 6. Se disser que já pagou: Peça para enviar o comprovante por aqui.
-7. Mantenha respostas curtas e ágeis (1 a 3 parágrafos curtos), exatamente como no WhatsApp real.`;
+7. Se perguntar se pode testar ou investigar outro número ("posso tentar outro número?", "consigo ver outro?", "posso ver outra pessoa?"): Diga com entusiasmo e simpatia que sim, com certeza! É só me passar o novo número com DDD aqui que eu já inicio a busca no sistema e te trago a prévia imediatamente!
+8. Mantenha respostas curtas e ágeis (1 a 3 parágrafos curtos), exatamente como no WhatsApp real.`;
       } else {
         systemPrompt = systemPrompt
           .replace(/\{checkoutUrl\}/gi, checkoutUrl)
@@ -262,6 +266,7 @@ Regras:
   if (classification.includes('WHEN_GET_PHOTO_OR_ACCESS')) return objectionTexts.when_get_photo_or_access;
   if (classification.includes('SEND_LINK')) return objectionTexts.send_link;
   if (classification.includes('SAID_PAID')) return objectionTexts.said_paid_no_image;
+  if (classification.includes('TRY_ANOTHER_NUMBER')) return objectionTexts.try_another_number;
 
   return objectionTexts.refuse_or_random;
 }
@@ -337,6 +342,17 @@ function localClassifier(text, currentStageInfo = {}, language = 'pt') {
     (lower.includes('recebo') || lower.includes('foto') || lower.includes('acesso') || lower.includes('ver tudo') || lower.includes('mensagens') || lower.includes('painel') || lower.includes('libera') || lower.includes('conversas') || lower.includes('recibo') || lower.includes('ver todo') || lower.includes('access') || lower.includes('messages'))
   ) {
     return 'WHEN_GET_PHOTO_OR_ACCESS';
+  }
+
+  // 8. Pergunta se pode testar outro número
+  if (
+    lower.includes('outro numero') || lower.includes('outro contato') || lower.includes('outra pessoa') ||
+    lower.includes('trocar numero') || lower.includes('mudar numero') || lower.includes('testar outro') ||
+    lower.includes('tentar outro') || lower.includes('ver outro') || lower.includes('outro zap') ||
+    lower.includes('otro numero') || lower.includes('otra persona') || lower.includes('another number') ||
+    lower.includes('other number')
+  ) {
+    return 'TRY_ANOTHER_NUMBER';
   }
 
   return 'REFUSE_OR_RANDOM';

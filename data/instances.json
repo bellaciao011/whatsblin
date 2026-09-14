@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "uaz_r0e685ac3ec022c",
+    "name": "NOVA",
+    "tipo": "uazapi",
+    "url_servidor": "https://whatsblin.uazapi.com",
+    "instance_id": "r0e685ac3ec022c",
+    "instance_token": "7c81ecaf30280683a043bab8:0ac0f1ca9e36aacf8e39b0e2de6e4098:f7d1bc1899b0e9242e9c8c11f7d9702b2bdfc41a69e4517cfd423f1f9dd7aec2d8c76df4",
+    "phoneNumber": "557193768941",
+    "numero_conectado": "557193768941",
+    "status": "connected",
+    "assignedFlowId": "fluxo-espiao-foto",
+    "totalSent": 0,
+    "totalReceived": 0,
+    "criado_em": "2026-09-14 04:44:05.874Z",
+    "createdAt": "2026-09-14 04:44:05.874Z",
+    "lastSyncedAt": "2026-09-14T05:08:04.913Z"
+  }
+]

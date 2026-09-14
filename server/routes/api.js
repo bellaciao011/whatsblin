@@ -1257,10 +1257,15 @@ router.get('/events', (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'connection_status', data })}\n\n`);
   };
 
+  const onChatTyping = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'chat_typing', data })}\n\n`);
+  };
+
   eventBus.on('new_message', onNewMessage);
   eventBus.on('chat_updated', onChatUpdated);
   eventBus.on('instances_updated', onInstancesUpdated);
   eventBus.on('connection_status', onConnectionStatus);
+  eventBus.on('chat_typing', onChatTyping);
 
   // Keep-alive a cada 25 segundos para evitar timeout de proxies (Railway)
   const pingInterval = setInterval(() => {
@@ -1273,6 +1278,7 @@ router.get('/events', (req, res) => {
     eventBus.removeListener('chat_updated', onChatUpdated);
     eventBus.removeListener('instances_updated', onInstancesUpdated);
     eventBus.removeListener('connection_status', onConnectionStatus);
+    eventBus.removeListener('chat_typing', onChatTyping);
   });
 });
 

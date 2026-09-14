@@ -13,10 +13,42 @@ const fs = require('fs');
 const eventBus = new EventEmitter();
 
 /**
- * Abstração unificada de envio de mensagem de texto (suporta uazapi e Meta Cloud API)
+ * Simula status de presença 'composing' (digitando) nativo no WhatsApp e no Live Chat
  */
-async function sendOutgoingTextMessage(inst, cleanPhone, text) {
-  if (!inst) return;
+async function simulateTyping(inst, cleanPhone, durationMs = 2000, presenceType = 'composing') {
+  if (!cleanPhone) return;
+
+  // Notifica o Live Chat do painel que o bot está digitando
+  eventBus.emit('chat_typing', { phone: cleanPhone, isTyping: true, who: 'bot' });
+
+  // Envia presença nativa na uazapi para o WhatsApp do contato
+  if (inst && inst.tipo === 'uazapi' && inst.instance_token) {
+    try {
+      const decToken = cryptoService.decrypt(inst.instance_token);
+      await uazapiService.sendPresence(inst.url_servidor, decToken, cleanPhone, presenceType, (durationMs || 2000) + 1000);
+    } catch (err) {
+      // Falha silenciosa de presença (não interrompe o fluxo)
+    }
+  }
+
+  // Delay natural humano
+  if (durationMs > 0) {
+    await new Promise(r => setTimeout(r, durationMs));
+  }
+
+  // Finaliza status de digitando no Live Chat
+  eventBus.emit('chat_typing', { phone: cleanPhone, isTyping: false, who: 'bot' });
+}
+
+/**
+ * Abstração unificada de envio de mensagem de texto (suporta uazapi e Meta Cloud API com delay humano)
+ */
+async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 2000) {
+  if (!inst || !cleanPhone || !text) return;
+
+  if (typingDelay && typingDelay > 0) {
+    await simulateTyping(inst, cleanPhone, typingDelay, 'composing');
+  }
 
   if (inst.tipo === 'uazapi' && inst.instance_token) {
     try {
@@ -35,10 +67,14 @@ async function sendOutgoingTextMessage(inst, cleanPhone, text) {
 }
 
 /**
- * Abstração unificada de envio de imagem (suporta uazapi e Meta Cloud API)
+ * Abstração unificada de envio de imagem (suporta uazapi e Meta Cloud API com delay humano)
  */
-async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, mimeType, caption) {
-  if (!inst) return;
+async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, mimeType, caption, typingDelay = 2500) {
+  if (!inst || !cleanPhone) return;
+
+  if (typingDelay && typingDelay > 0) {
+    await simulateTyping(inst, cleanPhone, typingDelay, 'composing');
+  }
 
   if (inst.tipo === 'uazapi' && inst.instance_token) {
     try {
@@ -284,6 +320,83 @@ function getCurrentStageInfo(stageKey, funnel, language = 'pt') {
 }
 
 /**
+ * Detecta se a mensagem contém um número de telefone com DDD válido para investigação
+ * Suporta formatos: 96981266512, (96) 98126-6512, 11999998888, +55 11 98888-7777, etc.
+ */
+function extractNewTargetPhone(text) {
+  if (!text || typeof text !== 'string') return null;
+  const clean = text.trim();
+
+  // Ignora se for comprovante ou comando entre colchetes
+  if (clean.startsWith('[') && clean.endsWith(']')) return null;
+
+  // 1. Procura ocorrências de telefones brasileiros ou internacionais formatados
+  const phonePattern = /(?:\+?55\s?)?(?:\(?([1-9]{2})\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/g;
+  const matches = clean.match(phonePattern);
+  if (matches) {
+    for (const m of matches) {
+      const digits = m.replace(/\D/g, '');
+      if (digits.length >= 10 && digits.length <= 13) {
+        return digits;
+      }
+    }
+  }
+
+  // 2. Sequência contínua de dígitos em palavras (ex: "pesquisa 96981266512" ou "96981266512")
+  const words = clean.split(/[\s,;:]+/);
+  for (const w of words) {
+    const d = w.replace(/\D/g, '');
+    if (d.length >= 10 && d.length <= 13) {
+      return d;
+    }
+  }
+
+  const rawDigits = clean.replace(/\D/g, '');
+  if (rawDigits.length >= 10 && rawDigits.length <= 13) {
+    return rawDigits;
+  }
+
+  return null;
+}
+
+/**
+ * Retorna as propriedades visuais da etiqueta automática conforme o estágio do lead no funil
+ */
+function getStageTag(state, upsellStage) {
+  const st = (state || 'NOVO').toUpperCase();
+  const up = (upsellStage || 'stage_49').toLowerCase();
+
+  if (st === 'FINALIZADO' || st === 'PAGO' || st === 'APROVADO') {
+    return { id: 'pago', label: 'Venda Aprovada', icon: '✅', color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.35)' };
+  }
+  if (up === 'stage_400') {
+    return { id: 'upsell_400', label: 'Upsell R$400', icon: '💎', color: '#ec4899', bg: 'rgba(236,72,153,0.15)', border: 'rgba(236,72,153,0.35)' };
+  }
+  if (up === 'stage_200') {
+    return { id: 'upsell_200', label: 'Upsell R$200', icon: '💎', color: '#a855f7', bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.35)' };
+  }
+  if (up === 'stage_100') {
+    return { id: 'upsell_100', label: 'Upsell R$100', icon: '💎', color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.35)' };
+  }
+  if (st === 'DUVIDAS' || st === 'NEGOCIACAO') {
+    return { id: 'duvidas', label: 'Tirando Dúvidas (IA)', icon: '🤖', color: '#06b6d4', bg: 'rgba(6,182,212,0.15)', border: 'rgba(6,182,212,0.35)' };
+  }
+  if (st === 'OFERTA_ENVIADA') {
+    return { id: 'oferta', label: 'Oferta Enviada', icon: '💬', color: '#3b82f6', bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.35)' };
+  }
+  if (st === 'PROVA_ENVIADA') {
+    return { id: 'prova', label: 'Prova Enviada', icon: '📸', color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.35)' };
+  }
+  if (st === 'ANALISANDO') {
+    return { id: 'analisando', label: 'Pesquisando Alvo', icon: '🔍', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.35)' };
+  }
+  if (st === 'AGUARDANDO_NUMERO') {
+    return { id: 'aguardando', label: 'Aguardando Número', icon: '🟡', color: '#eab308', bg: 'rgba(234,179,8,0.15)', border: 'rgba(234,179,8,0.35)' };
+  }
+  return { id: 'novo', label: 'Novo Lead', icon: '🟢', color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.35)' };
+}
+
+/**
  * MOTOR DE EXECUÇÃO DO GRAFO VISUAL - MULTILÍNGUE COM VINCULAÇÃO ESTRITA DE CHIP
  */
 async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachment = null) {
@@ -349,7 +462,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // =========================================================================
   // CASO 1: LEAD JÁ ESTÁ NA ETAPA DE OFERTA / UPSELL (REPOSTAS, OBJEÇÕES, COMPROVANTES)
   // =========================================================================
-  if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO') {
+  if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'DUVIDAS') {
     // 1.1 Se o lead enviou imagem ou comprovante válido
     const isComprovanteValido = mediaAttachment || messageText.toLowerCase().includes('[comprovante_valido]') || messageText.toLowerCase().includes('comprovante aprovado') || messageText.toLowerCase().includes('comprobante aprobado') || messageText.toLowerCase().includes('receipt approved');
     const isImagemInvalida = messageText.toLowerCase().includes('[print_invalido]') || messageText.toLowerCase().includes('[imagem_aleatoria]');
@@ -524,6 +637,74 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       return;
     }
 
+    // 1.1.5 O lead quer testar outro número e enviou o novo número (ex: 96981266512 ou (11) 99999-8888)
+    const newTargetDigits = extractNewTargetPhone(messageText);
+    if (newTargetDigits) {
+      const normalizedNewTarget = newTargetDigits.length <= 11 && flowLanguage === 'pt' ? '55' + newTargetDigits : newTargetDigits;
+      console.log(`[FlowEngine] 🔄 Lead solicitou investigação de NOVO NÚMERO: ${normalizedNewTarget} (número anterior: ${chatData.variables.alvo})`);
+
+      chatData.variables.alvo = normalizedNewTarget;
+      chatData.state = 'ANALISANDO';
+      db.saveChat(cleanPhone, chatData);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+
+      // 1. Confirmação imediata informando início da busca do novo número
+      const fallbackStartingNew = flowLanguage === 'es'
+        ? `¡Perfecto! Voy a iniciar la búsqueda para el número ${normalizedNewTarget} y ya te traigo la previa. Espera un momento mientras verificamos en el sistema... 🔍`
+        : (flowLanguage === 'en'
+          ? `Perfect! I'll start checking the number ${normalizedNewTarget} right away. Please wait a moment while we verify in the system... 🔍`
+          : `Perfeito! Vou iniciar a busca para o número ${normalizedNewTarget} e já te trago a prévia. Aguarde um momento enquanto verificamos no sistema... 🔍`);
+
+      db.addChatMessage(cleanPhone, { from: 'bot', text: fallbackStartingNew, instanceId: inst.id }, 'ANALISANDO');
+      await sendOutgoingTextMessage(inst, cleanPhone, fallbackStartingNew, 1800);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+
+      // 2. Simula tempo de busca no sistema e consulta foto de perfil
+      await simulateTyping(inst, cleanPhone, 2500, 'composing');
+      const photoUrl = await lookupProfilePicture(normalizedNewTarget);
+      chatData.variables.photoUrl = photoUrl;
+      chatData.targetPhotoUrl = photoUrl;
+
+      // 3. Monta a nova imagem de prova personalizada para o novo alvo
+      const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates);
+      const proofsDir = path.join(__dirname, '../../public/generated');
+      fs.mkdirSync(proofsDir, { recursive: true });
+      const filename = `proof_${cleanPhone}_${Date.now()}.png`;
+      fs.writeFileSync(path.join(proofsDir, filename), imgBuffer);
+      const webProofUrl = `/generated/${filename}`;
+
+      const proofCaption = photoUrl
+        ? (flowLanguage === 'es' ? '✓ Nueva prueba generada con foto en el audio' : (flowLanguage === 'en' ? '✓ New proof generated with profile photo on audio' : '✓ Nova prova gerada com a foto deste número'))
+        : (flowLanguage === 'es' ? '🔒 Nueva prueba con audio protegido por encriptación' : (flowLanguage === 'en' ? '🔒 New proof with encrypted audio' : '🔒 Nova prova com áudio protegido por criptografia'));
+
+      db.addChatMessage(cleanPhone, {
+        from: 'bot',
+        mediaType: 'image',
+        mediaUrl: webProofUrl,
+        text: proofCaption,
+        instanceId: inst.id
+      }, 'PROVA_ENVIADA');
+
+      await sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, 'image/png', proofCaption, 2000);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+
+      // 4. Reenvia a oferta com o link de pagamento
+      const fallbackOfferNew = flowLanguage === 'es'
+        ? `¡Listo! Encontré las conversaciones y registros de este nuevo número también ✅\n\nPara desbloquear la desencriptación completa de todas las conversaciones, audios y ubicación en tiempo real, completa la activación en el enlace seguro:\n\n{checkoutUrl}\n\n¡En cuanto pagues, envíame el comprobante por aquí para habilitar tu acceso de inmediato!`
+        : (flowLanguage === 'en'
+          ? `Done! I found conversations and records for this new number as well ✅\n\nTo unlock full decryption of all chats, audios, and real-time location, complete activation on the secure link:\n\n{checkoutUrl}\n\nAs soon as you pay, send me the receipt here to unlock full access immediately!`
+          : `Pronto! Encontrei as conversas e registros desse novo número também ✅\n\nPara liberar a descriptografia completa de todas as conversas, áudios e localização em tempo real, conclua a ativação no link seguro abaixo:\n\n{checkoutUrl}\n\nAssim que pagar, me envia o comprovante por aqui para eu liberar seu acesso imediatamente!`);
+
+      const offerText = interpolateVariables(fallbackOfferNew, chatData.variables);
+      chatData.state = 'OFERTA_ENVIADA';
+      db.saveChat(cleanPhone, chatData);
+
+      db.addChatMessage(cleanPhone, { from: 'bot', text: offerText, instanceId: inst.id }, 'OFERTA_ENVIADA');
+      await sendOutgoingTextMessage(inst, cleanPhone, offerText, 2000);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+      return;
+    }
+
     // 1.2 Lead enviou mensagem de texto: aciona o classificador inteligente no idioma do fluxo
     console.log(`[FlowEngine] Analisando objeção do lead com IA (Lang: ${flowLanguage})...`);
     const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
@@ -651,12 +832,45 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 /**
  * Ponto de entrada chamado quando uma nova mensagem chega do WhatsApp (Webhook ou Simulador)
  */
-async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null, messageTimestamp = null) {
+async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null, messageTimestamp = null, senderName = null, senderPhoto = null) {
   const instances = db.getInstances();
   const instance = instances.find(i => i.id === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
   const cleanPhone = leadPhone.replace(/\D/g, '');
 
-  // 0. Atribuição de Tráfego Pago (TikTok Ads):
+  // 0. Atualiza dados de contato do lead (Nome e Foto de Perfil)
+  const existingChat = db.getChat(cleanPhone) || {};
+  let chatNeedsSave = false;
+
+  if (senderName && typeof senderName === 'string' && senderName.trim()) {
+    const cleanSenderName = senderName.trim();
+    if (!existingChat.leadName || existingChat.leadName.startsWith('Lead ') || existingChat.leadName === ('+' + cleanPhone)) {
+      existingChat.leadName = cleanSenderName;
+      chatNeedsSave = true;
+    }
+  }
+
+  if (senderPhoto && !existingChat.leadPhotoUrl) {
+    existingChat.leadPhotoUrl = senderPhoto;
+    chatNeedsSave = true;
+  } else if (!existingChat.leadPhotoUrl) {
+    // Busca foto pública do perfil do próprio lead de forma assíncrona
+    lookupProfilePicture(cleanPhone).then(photo => {
+      if (photo) {
+        const c = db.getChat(cleanPhone);
+        if (c && !c.leadPhotoUrl) {
+          c.leadPhotoUrl = photo;
+          db.saveChat(cleanPhone, c);
+          eventBus.emit('chat_updated', { phone: cleanPhone });
+        }
+      }
+    }).catch(() => {});
+  }
+
+  if (chatNeedsSave) {
+    db.saveChat(cleanPhone, existingChat);
+  }
+
+  // 0.1 Atribuição de Tráfego Pago (TikTok Ads):
   // Verifica se a mensagem contém o código gerado no link de campanha
   // Padrão: (CÓDIGO) ex: (AB79KP) ou código AB79KP
   if (messageText && typeof messageText === 'string') {
@@ -849,5 +1063,8 @@ module.exports = {
   executeFlowGraph,
   executeTikTokPixelNode,
   triggerManualFlow,
+  simulateTyping,
+  getStageTag,
+  extractNewTargetPhone,
   eventBus
 };

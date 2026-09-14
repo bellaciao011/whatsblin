@@ -88,6 +88,33 @@ router.post('/uazapi', async (req, res) => {
     }
 
     // =========================================================================
+    // 1.1 TRATAMENTO DE EVENTOS DE PRESENÇA (DIGITANDO / GRAVANDO ÁUDIO)
+    // =========================================================================
+    if (eventType === 'presence' || body.presence !== undefined || body.data?.presence !== undefined) {
+      const presData = body.data || body;
+      const rawUser = presData.number || presData.chatid || presData.jid || presData.sender || presData.id || '';
+      let cleanPhone = resolvePhoneFromLid(rawUser);
+      if (!cleanPhone || cleanPhone.length < 8) {
+        cleanPhone = String(rawUser).replace(/@.*$/, '').replace(/\D/g, '');
+      }
+
+      const presenceState = String(presData.presence || presData.type || presData.state || '').toLowerCase();
+      const isTyping = presenceState === 'composing' || presenceState === 'recording';
+
+      if (cleanPhone && cleanPhone.length >= 8) {
+        const chat = db.getChat(cleanPhone);
+        if (chat) {
+          chat.isTyping = isTyping;
+          chat.typingTimestamp = isTyping ? Date.now() : null;
+          db.saveChat(cleanPhone, chat);
+        }
+        eventBus.emit('chat_typing', { phone: cleanPhone, isTyping, who: 'lead' });
+        eventBus.emit('chat_updated', { phone: cleanPhone });
+      }
+      return;
+    }
+
+    // =========================================================================
     // 2. EXTRAÇÃO ROBUSTA DE MENSAGENS (SUPORTA TODOS OS FORMATOS DA UAZAPI)
     // =========================================================================
     let messagesList = [];
@@ -205,11 +232,14 @@ router.post('/uazapi', async (req, res) => {
         continue;
       }
 
-      console.log(`[uazapi Webhook] 📩 Mensagem de lead +${cleanPhone} (Chip: ${instLogName}): "${textBody || '[Mídia]'}"`);
+      const senderName = msg.pushName || msg.senderName || msg.name || msg.notify || msg.profileName || msg.verifiedName || null;
+      const senderPhoto = msg.profilePicUrl || msg.senderPhotoUrl || msg.avatarUrl || null;
+
+      console.log(`[uazapi Webhook] 📩 Mensagem de lead +${cleanPhone} (${senderName || 'Sem nome'}, Chip: ${instLogName}): "${textBody || '[Mídia]'}"`);
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
-        await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment, msgId);
+        await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment, msgId, null, senderName, senderPhoto);
       } else {
         console.warn('[uazapi Webhook] Nenhuma instância ativa configurada para processar esta mensagem.');
       }

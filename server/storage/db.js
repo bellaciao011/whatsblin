@@ -74,6 +74,12 @@ module.exports = {
     const chats = readJson('chats.json', {});
     return chats[phone] || null;
   },
+  saveChat: (phone, chatData) => {
+    const chats = readJson('chats.json', {});
+    chats[phone] = { ...(chats[phone] || {}), ...chatData };
+    writeJson('chats.json', chats);
+    return chats[phone];
+  },
   saveChats: (data) => writeJson('chats.json', data),
   
   getSettings: () => readJson('settings.json', {}),

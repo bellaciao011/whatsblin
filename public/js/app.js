@@ -260,7 +260,16 @@ function initRealtimeEvents() {
     state.eventSource.onmessage = (e) => {
       try {
         const payload = JSON.parse(e.data);
-        if (payload.type === 'new_message' || payload.type === 'chat_updated') {
+        if (payload.type === 'chat_typing') {
+          const { phone, isTyping } = payload.data || {};
+          if (phone && state.chats) {
+            if (!state.chats[phone]) state.chats[phone] = { leadPhone: phone, messages: [] };
+            state.chats[phone].isTyping = isTyping;
+          }
+          if (state.currentView === 'inbox') {
+            renderInbox(false);
+          }
+        } else if (payload.type === 'new_message' || payload.type === 'chat_updated') {
           // Se estiver no Inbox, atualiza a tela
           if (state.currentView === 'inbox') {
             renderInbox(false); // sem loading
@@ -1903,14 +1912,57 @@ async function renderInbox(showLoading = true) {
 
   const activeChat = state.chats[state.activeChatPhone] || null;
 
-  const getStateBadgeClass = (s) => {
-    const st = (s || '').toLowerCase();
-    if (st.includes('novo')) return 'novo';
-    if (st.includes('aguardando') || st.includes('analisando')) return 'aguardando';
-    if (st.includes('oferta') || st.includes('negociacao')) return 'oferta';
-    if (st.includes('finalizado')) return 'finalizado';
-    return 'novo';
+  const getLeadStageBadge = (c) => {
+    const st = (c?.state || 'NOVO').toUpperCase();
+    const up = (c?.upsellStage || 'stage_49').toLowerCase();
+
+    if (st === 'FINALIZADO' || st === 'PAGO' || st === 'APROVADO') {
+      return { class: 'pago', label: 'Venda Aprovada', icon: '✅' };
+    }
+    if (up === 'stage_400') {
+      return { class: 'upsell', label: 'Upsell R$400', icon: '💎' };
+    }
+    if (up === 'stage_200') {
+      return { class: 'upsell', label: 'Upsell R$200', icon: '💎' };
+    }
+    if (up === 'stage_100') {
+      return { class: 'upsell', label: 'Upsell R$100', icon: '💎' };
+    }
+    if (st === 'DUVIDAS' || st === 'NEGOCIACAO') {
+      return { class: 'duvidas', label: 'Tirando Dúvidas (IA)', icon: '🤖' };
+    }
+    if (st === 'OFERTA_ENVIADA') {
+      return { class: 'oferta', label: 'Oferta R$49', icon: '💬' };
+    }
+    if (st === 'PROVA_ENVIADA') {
+      return { class: 'prova', label: 'Prova Enviada', icon: '📸' };
+    }
+    if (st === 'ANALISANDO') {
+      return { class: 'analisando', label: 'Pesquisando Alvo', icon: '🔍' };
+    }
+    if (st === 'AGUARDANDO_NUMERO') {
+      return { class: 'aguardando', label: 'Aguardando Número', icon: '🟡' };
+    }
+    return { class: 'novo', label: 'Novo Lead', icon: '🟢' };
   };
+
+  const formatPhoneDisplay = (p) => {
+    const digits = String(p || '').replace(/\D/g, '');
+    if (digits.startsWith('55') && digits.length >= 12) {
+      const ddd = digits.slice(2, 4);
+      const rest = digits.slice(4);
+      if (rest.length === 9) return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+      if (rest.length === 8) return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+    }
+    return digits ? `+${digits}` : '';
+  };
+
+  const activeBadge = activeChat ? getLeadStageBadge(activeChat) : null;
+  const activeContactName = activeChat
+    ? (activeChat.leadName && !activeChat.leadName.startsWith('Lead ') && activeChat.leadName !== ('+' + activeChat.leadPhone)
+        ? activeChat.leadName
+        : formatPhoneDisplay(activeChat.leadPhone))
+    : '';
 
   const html = `
     <div class="inbox-container">
@@ -1932,20 +1984,44 @@ async function renderInbox(showLoading = true) {
               </button>
             </div>
           ` : phones.map(p => {
-            const c = state.chats[p];
+            const c = state.chats[p] || {};
             const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
             const isActive = p === state.activeChatPhone;
+            const badge = getLeadStageBadge(c);
+            const photoUrl = c.leadPhotoUrl || c.targetPhotoUrl || null;
+            const rawName = c.leadName;
+            const contactName = rawName && !rawName.startsWith('Lead ') && rawName !== ('+' + p) ? rawName : formatPhoneDisplay(p);
+            const phoneFormatted = formatPhoneDisplay(p);
+            const initials = contactName.slice(0, 2).toUpperCase();
+
             return `
               <div class="chat-item ${isActive ? 'active' : ''}" onclick="selectChat('${p}')">
                 <div class="chat-avatar">
-                  ${c.targetPhotoUrl ? `<img src="${c.targetPhotoUrl}" alt="">` : p.slice(-2)}
+                  ${photoUrl ? `<img src="${photoUrl}" alt="${contactName}" onerror="this.onerror=null; this.src=''; this.style.display='none'; this.nextElementSibling.style.display='block';">` : ''}
+                  <span style="${photoUrl ? 'display:none;' : ''}">${initials}</span>
+                  <span class="avatar-online-dot"></span>
                 </div>
                 <div class="chat-info">
-                  <div class="chat-name">
-                    <span>+${p}</span>
+                  <div class="chat-name-row">
+                    <span class="chat-contact-name" title="${contactName}">${contactName}</span>
                     <span class="chat-time">${lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
                   </div>
-                  <div class="chat-snippet">${lastMsg ? (lastMsg.mediaType ? '📷 [Foto da Prova]' : lastMsg.text) : 'Nova conversa'}</div>
+                  <div class="chat-subrow">
+                    <span class="chat-phone-formatted">${phoneFormatted}</span>
+                    <span class="chat-state-badge ${badge.class}">${badge.icon} ${badge.label}</span>
+                  </div>
+                  <div class="chat-snippet-row">
+                    ${c.isTyping ? `
+                      <div class="typing-indicator-snippet">
+                        <span>✍️ digitando</span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                      </div>
+                    ` : `
+                      <div class="chat-snippet">${lastMsg ? (lastMsg.mediaType ? '📷 [Foto da Prova]' : (lastMsg.text || '')) : 'Nova conversa'}</div>
+                    `}
+                  </div>
                 </div>
               </div>
             `;
@@ -1958,16 +2034,26 @@ async function renderInbox(showLoading = true) {
         ${activeChat ? `
           <div class="chat-header">
             <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
-              <div class="chat-avatar">
-                ${activeChat.targetPhotoUrl ? `<img src="${activeChat.targetPhotoUrl}" alt="">` : activeChat.leadPhone.slice(-2)}
+              <div class="chat-avatar" style="width: 48px; height: 48px;">
+                ${(activeChat.leadPhotoUrl || activeChat.targetPhotoUrl) ? `<img src="${activeChat.leadPhotoUrl || activeChat.targetPhotoUrl}" alt="" onerror="this.style.display='none';">` : activeChat.leadPhone.slice(-2)}
+                <span class="avatar-online-dot"></span>
               </div>
               <div style="min-width: 0;">
                 <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-                  <span>+${activeChat.leadPhone}</span>
-                  <span class="chat-state-badge ${getStateBadgeClass(activeChat.state)}">${activeChat.state || 'NOVO'}</span>
+                  <span style="color: #fff;">${activeContactName}</span>
+                  <span class="chat-state-badge ${activeBadge.class}">${activeBadge.icon} ${activeBadge.label}</span>
                 </div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                  ${activeChat.leadName || 'Contato do WhatsApp'} ${activeChat.upsellStage ? `• Etapa: ${activeChat.upsellStage}` : ''}
+                <div style="font-size: 11.5px; margin-top: 2px;">
+                  ${activeChat.isTyping ? `
+                    <span style="color: #25d366; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                      ✍️ digitando
+                      <span class="typing-dot"></span>
+                      <span class="typing-dot"></span>
+                      <span class="typing-dot"></span>
+                    </span>
+                  ` : `
+                    <span style="color: var(--text-muted);">${formatPhoneDisplay(activeChat.leadPhone)} ${activeChat.variables?.alvo ? `• Alvo: ${formatPhoneDisplay(activeChat.variables.alvo)}` : ''}</span>
+                  `}
                 </div>
               </div>
             </div>
@@ -2015,6 +2101,13 @@ async function renderInbox(showLoading = true) {
                 <span class="msg-time">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
               </div>
             `).join('')}
+            ${activeChat.isTyping ? `
+              <div class="msg-bubble lead msg-typing">
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+              </div>
+            ` : ''}
           </div>
 
           <div class="chat-footer">
