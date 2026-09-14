@@ -222,6 +222,12 @@ function handleRoute() {
     container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados...</div>';
   }
 
+  if (route === 'inbox') {
+    container.classList.add('inbox-view-active');
+  } else {
+    container.classList.remove('inbox-view-active');
+  }
+
   if (route === 'overview') renderOverview();
   else if (route === 'fluxo-ao-vivo') renderLiveFlow();
   else if (route === 'inbox') renderInbox();
@@ -2000,10 +2006,10 @@ async function renderInbox(showLoading = true) {
               </button>
             </div>
 
-            <!-- Linha de Input de Mensagem Manual -->
-            <form class="chat-input-row" onsubmit="sendManualMessage(event)">
-              <input type="text" class="form-input" id="chat-reply-input" placeholder="Digite uma mensagem manual para +${activeChat.leadPhone}... (Pressione Enter)" style="flex: 1; border-radius: 20px; padding: 11px 18px; font-size: 13.5px;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendManualMessage(event);}">
-              <button type="submit" class="btn btn-primary" style="border-radius: 50%; width: 44px; height: 44px; min-width: 44px; padding: 0; background: #25d366; border: none; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.4); cursor: pointer;" title="Enviar mensagem manual">
+            <!-- Linha de Input de Mensagem Manual ("Escrever na hora") -->
+            <form class="chat-input-row" onsubmit="sendManualMessage(event)" style="display: flex; align-items: center; gap: 10px; width: 100%;">
+              <input type="text" class="form-input" id="chat-reply-input" placeholder="💬 Escreva uma mensagem aqui para enviar na hora via WhatsApp... (Enter para enviar)" style="flex: 1; border-radius: 24px; padding: 13px 20px; font-size: 14px; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(255,255,255,0.14); color: #fff; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);" autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendManualMessage(event);}">
+              <button type="submit" class="btn btn-primary" style="border-radius: 50%; width: 46px; height: 46px; min-width: 46px; padding: 0; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; font-size: 19px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45); cursor: pointer; transition: transform 0.15s;" onmousedown="this.style.transform='scale(0.92)'" onmouseup="this.style.transform='scale(1)'" title="Enviar mensagem agora">
                 ➤
               </button>
             </form>
@@ -2019,9 +2025,32 @@ async function renderInbox(showLoading = true) {
 
   document.getElementById('view-container').innerHTML = html;
 
-  // Auto-scroll mensagens para o final
+  // Auto-scroll mensagens para o final e foca o campo de digitação
   const msgContainer = document.getElementById('chat-messages-container');
   if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
+  const replyInput = document.getElementById('chat-reply-input');
+  if (replyInput && document.activeElement !== replyInput && window.innerWidth > 768) {
+    replyInput.focus();
+  }
+
+  // Auto-inicia polling de atualização em segundo plano do Inbox (caso SSE oscile)
+  if (!window.inboxLivePollingTimer) {
+    window.inboxLivePollingTimer = setInterval(async () => {
+      if (state.currentView === 'inbox' && !document.hidden) {
+        try {
+          const freshChats = await fetch('/api/chats').then(r => r.json()).catch(() => null);
+          if (freshChats && Object.keys(freshChats).length > 0) {
+            const currentLen = state.chats?.[state.activeChatPhone]?.messages?.length || 0;
+            const newLen = freshChats?.[state.activeChatPhone]?.messages?.length || 0;
+            if (newLen !== currentLen || JSON.stringify(freshChats[state.activeChatPhone]?.state) !== JSON.stringify(state.chats?.[state.activeChatPhone]?.state)) {
+              state.chats = freshChats;
+              renderInbox(false);
+            }
+          }
+        } catch (e) {}
+      }
+    }, 3000);
+  }
 }
 
 window.selectChat = function(phone) {

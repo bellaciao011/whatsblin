@@ -346,6 +346,35 @@ async function disconnectInstance(serverUrl, instanceToken) {
   }
 }
 
+const lidToPhoneCache = new Map();
+
+/**
+ * Registra o mapeamento de LID (@lid) para número de telefone real (@s.whatsapp.net)
+ */
+function registerLidMapping(lid, phoneOrJid) {
+  if (!lid || !phoneOrJid) return;
+  const cleanLid = String(lid).replace(/@.*$/, '').replace(/\D/g, '');
+  const cleanPhone = String(phoneOrJid).replace(/@.*$/, '').replace(/\D/g, '');
+  if (cleanLid && cleanPhone && cleanPhone.length >= 8 && cleanPhone !== cleanLid) {
+    lidToPhoneCache.set(cleanLid, cleanPhone);
+  }
+}
+
+/**
+ * Resolve um identificador (@lid ou telefone) para o número de telefone real
+ */
+function resolvePhoneFromLid(target) {
+  if (!target) return '';
+  const str = String(target).trim();
+  const digits = str.replace(/@.*$/, '').replace(/\D/g, '');
+  if (str.includes('@lid') || digits.length >= 14) {
+    if (lidToPhoneCache.has(digits)) {
+      return lidToPhoneCache.get(digits);
+    }
+  }
+  return digits;
+}
+
 /**
  * 8. Busca conversas recentes da instância
  * POST /chat/find
@@ -371,7 +400,16 @@ async function findChats(serverUrl, instanceToken, limit = 50) {
         timeout: 15000
       }
     );
-    return res.data?.chats || [];
+    const chats = res.data?.chats || [];
+    for (const c of chats) {
+      if (c.wa_chatlid && c.wa_chatid) {
+        registerLidMapping(c.wa_chatlid, c.wa_chatid);
+      }
+      if (c.wa_chatlid && c.phone) {
+        registerLidMapping(c.wa_chatlid, c.phone);
+      }
+    }
+    return chats;
   } catch (err) {
     const parsed = parseApiError(err);
     console.warn(`[uazapiService] Aviso ao buscar chats:`, parsed.message);
@@ -445,6 +483,9 @@ module.exports = {
   disconnectInstance,
   findChats,
   findMessages,
-  fetchAllInstances
+  fetchAllInstances,
+  registerLidMapping,
+  resolvePhoneFromLid,
+  lidToPhoneCache
 };
 

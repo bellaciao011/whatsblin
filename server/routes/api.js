@@ -308,16 +308,19 @@ async function syncChatsFromUazapi(inst) {
         allChats[cleanPhone].leadName = leadName;
       }
 
-      // Busca mensagens recentes desta conversa se vazia
-      if (allChats[cleanPhone].messages.length === 0) {
-        try {
-          const msgs = await uazapiService.findMessages(inst.url_servidor, decToken, c.wa_chatid, 15);
-          if (Array.isArray(msgs)) {
-            for (const m of msgs) {
+      // Busca mensagens recentes desta conversa e sincroniza qualquer mensagem faltante
+      try {
+        const msgs = await uazapiService.findMessages(inst.url_servidor, decToken, c.wa_chatid, 25);
+        if (Array.isArray(msgs)) {
+          msgs.sort((a, b) => (a.messageTimestamp || 0) - (b.messageTimestamp || 0));
+          for (const m of msgs) {
+            const msgId = m.id || m.messageid || `${cleanPhone}_${m.messageTimestamp}`;
+            const exists = allChats[cleanPhone].messages.some(existing => existing.id === msgId);
+            if (!exists) {
               const text = (m.text || m.body || m.content?.text || (typeof m.content === 'string' ? m.content : '') || m.message?.conversation || '').trim();
               if (text || m.fileURL) {
                 allChats[cleanPhone].messages.push({
-                  id: m.id || m.messageid || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                  id: msgId,
                   timestamp: parseUazapiTimestamp(m.messageTimestamp || m.timestamp),
                   from: m.fromMe ? 'agent' : 'lead',
                   text: text || '[Mídia]',
@@ -329,8 +332,8 @@ async function syncChatsFromUazapi(inst) {
               }
             }
           }
-        } catch (mErr) {}
-      }
+        }
+      } catch (mErr) {}
     }
 
     db.saveChats(allChats);

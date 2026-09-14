@@ -70,6 +70,10 @@ module.exports = {
   saveFunnel: (data) => writeJson('funnel.json', data),
   
   getChats: () => readJson('chats.json', {}),
+  getChat: (phone) => {
+    const chats = readJson('chats.json', {});
+    return chats[phone] || null;
+  },
   saveChats: (data) => writeJson('chats.json', data),
   
   getSettings: () => readJson('settings.json', {}),

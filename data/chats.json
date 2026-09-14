@@ -3,8 +3,8 @@
     "leadPhone": "557196774123",
     "leadName": ".",
     "instanceId": "uaz_r6b42c61158e910",
-    "state": "NOVO",
-    "lastMessageTime": "2026-09-14T01:52:38.000Z",
+    "state": "OFERTA_ENVIADA",
+    "lastMessageTime": "2026-09-14T03:36:21.776Z",
     "messages": [
       {
         "id": "557193768941:3EB0E23CA0C13732D94466",
@@ -104,8 +104,181 @@
         "mediaUrl": null,
         "mediaType": "Conversation",
         "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789355898374_626",
+        "timestamp": "2026-09-14T03:18:18.374Z",
+        "from": "lead",
+        "text": "71993768941",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789355898378_931",
+        "timestamp": "2026-09-14T03:18:18.378Z",
+        "from": "bot",
+        "text": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356153939_719",
+        "timestamp": "2026-09-14T03:22:33.939Z",
+        "from": "lead",
+        "text": "71993768941",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356172154_2",
+        "timestamp": "2026-09-14T03:22:52.154Z",
+        "from": "lead",
+        "text": "por que tenho que pagar?",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356172157_50",
+        "timestamp": "2026-09-14T03:22:52.157Z",
+        "from": "bot",
+        "text": "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual de R$ 49,90 pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB0A717AD2F4E6E6C6029",
+        "timestamp": "2026-09-14T03:18:19.334Z",
+        "from": "agent",
+        "text": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova",
+        "mediaUrl": null,
+        "mediaType": "ExtendedTextMessage",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356979308_430",
+        "timestamp": "2026-09-14T03:36:19.308Z",
+        "from": "lead",
+        "text": "71993768941",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356979312_331",
+        "timestamp": "2026-09-14T03:36:19.312Z",
+        "from": "bot",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356980079_144",
+        "timestamp": "2026-09-14T03:36:20.079Z",
+        "from": "lead",
+        "text": "por que tenho que pagar?",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356980082_428",
+        "timestamp": "2026-09-14T03:36:20.082Z",
+        "from": "bot",
+        "text": "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual de R$ 49,90 pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356980813_263",
+        "timestamp": "2026-09-14T03:36:20.813Z",
+        "from": "lead",
+        "text": "Não entendi",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356980816_1",
+        "timestamp": "2026-09-14T03:36:20.816Z",
+        "from": "bot",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356992335_180",
+        "timestamp": "2026-09-14T03:36:32.335Z",
+        "from": "lead",
+        "text": "por que tenho que pagar?",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356992337_340",
+        "timestamp": "2026-09-14T03:36:32.337Z",
+        "from": "bot",
+        "text": "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual de R$ 49,90 pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356993100_711",
+        "timestamp": "2026-09-14T03:36:33.100Z",
+        "from": "lead",
+        "text": "Não entendi",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "msg_1789356993103_13",
+        "timestamp": "2026-09-14T03:36:33.103Z",
+        "from": "bot",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB05EDAEA272B79D5BE40",
+        "timestamp": "2026-09-14T03:36:20.273Z",
+        "from": "agent",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "mediaUrl": null,
+        "mediaType": "ExtendedTextMessage",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB02F2AE613EEFCDF8C28",
+        "timestamp": "2026-09-14T03:36:21.043Z",
+        "from": "agent",
+        "text": "Cada etapa ativa ferramentas essenciais para liberar o acesso completo no sistema. Sem concluir o pagamento da etapa atual de R$ 49,90 pelo link que te enviei, o painel não fica 100% liberado. Consegue finalizar pelo link e me enviar o comprovante?",
+        "mediaUrl": null,
+        "mediaType": "ExtendedTextMessage",
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB019E01B16C5BFBCA67B",
+        "timestamp": "2026-09-14T03:36:21.776Z",
+        "from": "agent",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "mediaUrl": null,
+        "mediaType": "ExtendedTextMessage",
+        "instanceId": "uaz_r6b42c61158e910"
       }
-    ]
+    ],
+    "assignedFlowId": "fluxo-espiao-foto",
+    "flowLanguage": "pt",
+    "variables": {
+      "phone": "557196774123",
+      "firstName": ".",
+      "checkoutUrl100": "https://pay.kirvano.com/checkout-100",
+      "checkoutUrl200": "https://pay.kirvano.com/checkout-200",
+      "checkoutUrl400": "https://pay.kirvano.com/checkout-400",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-49",
+      "valor_atual": "49,90",
+      "valor_pago": "0",
+      "proximo_valor": "100",
+      "alvo": "5571993768941",
+      "photoUrl": "https://pps.whatsapp.net/v/t61.24694-24/676868829_5038874773104470_411527520359563466_n.jpg?ccb=11-4&oh=01_Q5Aa5gEvjqwuxuOQK_P7lvwYGYOHVfkN2gzIlLx5KWAdQu1A7Q&oe=6AB49761&_nc_sid=5e03e0&_nc_cat=110"
+    },
+    "upsellStage": "stage_49"
   },
   "551151285383": {
     "leadPhone": "551151285383",

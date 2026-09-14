@@ -9,6 +9,7 @@ const uazapiWebhookRoutes = require('./routes/uazapiWebhook');
 const apiRoutes = require('./routes/api');
 const campaignRoutes = require('./routes/campaignRoutes');
 const domainRoutes = require('./routes/domainRoutes');
+const { startUazapiMessageSyncWorker } = require('./services/uazapiPoller');
 
 const app = express();
 
@@ -138,6 +139,13 @@ app.listen(PORT, () => {
       if (connected) {
         console.log(`[Boot] ✓ Conexão WhatsApp preservada e ativa: ${connected.name} (${connected.numero_conectado || connected.id})`);
       }
-    }).catch(e => console.warn('[Boot] Aviso ao restaurar conexão:', e.message));
+      // Inicia sincronizador contínuo em segundo plano (a cada 3.5s)
+      startUazapiMessageSyncWorker(3500);
+    }).catch(e => {
+      console.warn('[Boot] Aviso ao restaurar conexão:', e.message);
+      startUazapiMessageSyncWorker(3500);
+    });
+  } else {
+    startUazapiMessageSyncWorker(3500);
   }
 });
