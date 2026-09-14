@@ -222,10 +222,13 @@ function handleRoute() {
     container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">Carregando dados...</div>';
   }
 
+  const mainViewport = document.querySelector('.main-viewport');
   if (route === 'inbox') {
     container.classList.add('inbox-view-active');
+    if (mainViewport) mainViewport.classList.add('inbox-active');
   } else {
     container.classList.remove('inbox-view-active');
+    if (mainViewport) mainViewport.classList.remove('inbox-active');
   }
 
   if (route === 'overview') renderOverview();
@@ -1866,9 +1869,25 @@ async function renderInbox(showLoading = true) {
   ]);
   state.chats = chats || {};
   state.flows = flowsRes || [];
-  const phones = Object.keys(state.chats);
 
-  if (!state.activeChatPhone && phones.length > 0) {
+  // Salva a posição de rolagem da lista de contatos para não resetar
+  const oldListEl = document.getElementById('inbox-list');
+  const savedListScroll = oldListEl ? oldListEl.scrollTop : 0;
+
+  // Ordena os contatos pelo horário da última mensagem (mais recentes no topo)
+  const phones = Object.keys(state.chats).sort((a, b) => {
+    const chatA = state.chats[a];
+    const chatB = state.chats[b];
+    const timeA = chatA?.messages?.length > 0
+      ? new Date(chatA.messages[chatA.messages.length - 1].timestamp).getTime()
+      : new Date(chatA?.lastMessageTime || 0).getTime();
+    const timeB = chatB?.messages?.length > 0
+      ? new Date(chatB.messages[chatB.messages.length - 1].timestamp).getTime()
+      : new Date(chatB?.lastMessageTime || 0).getTime();
+    return timeB - timeA;
+  });
+
+  if ((!state.activeChatPhone || !state.chats[state.activeChatPhone]) && phones.length > 0) {
     state.activeChatPhone = phones[0];
   }
 
@@ -2025,13 +2044,15 @@ async function renderInbox(showLoading = true) {
 
   document.getElementById('view-container').innerHTML = html;
 
-  // Auto-scroll mensagens para o final e foca o campo de digitação
+  // Restaura posição de rolagem da lista de contatos para não pular
+  const newListEl = document.getElementById('inbox-list');
+  if (newListEl && savedListScroll > 0) {
+    newListEl.scrollTop = savedListScroll;
+  }
+
+  // Auto-scroll apenas na caixa de mensagens ativas
   const msgContainer = document.getElementById('chat-messages-container');
   if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
-  const replyInput = document.getElementById('chat-reply-input');
-  if (replyInput && document.activeElement !== replyInput && window.innerWidth > 768) {
-    replyInput.focus();
-  }
 
   // Auto-inicia polling de atualização em segundo plano do Inbox (caso SSE oscile)
   if (!window.inboxLivePollingTimer) {
@@ -2040,9 +2061,13 @@ async function renderInbox(showLoading = true) {
         try {
           const freshChats = await fetch('/api/chats').then(r => r.json()).catch(() => null);
           if (freshChats && Object.keys(freshChats).length > 0) {
+            const currentTotal = Object.keys(state.chats || {}).length;
+            const freshTotal = Object.keys(freshChats).length;
             const currentLen = state.chats?.[state.activeChatPhone]?.messages?.length || 0;
             const newLen = freshChats?.[state.activeChatPhone]?.messages?.length || 0;
-            if (newLen !== currentLen || JSON.stringify(freshChats[state.activeChatPhone]?.state) !== JSON.stringify(state.chats?.[state.activeChatPhone]?.state)) {
+            const stateChanged = JSON.stringify(freshChats[state.activeChatPhone]?.state) !== JSON.stringify(state.chats?.[state.activeChatPhone]?.state);
+
+            if (freshTotal !== currentTotal || newLen !== currentLen || stateChanged) {
               state.chats = freshChats;
               renderInbox(false);
             }

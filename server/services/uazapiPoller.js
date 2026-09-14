@@ -63,6 +63,23 @@ async function syncUazapiInstancesNow() {
 
   try {
     const instances = db.getInstances();
+
+    // Auto-detecta e reconecta instâncias ativas na uazapi caso o status local esteja desatualizado
+    for (const inst of instances) {
+      if ((inst.tipo === 'uazapi' || inst.instance_id) && inst.instance_token && inst.status !== 'connected') {
+        try {
+          const decToken = cryptoService.decrypt(inst.instance_token);
+          const serverUrl = inst.url_servidor || 'https://whatsblin.uazapi.com';
+          const statusRes = await uazapiService.getInstanceStatus(serverUrl, decToken);
+          if (statusRes?.status?.connected === true) {
+            console.log(`[uazapi Poller] Instância ${inst.name || inst.id} está conectada no uazapi! Atualizando status local para 'connected'...`);
+            inst.status = 'connected';
+            db.saveInstance(inst);
+          }
+        } catch (e) {}
+      }
+    }
+
     const uazapiConnected = instances.filter(i => (i.tipo === 'uazapi' || i.instance_id) && i.status === 'connected' && i.instance_token);
 
     if (uazapiConnected.length === 0) {
@@ -117,7 +134,7 @@ async function syncUazapiInstancesNow() {
             instanceId: inst.id,
             state: 'NOVO',
             lastMessageTime: parseTimestamp(c.wa_lastMsgTimestamp),
-            lastProcessedTimestamp: remoteTimestampMs || Date.now(),
+            lastProcessedTimestamp: 0,
             messages: []
           };
           const allChats = db.getChats();
@@ -126,8 +143,8 @@ async function syncUazapiInstancesNow() {
           anyUpdate = true;
         }
 
-        // Inicializa watermark se ainda não existir
-        if (!chat.lastProcessedTimestamp) {
+        // Se o chat ainda não tiver watermark ou tiver 0 mensagens, permite processar novas mensagens
+        if (chat.lastProcessedTimestamp === undefined) {
           let maxExistingTs = 0;
           if (Array.isArray(chat.messages) && chat.messages.length > 0) {
             for (const m of chat.messages) {
@@ -135,7 +152,7 @@ async function syncUazapiInstancesNow() {
               if (t > maxExistingTs) maxExistingTs = t;
             }
           }
-          chat.lastProcessedTimestamp = maxExistingTs > 0 ? maxExistingTs : (remoteTimestampMs || Date.now());
+          chat.lastProcessedTimestamp = maxExistingTs;
           const allChats = db.getChats();
           allChats[cleanPhone] = chat;
           db.saveChats(allChats);
@@ -205,9 +222,22 @@ async function syncUazapiInstancesNow() {
             anyUpdate = true;
           } else {
             // Mensagem de entrada do LEAD:
-            // 3. Watermark: Se o timestamp for anterior ou igual ao watermark, é mensagem antiga do histórico!
-            if (msgTimestampMs <= (chat.lastProcessedTimestamp || 0)) {
+            const hasExistingMessages = Array.isArray(chat.messages) && chat.messages.length > 0;
+            const isHistoricalMessage = hasExistingMessages && (msgTimestampMs <= (chat.lastProcessedTimestamp || 0));
+
+            // Se for mensagem de histórico antigo já processada, salva apenas para visualização no painel
+            if (isHistoricalMessage) {
               seenMessageIds.add(msgId);
+              db.addChatMessage(cleanPhone, {
+                id: msgId,
+                timestamp: parseTimestamp(m.messageTimestamp),
+                from: 'lead',
+                text: text || (mediaUrl ? '[Mídia]' : ''),
+                mediaUrl: mediaUrl,
+                mediaType: m.messageType || null,
+                instanceId: inst.id
+              });
+              anyUpdate = true;
               continue;
             }
 

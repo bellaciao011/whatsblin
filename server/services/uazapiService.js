@@ -235,8 +235,6 @@ async function configureWebhook(serverUrl, instanceToken, webhookUrl) {
   }
 }
 
-/**
- * 5. Envio de mensagem de texto
 let lastSendTimestamp = 0;
 
 async function throttleSend(minGapMs = 1500) {

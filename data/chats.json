@@ -4,7 +4,7 @@
     "leadName": ".",
     "instanceId": "uaz_r6b42c61158e910",
     "state": "OFERTA_ENVIADA",
-    "lastMessageTime": "2026-09-14T04:06:43.673Z",
+    "lastMessageTime": "2026-09-14T03:37:35.745Z",
     "messages": [
       {
         "id": "557193768941:3EB0E23CA0C13732D94466",
@@ -197,6 +197,15 @@
         "mediaUrl": null,
         "mediaType": null,
         "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "id": "557193768941:3EB00B2F78507FB89ECC81",
+        "timestamp": "2026-09-14T03:37:35.745Z",
+        "from": "agent",
+        "text": "Tranquilo, qualquer coisa é só chamar 🙂\n\nSe quiser, pode seguir com o pagamento pelo link que já te enviaram e me enviar o comprovante aqui. Estou pronta para ajudar a Descobrir tudo!",
+        "mediaUrl": null,
+        "mediaType": "Queued",
+        "instanceId": "uaz_r6b42c61158e910"
       }
     ],
     "assignedFlowId": "fluxo-espiao-foto",
@@ -233,7 +242,8 @@
         "mediaType": "TemplateMessage",
         "instanceId": "uaz_r6b42c61158e910"
       }
-    ]
+    ],
+    "lastProcessedTimestamp": 1788979152000
   },
   "552120181195": {
     "leadPhone": "552120181195",
@@ -241,7 +251,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-08-26T20:21:20.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1787775680000
   },
   "8618026253750": {
     "leadPhone": "8618026253750",
@@ -249,7 +260,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-07-15T04:29:14.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1784089754000
   },
   "552120181083": {
     "leadPhone": "552120181083",
@@ -257,7 +269,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-07-02T21:17:24.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1783027044000
   },
   "447860098592": {
     "leadPhone": "447860098592",
@@ -265,7 +278,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-06-27T22:53:48.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1782600828000
   },
   "447974905044": {
     "leadPhone": "447974905044",
@@ -273,7 +287,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-06-06T02:44:29.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1780713869000
   },
   "553193604503": {
     "leadPhone": "553193604503",
@@ -281,7 +296,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T17:45:05.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779817505000
   },
   "556798384290": {
     "leadPhone": "556798384290",
@@ -289,7 +305,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T17:43:08.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779817388000
   },
   "554796454328": {
     "leadPhone": "554796454328",
@@ -297,7 +314,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T16:57:31.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779814651000
   },
   "556384332389": {
     "leadPhone": "556384332389",
@@ -305,7 +323,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T16:38:35.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779813515000
   },
   "554191043141": {
     "leadPhone": "554191043141",
@@ -313,7 +332,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T16:10:05.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779811805000
   },
   "558899846695": {
     "leadPhone": "558899846695",
@@ -321,7 +341,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T14:37:04.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779806224000
   },
   "558695024048": {
     "leadPhone": "558695024048",
@@ -329,7 +350,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T14:22:59.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779805379000
   },
   "555596287306": {
     "leadPhone": "555596287306",
@@ -337,7 +359,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T14:22:53.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779805373000
   },
   "5516997956583": {
     "leadPhone": "5516997956583",
@@ -345,15 +368,48 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T07:01:39.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779778899000
   },
   "556182615172": {
     "leadPhone": "556182615172",
     "leadName": "Lead +556182615172",
     "instanceId": "uaz_r6b42c61158e910",
-    "state": "NOVO",
-    "lastMessageTime": "2026-05-26T06:15:24.000Z",
-    "messages": []
+    "state": "AGUARDANDO_NUMERO",
+    "lastMessageTime": "2026-09-14T04:17:17.790Z",
+    "messages": [
+      {
+        "id": "557193768941:3A9A162BC993EB52911B",
+        "timestamp": "2026-09-14T04:11:18.000Z",
+        "from": "lead",
+        "text": "Oi",
+        "mediaUrl": null,
+        "mediaType": null,
+        "instanceId": "uaz_r6b42c61158e910"
+      },
+      {
+        "from": "bot",
+        "text": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova",
+        "instanceId": "uaz_r6b42c61158e910",
+        "id": "msg_1789359437790_296",
+        "timestamp": "2026-09-14T04:17:17.790Z"
+      }
+    ],
+    "lastProcessedTimestamp": 1789359078000,
+    "assignedFlowId": "fluxo-espiao-foto",
+    "flowLanguage": "pt",
+    "variables": {
+      "phone": "556182615172",
+      "firstName": "Lead",
+      "checkoutUrl100": "https://pay.kirvano.com/checkout-100",
+      "checkoutUrl200": "https://pay.kirvano.com/checkout-200",
+      "checkoutUrl400": "https://pay.kirvano.com/checkout-400",
+      "checkoutUrl": "https://pay.kirvano.com/checkout-49",
+      "valor_atual": "49,90",
+      "valor_pago": "0",
+      "proximo_valor": "100"
+    },
+    "upsellStage": "stage_49"
   },
   "447710173736": {
     "leadPhone": "447710173736",
@@ -361,7 +417,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-05-26T05:21:24.000Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1779772884000
   },
   "5511958100425": {
     "leadPhone": "5511958100425",
@@ -369,7 +426,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:06.159Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359357261
   },
   "5511966126359": {
     "leadPhone": "5511966126359",
@@ -377,7 +435,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:06.350Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359357457
   },
   "5514998085421": {
     "leadPhone": "5514998085421",
@@ -385,7 +444,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:06.541Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359357653
   },
   "5514999098375": {
     "leadPhone": "5514999098375",
@@ -393,7 +453,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:06.732Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359357848
   },
   "5518981206783": {
     "leadPhone": "5518981206783",
@@ -401,7 +462,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:06.923Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359358049
   },
   "5518997038772": {
     "leadPhone": "5518997038772",
@@ -409,7 +471,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:07.114Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359358245
   },
   "5519983059703": {
     "leadPhone": "5519983059703",
@@ -417,7 +480,8 @@
     "instanceId": "uaz_r6b42c61158e910",
     "state": "NOVO",
     "lastMessageTime": "2026-09-14T02:16:07.305Z",
-    "messages": []
+    "messages": [],
+    "lastProcessedTimestamp": 1789359358441
   },
   "5519992698829": {
     "leadPhone": "5519992698829",

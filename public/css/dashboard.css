@@ -546,23 +546,31 @@ body {
 }
 
 /* Live Chat Layout */
+.main-viewport:has(.inbox-view-active),
+.main-viewport.inbox-active {
+  overflow: hidden !important;
+}
+
 .view-content:has(.inbox-container),
 .view-content.inbox-view-active {
-  padding: 12px 20px !important;
+  padding: 10px 16px !important;
   max-width: 100% !important;
   height: calc(100vh - 70px) !important;
+  max-height: calc(100vh - 70px) !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
 .inbox-container {
   display: grid;
   grid-template-columns: 320px 1fr;
   height: 100% !important;
-  max-height: calc(100vh - 94px) !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: hidden !important;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
 }
 
@@ -570,17 +578,25 @@ body {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
   background: rgba(15, 20, 32, 0.5);
 }
 
 .inbox-search {
-  padding: 14px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .chat-list {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
 }
 
 .chat-item {
