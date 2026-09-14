@@ -85,7 +85,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </span>
             <span>Conexões (Chips)</span>
-            <span class="nav-badge" id="badge-chips">1</span>
+            <span class="nav-badge" id="badge-chips">0</span>
           </a>
         </li>
         <li>
@@ -295,17 +295,121 @@
 
       <!-- Container Configuração API Web (uazapi) -->
       <div id="section-web-uazapi" style="display: none;">
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label class="form-label" style="font-size: 12px;">URL do Servidor uazapi</label>
-          <input type="text" class="form-input" id="uazapi-url" placeholder="https://api.uazapi.com">
+        <!-- Inputs de Configuração -->
+        <div id="uazapi-form-inputs">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" style="font-size: 12px; display: flex; justify-content: space-between;">
+              <span>URL do Servidor uazapi *</span>
+              <span style="font-size: 11px; color: #38bdf8;">Padrão: free.uazapi.com</span>
+            </label>
+            <input type="text" class="form-input" id="uazapi-url" value="https://free.uazapi.com" placeholder="https://free.uazapi.com">
+          </div>
+
+          <!-- Tipo de Instância: Criar Nova vs Existente -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-size: 12px;">Origem da Instância</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
+                <input type="radio" name="uazapi-mode" id="uazapi-mode-create" value="create" checked onchange="toggleUazapiMode(this.value)">
+                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">Criar Nova</span>
+              </label>
+              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
+                <input type="radio" name="uazapi-mode" id="uazapi-mode-key" value="key" onchange="toggleUazapiMode(this.value)">
+                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">Já Tenho Chave</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Campo Token Mestre (exibido se escolher "Criar Nova") -->
+          <div class="form-group" id="group-uazapi-admintoken" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-size: 12px; display: flex; justify-content: space-between;">
+              <span>Token Mestre do Servidor (admintoken) *</span>
+              <span style="font-size: 10.5px; color: #f59e0b;">Exigido para criar instâncias</span>
+            </label>
+            <input type="password" class="form-input" id="uazapi-admintoken" placeholder="Insira o admintoken da sua conta uazapi">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Necessário para criar uma instância do zero. Se a instância já existe no painel da uazapi, selecione <strong>"Já Tenho Chave"</strong> acima.
+            </div>
+          </div>
+
+          <!-- Campo Chave da Instância (exibido apenas se escolher "Já Tenho Chave") -->
+          <div class="form-group" id="group-uazapi-key" style="display: none; margin-bottom: 14px;">
+            <label class="form-label" style="font-size: 12px;">API Key da Instância (token) *</label>
+            <input type="password" class="form-input" id="uazapi-key" placeholder="Chave da instância existente">
+          </div>
+
+          <!-- Método de Pareamento: QR Code vs Código por Telefone -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" style="font-size: 12px;">Método de Conexão</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
+                <input type="radio" name="uazapi-connect-type" id="uazapi-type-qr" value="qr" checked onchange="toggleUazapiConnectType(this.value)">
+                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">📷 QR Code</span>
+              </label>
+              <label class="leona-switch-row" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02);">
+                <input type="radio" name="uazapi-connect-type" id="uazapi-type-phone" value="phone" onchange="toggleUazapiConnectType(this.value)">
+                <span style="font-size: 12px; font-weight: 600; color: #fff; margin-left: 6px;">🔢 Código Número</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Campo Telefone (se escolher Código Número) -->
+          <div class="form-group" id="group-uazapi-phone" style="display: none; margin-bottom: 16px;">
+            <label class="form-label" style="font-size: 12px;">Telefone com DDI + DDD (ex: 5511999999999)</label>
+            <input type="text" class="form-input" id="uazapi-phone-input" placeholder="5511999999999">
+          </div>
         </div>
-        <div class="form-group" style="margin-bottom: 18px;">
-          <label class="form-label" style="font-size: 12px;">API Key da Instância</label>
-          <input type="password" class="form-input" id="uazapi-key" placeholder="Sua chave de autenticação">
+
+        <!-- Área Dinâmica de Conexão em Tempo Real (QR Code / Pareamento) -->
+        <div id="uazapi-live-area" style="display: none; margin-top: 10px; margin-bottom: 16px; text-align: center;">
+          <!-- Status Banner -->
+          <div id="uazapi-status-box" style="padding: 10px 14px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px;">
+            <div class="spinner" id="uazapi-status-spinner" style="width: 16px; height: 16px; border-width: 2px; margin: 0;"></div>
+            <span id="uazapi-status-text" style="color: #93c5fd; font-weight: 600;">Iniciando conexão na uazapi...</span>
+          </div>
+
+          <!-- Container do QR Code -->
+          <div id="uazapi-qr-container" style="background: #ffffff; padding: 14px; border-radius: 12px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.5); min-width: 230px; min-height: 230px; vertical-align: middle;">
+            <div id="uazapi-qr-placeholder" style="display: none; padding: 55px 15px; color: #334155; text-align: center;">
+              <div class="spinner" style="width: 32px; height: 32px; border-width: 3px; border-color: #3b82f6; border-top-color: transparent; margin: 0 auto 12px;"></div>
+              <div style="font-size: 13px; font-weight: 700; color: #0f172a;">Gerando QR Code...</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Aguardando retorno da uazapi</div>
+            </div>
+            <img id="uazapi-qr-img" src="" alt="QR Code WhatsApp" style="width: 210px; height: 210px; display: block; object-fit: contain; margin: 0 auto;">
+          </div>
+
+          <!-- Container do Código de Pareamento por Telefone -->
+          <div id="uazapi-paircode-container" style="display: none; padding: 18px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; margin: 10px auto; max-width: 300px;">
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px;">Digite este código no WhatsApp do celular:</div>
+            <div id="uazapi-paircode-text" style="font-family: monospace; font-size: 24px; font-weight: 800; letter-spacing: 4px; color: #10b981;">------</div>
+          </div>
+
+          <!-- Barra de Timeout e Alerta de Renovação -->
+          <div style="margin-top: 12px;">
+            <div id="uazapi-timer-text" style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">
+              ⏱️ QR Code expira em: <span id="uazapi-timer-val" style="color: #f59e0b;">02:00</span>
+            </div>
+            <div id="uazapi-refresh-notice" style="display: none; margin-top: 6px; font-size: 11.5px; color: #fb923c; font-weight: 700; animation: pulse 1.5s infinite;">
+              🔄 QR Code expirado, gerando novo automaticamente...
+            </div>
+          </div>
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()">Cancelar</button>
-          <button type="button" class="btn btn-primary" onclick="handleSaveUazapi()">Conectar uazapi</button>
+
+        <!-- Alerta de Erro Detalhado -->
+        <div id="uazapi-error-alert" style="display: none; margin-bottom: 16px; padding: 12px 14px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 10px; font-size: 12px; color: #fca5a5; line-height: 1.45; text-align: left;">
+          <div style="font-weight: 700; margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️ Falha na Conexão</span>
+          </div>
+          <div id="uazapi-error-message">Detalhes do erro aqui.</div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+          <button type="button" class="btn btn-secondary" id="btn-uazapi-back" onclick="backToUazapiForm()" style="display: none; border-radius: 10px; padding: 10px 18px;">← Voltar</button>
+          <button type="button" class="btn btn-secondary" onclick="closeAddChipModal()" style="border-radius: 10px; padding: 10px 18px;">Fechar</button>
+          <button type="button" class="btn btn-primary" id="btn-connect-uazapi" onclick="handleSaveUazapi()" style="border-radius: 10px; padding: 10px 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span id="btn-uazapi-text">Conectar uazapi</span>
+          </button>
         </div>
       </div>
 
@@ -336,7 +440,7 @@
 
   <div id="fb-root"></div>
   <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
-  <script src="/js/flowBuilder.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/flowBuilder.js?v=20260914_uazapi_v3"></script>
+  <script src="/js/app.js?v=20260914_uazapi_v3"></script>
 </body>
 </html>

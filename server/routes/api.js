@@ -8,6 +8,8 @@ const { processIncomingMessage, lookupProfilePicture, eventBus } = require('../s
 const metaService = require('../services/metaService');
 const tiktokService = require('../services/tiktokService');
 const authService = require('../services/authService');
+const uazapiService = require('../services/uazapiService');
+const cryptoService = require('../services/cryptoService');
 
 /**
  * =========================================================================
@@ -83,25 +85,54 @@ router.get('/stats', (req, res) => {
 });
 
 /**
+ * Helper para construir a URL pública do Webhook para registro na uazapi
+ */
+function getPublicWebhookUrl(req) {
+  const settings = db.getSettings();
+  if (settings.webhookBaseUrl && String(settings.webhookBaseUrl).startsWith('http')) {
+    return `${settings.webhookBaseUrl.replace(/\/+$/, '')}/api/webhooks/uazapi`;
+  }
+  const host = req.get('host') || 'localhost:3000';
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+  return `${proto}://${host}/api/webhooks/uazapi`;
+}
+
+/**
  * Instâncias / Chips (CRUD)
  */
 router.get('/instances', (req, res) => {
-  res.json(db.getInstances());
+  const instances = db.getInstances();
+  // Mascara tokens para não expor segredos sensíveis no frontend
+  const safe = instances.map(i => {
+    const copy = { ...i };
+    if (copy.instance_token) {
+      copy.hasInstanceToken = true;
+      copy.instance_token = '••••••••';
+    }
+    if (copy.accessToken) {
+      copy.hasAccessToken = true;
+      copy.accessToken = '••••••••';
+    }
+    return copy;
+  });
+  res.json(safe);
 });
 
 router.post('/instances', (req, res) => {
   const instances = db.getInstances();
-  const { name, phoneNumber, phoneNumberId, wabaId, accessToken, assignedFlowId } = req.body;
+  const { name, phoneNumber, phoneNumberId, wabaId, accessToken, assignedFlowId, tipo, url_servidor } = req.body;
 
   const newInst = {
     id: req.body.id || `inst_${Date.now()}`,
     name: name || 'Novo Chip',
+    tipo: tipo || 'meta',
+    url_servidor: url_servidor || '',
     phoneNumber: phoneNumber || '',
     phoneNumberId: phoneNumberId || '',
     wabaId: wabaId || '',
     accessToken: accessToken || '',
     assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
-    status: accessToken && phoneNumberId ? 'connected' : 'disconnected',
+    status: (accessToken && phoneNumberId) ? 'connected' : 'disconnected',
     totalSent: 0,
     totalReceived: 0,
     createdAt: new Date().toISOString()
@@ -134,11 +165,337 @@ router.patch('/instances/:id/flow', (req, res) => {
   res.json({ success: true, instance: inst });
 });
 
-router.delete('/instances/:id', (req, res) => {
+router.delete('/instances/:id', async (req, res) => {
   let instances = db.getInstances();
-  instances = instances.filter(i => i.id !== req.params.id);
+  const target = instances.find(i => i.id === req.params.id || i.instance_id === req.params.id);
+  
+  if (target && target.tipo === 'uazapi' && target.instance_token) {
+    try {
+      const decToken = cryptoService.decrypt(target.instance_token);
+      await uazapiService.disconnectInstance(target.url_servidor, decToken);
+    } catch (e) {
+      console.warn('[Instances] Aviso ao desconectar uazapi no delete:', e.message);
+    }
+  }
+
+  instances = instances.filter(i => i.id !== req.params.id && i.instance_id !== req.params.id);
   db.saveInstances(instances);
   res.json({ success: true });
+});
+
+/**
+ * =========================================================================
+ * ENDPOINTS uazapi (WHATSAPP API WEB)
+ * =========================================================================
+ */
+
+/**
+ * Inicia o fluxo de conexão da uazapi:
+ * 1. Cria a instância se necessário (usando UAZAPI_ADMIN_TOKEN) OU valida chave existente
+/**
+ * Helpers para extração flexível e robusta de QR code, paircode e número conectado
+ * Compatível com múltiplos formatos e versões da uazapi / Baileys
+ */
+function extractQrCode(primaryObj, fallbackObj) {
+  const getVal = (obj) => {
+    if (!obj) return null;
+    return obj.qrcode || 
+           obj.instance?.qrcode || 
+           obj.base64 || 
+           obj.instance?.base64 || 
+           obj.qr || 
+           obj.instance?.qr || 
+           (typeof obj.status === 'object' ? (obj.status?.qrcode || obj.status?.base64) : null) || 
+           null;
+  };
+  return getVal(primaryObj) || getVal(fallbackObj) || null;
+}
+
+function extractPairCode(primaryObj, fallbackObj) {
+  const getVal = (obj) => {
+    if (!obj) return null;
+    return obj.paircode || 
+           obj.instance?.paircode || 
+           (typeof obj.status === 'object' ? obj.status?.paircode : null) || 
+           null;
+  };
+  return getVal(primaryObj) || getVal(fallbackObj) || null;
+}
+
+function extractConnectedUser(statusRes, connectRes) {
+  return statusRes?.status?.jid?.user ||
+         statusRes?.jid?.user ||
+         statusRes?.instance?.numero_conectado ||
+         connectRes?.jid?.user ||
+         connectRes?.instance?.numero_conectado ||
+         null;
+}
+
+/**
+ * 1. POST /api/uazapi/init-connect
+ * Fluxo de inicialização de conexão uazapi:
+ * - Se fornecida API Key (instanceKey), valida na uazapi com GET /instance/status
+ * - Se não fornecida API Key, cria nova instância usando Token Mestre (admintoken)
+ * - Dispara POST /instance/connect para iniciar socket e geração de QR code
+ * - Salva conexão no banco local (instances.json) com status 'connecting'
+ * - Retorna QR code, paircode e status real
+ */
+router.post('/uazapi/init-connect', async (req, res) => {
+  try {
+    const { name, serverUrl, instanceKey, phone, assignedFlowId, adminToken: inputAdminToken } = req.body;
+    const cleanName = (name || 'Conexão uazapi').trim();
+    const cleanServerUrl = uazapiService.normalizeServerUrl(serverUrl || 'https://free.uazapi.com');
+    const cleanPhone = phone ? String(phone).replace(/\D/g, '') : null;
+
+    let instanceToken = '';
+    let instanceId = '';
+
+    // 1. Identifica se usa uma API Key existente ou se precisa criar uma nova instância
+    if (instanceKey && String(instanceKey).trim()) {
+      instanceToken = String(instanceKey).trim();
+      console.log(`[uazapi Init] Validando API Key de instância informada pelo usuário em ${cleanServerUrl}...`);
+      
+      try {
+        const checkStatus = await uazapiService.getInstanceStatus(cleanServerUrl, instanceToken);
+        instanceId = checkStatus.instance?.id || `uaz_${Date.now()}`;
+        console.log(`[uazapi Init] ✓ API Key válida para instância: ${instanceId}`);
+      } catch (err) {
+        return res.status(err.details?.status || 400).json({
+          success: false,
+          error: `Falha ao validar a API Key da instância fornecida: ${err.message}`,
+          details: err.details
+        });
+      }
+    } else {
+      // Cria programaticamente com o Token Mestre (admintoken)
+      const settings = db.getSettings();
+      const adminToken = (inputAdminToken && String(inputAdminToken).trim()) || process.env.UAZAPI_ADMIN_TOKEN || settings.uazapiAdminToken;
+
+      if (!adminToken) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token Mestre do servidor (admintoken) não informado. Para criar uma nova instância na uazapi é obrigatório fornecer o admintoken da sua conta. Caso sua instância já exista, selecione a opção "Já Tenho Chave" e informe a API Key (token).',
+          code: 'MISSING_ADMIN_TOKEN'
+        });
+      }
+
+      if (inputAdminToken && String(inputAdminToken).trim() && inputAdminToken !== settings.uazapiAdminToken) {
+        settings.uazapiAdminToken = String(inputAdminToken).trim();
+        db.saveSettings(settings);
+      }
+
+      const createRes = await uazapiService.createInstance(cleanServerUrl, adminToken, cleanName);
+      instanceToken = createRes.token;
+      instanceId = createRes.instance?.id || `uaz_${Date.now()}`;
+      console.log(`[uazapi Init] ✓ Instância criada na uazapi com sucesso! ID: ${instanceId}`);
+    }
+
+    // 2. Dispara a conexão (inicia geração do QR code ou código de pareamento)
+    console.log(`[uazapi Init] Chamando /instance/connect para ${instanceId}...`);
+    const connectRes = await uazapiService.connectInstance(cleanServerUrl, instanceToken, { phone: cleanPhone });
+
+    // Pequeno intervalo para a uazapi disponibilizar o QR code no status
+    await new Promise(r => setTimeout(r, 650));
+
+    // 3. Obtém o status da instância com o QR code gerado
+    let statusRes = null;
+    try {
+      statusRes = await uazapiService.getInstanceStatus(cleanServerUrl, instanceToken);
+    } catch (statusErr) {
+      console.warn(`[uazapi Init] Status inicial pós-connect: ${statusErr.message}`);
+      statusRes = { status: { connected: false, loggedIn: false } };
+    }
+
+    // Identifica se realmente há um número de WhatsApp conectado
+    const connectedUser = extractConnectedUser(statusRes, connectRes);
+    const isFullyConnected = Boolean(
+      (statusRes?.status?.connected || statusRes?.connected || connectRes?.connected) &&
+      (statusRes?.status?.loggedIn || statusRes?.loggedIn || connectRes?.loggedIn || statusRes?.instance?.status === 'connected') &&
+      connectedUser
+    );
+
+    // Extrai QR code e paircode de qualquer campo retornado pela uazapi
+    const qrcode = extractQrCode(statusRes, connectRes);
+    const paircode = extractPairCode(statusRes, connectRes);
+
+    // Criptografa o token da instância antes de salvar (AES-256-GCM)
+    const encryptedToken = cryptoService.encrypt(instanceToken);
+
+    // Persistência na tabela de conexões/instâncias (db.js / instances.json)
+    const connectionId = `uaz_${instanceId}`;
+    const newConnection = {
+      id: connectionId,
+      name: cleanName,
+      tipo: 'uazapi',
+      url_servidor: cleanServerUrl,
+      instance_id: instanceId,
+      instance_token: encryptedToken,
+      phoneNumber: connectedUser || cleanPhone || '',
+      numero_conectado: connectedUser || '',
+      status: isFullyConnected ? 'connected' : 'connecting',
+      assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
+      totalSent: 0,
+      totalReceived: 0,
+      criado_em: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+
+    db.saveInstance(newConnection);
+    console.log(`[uazapi Init] ✓ Instância salva no sistema local com status: ${newConnection.status}`);
+
+    // Se a instância já estava autenticada anteriormente, ativa o webhook
+    if (isFullyConnected) {
+      const webhookUrl = getPublicWebhookUrl(req);
+      uazapiService.configureWebhook(cleanServerUrl, instanceToken, webhookUrl).catch(e => {
+        console.warn('[uazapi Init] Aviso ao configurar webhook para instância pré-conectada:', e.message);
+      });
+    }
+
+    res.json({
+      success: true,
+      instanceId: connectionId,
+      uazapiInstanceId: instanceId,
+      qrcode,
+      paircode,
+      connected: isFullyConnected,
+      numero_conectado: connectedUser || '',
+      status: statusRes?.status || { connected: isFullyConnected, loggedIn: isFullyConnected }
+    });
+  } catch (err) {
+    console.error('[uazapi Init Error]', err);
+    res.status(err.details?.status || 500).json({
+      success: false,
+      error: err.message || 'Falha ao iniciar conexão com a uazapi',
+      details: err.details
+    });
+  }
+});
+
+/**
+ * Consulta o status da instância em polling (a cada 2-3s)
+ * Se connected: true e loggedIn: true e número autenticado:
+ * - Atualiza status no banco para 'connected'
+ * - Salva numero_conectado a partir de status.jid.user
+ * - Configura automaticamente o webhook na uazapi com excludeMessages: ["wasSentByApi"]
+ */
+router.get('/uazapi/status/:instanceId', async (req, res) => {
+  try {
+    const inst = db.getInstance(req.params.instanceId);
+    if (!inst) {
+      return res.status(404).json({ success: false, error: 'Conexão não encontrada no sistema' });
+    }
+
+    if (inst.tipo !== 'uazapi') {
+      return res.json({
+        success: true,
+        connected: inst.status === 'connected',
+        instance: { id: inst.id, name: inst.name, status: inst.status }
+      });
+    }
+
+    const decryptedToken = cryptoService.decrypt(inst.instance_token);
+    const statusRes = await uazapiService.getInstanceStatus(inst.url_servidor, decryptedToken);
+
+    const connectedUser = extractConnectedUser(statusRes, null);
+    const isFullyConnected = Boolean(
+      (statusRes?.status?.connected || statusRes?.connected) &&
+      (statusRes?.status?.loggedIn || statusRes?.loggedIn || statusRes?.instance?.status === 'connected') &&
+      connectedUser
+    );
+
+    if (isFullyConnected) {
+      inst.status = 'connected';
+      inst.numero_conectado = connectedUser;
+      inst.phoneNumber = connectedUser;
+      db.saveInstance(inst);
+
+      // Configuração automática do Webhook em Modo Simples
+      try {
+        const webhookUrl = getPublicWebhookUrl(req);
+        await uazapiService.configureWebhook(inst.url_servidor, decryptedToken, webhookUrl);
+        console.log(`[uazapi Status] ✓ Webhook configurado com sucesso para ${inst.name}: ${webhookUrl}`);
+      } catch (webhookErr) {
+        console.warn(`[uazapi Status] Aviso ao configurar webhook: ${webhookErr.message}`);
+      }
+    } else {
+      if (inst.status !== 'connecting') {
+        inst.status = 'connecting';
+        db.saveInstance(inst);
+      }
+    }
+
+    const qrcode = extractQrCode(statusRes, null);
+    const paircode = extractPairCode(statusRes, null);
+
+    res.json({
+      success: true,
+      connected: isFullyConnected,
+      loggedIn: isFullyConnected,
+      numero_conectado: connectedUser || inst.numero_conectado || '',
+      qrcode,
+      paircode,
+      status: statusRes?.status || {},
+      instance: {
+        id: inst.id,
+        name: inst.name,
+        numero_conectado: inst.numero_conectado,
+        status: inst.status
+      }
+    });
+  } catch (err) {
+    console.error('[uazapi Status Error]', err);
+    res.status(err.details?.status || 500).json({
+      success: false,
+      error: err.message || 'Falha ao consultar status da uazapi',
+      details: err.details
+    });
+  }
+});
+
+/**
+ * Renovação automática do QR Code quando atingir o timeout de 2 minutos
+ */
+router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
+  try {
+    const inst = db.getInstance(req.params.instanceId);
+    if (!inst || inst.tipo !== 'uazapi') {
+      return res.status(404).json({ success: false, error: 'Instância uazapi não encontrada' });
+    }
+
+    const decryptedToken = cryptoService.decrypt(inst.instance_token);
+    console.log(`[uazapi Refresh] Renovando QR Code após timeout de 2 minutos para ${inst.name}...`);
+    
+    // Dispara nova conexão para gerar QR Code novo
+    const connectRes = await uazapiService.connectInstance(inst.url_servidor, decryptedToken);
+    await new Promise(r => setTimeout(r, 650));
+    
+    const statusRes = await uazapiService.getInstanceStatus(inst.url_servidor, decryptedToken);
+
+    const connectedUser = extractConnectedUser(statusRes, connectRes);
+    const isFullyConnected = Boolean(
+      (statusRes?.status?.connected || statusRes?.connected) &&
+      (statusRes?.status?.loggedIn || statusRes?.loggedIn) &&
+      connectedUser
+    );
+
+    const qrcode = extractQrCode(statusRes, connectRes);
+    const paircode = extractPairCode(statusRes, connectRes);
+
+    res.json({
+      success: true,
+      qrcode,
+      paircode,
+      connected: isFullyConnected,
+      status: statusRes?.status || {}
+    });
+  } catch (err) {
+    console.error('[uazapi Refresh Error]', err);
+    res.status(err.details?.status || 500).json({
+      success: false,
+      error: err.message || 'Falha ao renovar QR Code da uazapi',
+      details: err.details
+    });
+  }
 });
 
 /**
@@ -172,8 +529,15 @@ router.post('/chats/:phone/send', async (req, res) => {
     instanceId: instance.id
   });
 
-  // Envia via Meta se o chip estiver conectado
-  if (instance.accessToken && instance.phoneNumberId) {
+  // Envia a mensagem dependendo do tipo da conexão (uazapi ou Meta)
+  if (instance.tipo === 'uazapi' && instance.instance_token) {
+    try {
+      const decToken = cryptoService.decrypt(instance.instance_token);
+      await uazapiService.sendTextMessage(instance.url_servidor, decToken, phone, text);
+    } catch (e) {
+      console.error('[API Send] Falha ao enviar texto via uazapi:', e.message);
+    }
+  } else if (instance.accessToken && instance.phoneNumberId) {
     await metaService.sendTextMessage(instance.phoneNumberId, instance.accessToken, phone, text);
   }
 

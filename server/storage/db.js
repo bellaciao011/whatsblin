@@ -32,6 +32,39 @@ function writeJson(filename, data) {
 module.exports = {
   getInstances: () => readJson('instances.json', []),
   saveInstances: (data) => writeJson('instances.json', data),
+  getInstance: (id) => {
+    const instances = readJson('instances.json', []);
+    return instances.find(i => i.id === id || i.instance_id === id || i.phoneNumberId === id) || null;
+  },
+  saveInstance: (instanceData) => {
+    const instances = readJson('instances.json', []);
+    const idx = instances.findIndex(i => i.id === instanceData.id || (instanceData.instance_id && i.instance_id === instanceData.instance_id));
+    if (idx >= 0) {
+      instances[idx] = { ...instances[idx], ...instanceData };
+    } else {
+      instances.push(instanceData);
+    }
+    writeJson('instances.json', instances);
+    return idx >= 0 ? instances[idx] : instanceData;
+  },
+  deleteInstance: (id) => {
+    const instances = readJson('instances.json', []);
+    const filtered = instances.filter(i => i.id !== id && i.instance_id !== id);
+    writeJson('instances.json', filtered);
+    return true;
+  },
+  getWhatsAppConnections: () => readJson('instances.json', []),
+  saveWhatsAppConnection: (connectionData) => {
+    const instances = readJson('instances.json', []);
+    const idx = instances.findIndex(i => i.id === connectionData.id || (connectionData.instance_id && i.instance_id === connectionData.instance_id));
+    if (idx >= 0) {
+      instances[idx] = { ...instances[idx], ...connectionData };
+    } else {
+      instances.push(connectionData);
+    }
+    writeJson('instances.json', instances);
+    return idx >= 0 ? instances[idx] : connectionData;
+  },
   
   getFunnel: () => readJson('funnel.json', {}),
   saveFunnel: (data) => writeJson('funnel.json', data),

@@ -1,0 +1,358 @@
+const axios = require('axios');
+
+/**
+ * Normaliza URL do servidor uazapi removendo barras finais
+ */
+function normalizeServerUrl(url) {
+  if (!url || typeof url !== 'string') return 'https://free.uazapi.com';
+  let clean = url.trim().replace(/\/+$/, '');
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    clean = 'https://' + clean;
+  }
+  return clean;
+}
+
+/**
+ * Trata erros de API da uazapi conforme especificação OpenAPI oficial
+ * - 401: Token inválido/expirado
+ * - 404: Instância não encontrada
+ * - 429: Limite de conexões simultâneas atingido
+ * - 503: Capacidade temporariamente indisponível (com leitura de Retry-After)
+ */
+function parseApiError(err) {
+  if (!err.response) {
+    return {
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: `Falha de conexão com o servidor uazapi: ${err.message || 'Servidor inacessível ou timeout'}`
+    };
+  }
+
+  const status = err.response.status;
+  const data = err.response.data || {};
+  const headers = err.response.headers || {};
+  const rawMsg = data.error || data.message || data.msg || '';
+
+  if (status === 401) {
+    return {
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Autenticação recusada (401): Token inválido ou expirado. Verifique as credenciais da instância ou o Token Mestre (admintoken).'
+    };
+  }
+
+  if (status === 404) {
+    return {
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Instância não encontrada (404) no servidor uazapi especificado.'
+    };
+  }
+
+  if (status === 429) {
+    return {
+      status: 429,
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Limite de conexões simultâneas ou requisições atingido (429). Aguarde alguns instantes antes de tentar novamente.'
+    };
+  }
+
+  if (status === 503) {
+    // A doc OpenAPI informa que vem o header Retry-After em segundos
+    const retryAfterHeader = headers['retry-after'] || headers['Retry-After'];
+    const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 5;
+    return {
+      status: 503,
+      code: 'SERVICE_UNAVAILABLE',
+      retryAfter: isNaN(retryAfter) ? 5 : retryAfter,
+      message: `Capacidade de conexão temporariamente indisponível (503). O servidor solicitou aguardar ${retryAfter} segundo(s) para tentar novamente.`
+    };
+  }
+
+  return {
+    status,
+    code: 'API_ERROR',
+    message: rawMsg || `Erro ${status} retornado pela uazapi.`
+  };
+}
+
+/**
+ * 1. Cria uma nova instância no servidor uazapi
+ * Requer admintoken no header
+ * POST /instance/create
+ * Body: { name: string }
+ */
+async function createInstance(serverUrl, adminToken, name) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!adminToken) {
+    throw new Error('O Token Mestre (admintoken) não foi configurado. Defina UAZAPI_ADMIN_TOKEN no ambiente ou insira a chave da instância.');
+  }
+
+  try {
+    console.log(`[uazapiService] Criando instância "${name}" em ${baseUrl}/instance/create...`);
+    const res = await axios.post(
+      `${baseUrl}/instance/create`,
+      { name: name.trim() },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'admintoken': adminToken.trim()
+        },
+        timeout: 15000
+      }
+    );
+
+    // Resposta padrão: { token: "...", instance: { id: "...", status: "disconnected", ... } }
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao criar instância:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 2. Inicia o fluxo de conexão da instância
+ * Requer token de instância no header
+ * POST /instance/connect
+ * Body: {} (gera QR code) OU { phone: "5511999999999" } (gera código de pareamento)
+ */
+async function connectInstance(serverUrl, instanceToken, options = {}) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) {
+    throw new Error('Token da instância não informado.');
+  }
+
+  const body = {};
+  if (options.phone && String(options.phone).trim()) {
+    body.phone = String(options.phone).replace(/\D/g, '');
+  }
+
+  try {
+    console.log(`[uazapiService] Solicitando conexão para a instância em ${baseUrl}/instance/connect...`);
+    const res = await axios.post(
+      `${baseUrl}/instance/connect`,
+      body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 15000
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao conectar instância:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 3. Consulta status atual da instância e QR code atualizado
+ * Requer token de instância no header
+ * GET /instance/status
+ */
+async function getInstanceStatus(serverUrl, instanceToken) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) {
+    throw new Error('Token da instância não informado.');
+  }
+
+  try {
+    const res = await axios.get(
+      `${baseUrl}/instance/status`,
+      {
+        headers: {
+          'token': instanceToken.trim()
+        },
+        timeout: 10000
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao obter status da instância:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 4. Configura webhook da instância em Modo Simples (sem id/action)
+ * POST /webhook
+ * Body: {
+ *   url: "https://SEUDOMINIO/api/webhooks/uazapi",
+ *   events: ["messages", "connection"],
+ *   excludeMessages: ["wasSentByApi"]
+ * }
+ */
+async function configureWebhook(serverUrl, instanceToken, webhookUrl) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) {
+    throw new Error('Token da instância não informado.');
+  }
+  if (!webhookUrl) {
+    throw new Error('URL de webhook não informada.');
+  }
+
+  const payload = {
+    url: webhookUrl,
+    events: ['messages', 'connection'],
+    excludeMessages: ['wasSentByApi']
+  };
+
+  try {
+    console.log(`[uazapiService] Configurando webhook da instância em ${baseUrl}/webhook -> ${webhookUrl}...`);
+    const res = await axios.post(
+      `${baseUrl}/webhook`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 12000
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao configurar webhook:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 5. Envio de mensagem de texto
+ * POST /send/text
+ * Body: { number: "5511999999999", text: "..." }
+ */
+async function sendTextMessage(serverUrl, instanceToken, number, text) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) throw new Error('Token da instância não informado.');
+  if (!number) throw new Error('Número de destino não informado.');
+  if (!text) throw new Error('Conteúdo da mensagem não informado.');
+
+  const cleanNumber = String(number).replace(/\D/g, '');
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/send/text`,
+      {
+        number: cleanNumber,
+        text: String(text)
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 15000
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao enviar texto para ${cleanNumber}:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 6. Envio de mensagem com mídia (imagem, áudio, etc.)
+ * POST /send/media
+ * Body: { number, type: 'image', file: 'data:image/png;base64,...', caption }
+ */
+async function sendMediaMessage(serverUrl, instanceToken, number, mediaSource, caption = '', docName = '', mediaType = 'image') {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) throw new Error('Token da instância não informado.');
+  if (!number) throw new Error('Número de destino não informado.');
+  if (!mediaSource) throw new Error('Arquivo de mídia não informado.');
+
+  const cleanNumber = String(number).replace(/\D/g, '');
+
+  const payload = {
+    number: cleanNumber,
+    type: mediaType || 'image',
+    file: mediaSource
+  };
+
+  if (caption) payload.caption = caption;
+  if (docName) payload.docName = docName;
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/send/media`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 25000
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.error(`[uazapiService] Erro ao enviar mídia para ${cleanNumber}:`, parsed);
+    const error = new Error(parsed.message);
+    error.details = parsed;
+    throw error;
+  }
+}
+
+/**
+ * 7. Desconectar instância
+ * POST /instance/disconnect
+ */
+async function disconnectInstance(serverUrl, instanceToken) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) return;
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/instance/disconnect`,
+      {},
+      {
+        headers: {
+          'token': instanceToken.trim()
+        },
+        timeout: 10000
+      }
+    );
+    return res.data;
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.warn(`[uazapiService] Aviso ao desconectar instância:`, parsed.message);
+    return null;
+  }
+}
+
+module.exports = {
+  normalizeServerUrl,
+  parseApiError,
+  createInstance,
+  connectInstance,
+  getInstanceStatus,
+  configureWebhook,
+  sendTextMessage,
+  sendMediaMessage,
+  disconnectInstance
+};

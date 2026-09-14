@@ -5,6 +5,7 @@ const db = require('./storage/db');
 const authService = require('./services/authService');
 
 const webhookRoutes = require('./routes/webhook');
+const uazapiWebhookRoutes = require('./routes/uazapiWebhook');
 const apiRoutes = require('./routes/api');
 const campaignRoutes = require('./routes/campaignRoutes');
 const domainRoutes = require('./routes/domainRoutes');
@@ -16,16 +17,26 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// 1. RECURSOS PÚBLICOS CRÍTICOS (NUNCA EXIGEM AUTENTICAÇÃO)
+// Prevenir cache agressivo do navegador para scripts, páginas e estilos
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path === '/' || req.path === '/login') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 // - /generated: Fotos geradas baixadas pelo WhatsApp e Leona
 // - /assets: Templates e mídias estáticas do sistema
 // - /css: Estilos compartilhados para a tela de login
 // - /webhook: Endpoint oficial da Meta WhatsApp Cloud API
+// - /api/webhooks/uazapi: Endpoint oficial da uazapi Webhook
 // - /c: Endpoint de links curtos de campanha do TikTok Ads
 app.use('/generated', express.static(path.join(__dirname, '../public/generated')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/css', express.static(path.join(__dirname, '../public/css')));
 app.use('/webhook', webhookRoutes);
+app.use('/api/webhooks', uazapiWebhookRoutes);
 app.use('/c', campaignRoutes);
 
 // Rota da Tela de Login (se já estiver autenticado, vai direto para o dashboard)
@@ -83,11 +94,24 @@ app.use((req, res, next) => {
 app.use('/api', apiRoutes);
 app.use('/api/dominios', domainRoutes);
 
+// Prevenir cache agressivo do navegador para scripts, páginas e estilos
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path === '/' || req.path === '') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
 // Servir frontend do dashboard e scripts protegidos
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Fallback SPA protegido
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 

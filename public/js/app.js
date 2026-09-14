@@ -277,10 +277,16 @@ function initRealtimeEvents() {
 
 async function updateBadges() {
   try {
-    const res = await fetch('/api/chats');
-    state.chats = await res.json();
-    const count = Object.keys(state.chats).length;
-    document.getElementById('badge-leads').textContent = count;
+    const [chatsRes, instRes] = await Promise.all([
+      fetch('/api/chats').then(r => r.json()).catch(() => ({})),
+      fetch('/api/instances').then(r => r.json()).catch(() => ([]))
+    ]);
+    state.chats = chatsRes;
+    const leadsBadge = document.getElementById('badge-leads');
+    if (leadsBadge) leadsBadge.textContent = Object.keys(state.chats).length;
+
+    const chipsBadge = document.getElementById('badge-chips');
+    if (chipsBadge && Array.isArray(instRes)) chipsBadge.textContent = instRes.length;
   } catch (e) {}
 }
 
@@ -1630,8 +1636,18 @@ async function testTikTokPixelManual(code, token) {
    VIEW 2: INSTANCES (CHIPS DA META)
    ========================================================================= */
 async function renderInstances() {
-  const instances = await fetch('/api/instances').then(r => r.json());
+  let instances = [];
+  try {
+    const res = await fetch('/api/instances');
+    const data = await res.json();
+    instances = Array.isArray(data) ? data : [];
+  } catch(e) {
+    instances = [];
+  }
   state.instances = instances;
+
+  const badgeChips = document.getElementById('badge-chips');
+  if (badgeChips) badgeChips.textContent = instances.length;
 
   const html = `
     <div class="card">
@@ -1649,54 +1665,94 @@ async function renderInstances() {
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; margin-top: 10px;">
-        ${instances.map(i => `
-          <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
-            <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="brand-icon" style="width: 34px; height: 34px; font-size: 17px;">📱</div>
-                <div>
-                  <div style="font-weight: 700; font-size: 15px;">${i.name}</div>
-                  <div style="font-size: 12px; color: var(--text-muted);">${i.phoneNumber}</div>
+      <div style="margin-top: 15px;">
+        ${instances.length === 0 ? `
+          <div style="text-align: center; padding: 50px 20px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px;">
+            <div style="font-size: 38px; margin-bottom: 12px;">📱</div>
+            <h4 style="color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 700;">Nenhuma Conexão WhatsApp Ativa</h4>
+            <p style="color: var(--text-muted); font-size: 13px; max-width: 480px; margin: 0 auto 18px; line-height: 1.5;">
+              Conecte sua conta do WhatsApp via <strong>uazapi (API Web / QR Code)</strong> ou <strong>Meta Cloud API</strong> para sincronizar conversas, enviar mensagens automáticas e receber pedidos.
+            </p>
+            <button class="btn btn-primary" onclick="openAddChipModal()" style="padding: 10px 20px; font-size: 13px; font-weight: 700; border-radius: 10px;">
+              🔌 Conectar WhatsApp Agora
+            </button>
+          </div>
+        ` : `
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">
+            ${instances.map(i => {
+              const isUazapi = i.tipo === 'uazapi';
+              const isConnected = i.status === 'connected';
+              const displayPhone = i.numero_conectado || i.phoneNumber || 'Aguardando pareamento';
+              return `
+              <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="brand-icon" style="width: 36px; height: 36px; font-size: 18px; background: ${isUazapi ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)'}; border: 1px solid ${isUazapi ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'};">
+                      ${isUazapi ? '⚡' : '📱'}
+                    </div>
+                    <div>
+                      <div style="font-weight: 700; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 6px;">
+                        <span>${i.name}</span>
+                        <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${isUazapi ? 'rgba(16,185,129,0.18)' : 'rgba(56,189,248,0.18)'}; color: ${isUazapi ? '#10b981' : '#38bdf8'};">
+                          ${isUazapi ? 'uazapi' : 'Meta API'}
+                        </span>
+                      </div>
+                      <div style="font-size: 12px; color: ${isConnected ? 'var(--wa-green)' : 'var(--text-muted)'}; margin-top: 2px; font-weight: 600;">
+                        ${displayPhone}
+                      </div>
+                    </div>
+                  </div>
+                  <span class="btn" style="padding: 3px 9px; font-size: 11px; font-weight: 600; border-radius: 6px; background: ${isConnected ? 'rgba(37, 211, 102, 0.15)' : (i.status === 'connecting' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)')}; color: ${isConnected ? 'var(--wa-green)' : (i.status === 'connecting' ? '#f59e0b' : 'var(--red)')};">
+                    ${isConnected ? '● Conectado' : (i.status === 'connecting' ? '⏳ Conectando' : '○ Desconectado')}
+                  </span>
+                </div>
+
+                <!-- Vínculo Estrito de Fluxo (Multilíngue) -->
+                <div style="margin-bottom: 14px; padding: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="font-size: 11.5px; font-weight: 700; color: #93c5fd; display: flex; align-items: center; gap: 5px;">
+                      <span>🎯 Fluxo de Mensagens:</span>
+                    </label>
+                    <span style="font-size: 10.5px; color: #34d399; font-weight: 600; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">
+                      🔒 Ativo & Vinculado
+                    </span>
+                  </div>
+                  <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
+                    <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-foto' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
+                    <option value="fluxo-espiao-es" ${i.assignedFlowId === 'fluxo-espiao-es' ? 'selected' : ''}>🇪🇸 Funil Oficial (Español)</option>
+                    <option value="fluxo-espiao-en" ${i.assignedFlowId === 'fluxo-espiao-en' ? 'selected' : ''}>🇺🇸 Funil Oficial (English)</option>
+                  </select>
+                  <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
+                    As conversas deste número acionam <strong>exclusivamente</strong> este fluxo para evitar qualquer mistura.
+                  </div>
+                </div>
+                
+                <div style="font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); margin-bottom: 16px;">
+                  ${isUazapi ? `
+                    <div><strong>Servidor:</strong> <span style="font-family: monospace; font-size: 11px; color: #cbd5e1;">${i.url_servidor || 'https://free.uazapi.com'}</span></div>
+                    <div><strong>ID Instância:</strong> <span style="font-family: monospace; font-size: 11px; color: #cbd5e1;">${i.instance_id || i.id}</span></div>
+                    <div><strong>Segurança:</strong> <span style="color: #10b981; font-size: 11px;">🔒 Token AES-256-GCM</span></div>
+                  ` : `
+                    <div><strong>Phone Number ID:</strong> ${i.phoneNumberId || 'Não informado'}</div>
+                    <div><strong>WABA ID:</strong> ${i.wabaId || 'Não informado'}</div>
+                  `}
+                  <div><strong>Mensagens Enviadas:</strong> ${i.totalSent || 0}</div>
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                  ${isUazapi && !isConnected ? `
+                    <button class="btn btn-primary" style="flex: 1; font-size: 12px; padding: 8px 10px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="openUazapiQrModal('${i.id}')">
+                      <span>📷</span> <span>Ver QR Code</span>
+                    </button>
+                  ` : ''}
+                  <button class="btn btn-secondary" style="${(isUazapi && !isConnected) ? '' : 'flex: 1;'} font-size: 12px;" onclick="testChip('${i.id}')">Testar Envio</button>
+                  <button class="btn btn-danger" style="padding: 8px 12px;" onclick="deleteChip('${i.id}')">Excluir</button>
                 </div>
               </div>
-              <span class="btn" style="padding: 3px 9px; font-size: 11px; font-weight: 600; border-radius: 6px; background: ${i.status === 'connected' ? 'rgba(37, 211, 102, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${i.status === 'connected' ? 'var(--wa-green)' : 'var(--red)'};">
-                ${i.status === 'connected' ? '● Conectado' : '○ Desconectado'}
-              </span>
-            </div>
-
-            <!-- Vínculo Estrito de Fluxo (Multilíngue) -->
-            <div style="margin-bottom: 14px; padding: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label style="font-size: 11.5px; font-weight: 700; color: #93c5fd; display: flex; align-items: center; gap: 5px;">
-                  <span>🎯 Fluxo de Mensagens:</span>
-                </label>
-                <span style="font-size: 10.5px; color: #34d399; font-weight: 600; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">
-                  🔒 Ativo & Vinculado
-                </span>
-              </div>
-              <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
-                <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-foto' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
-                <option value="fluxo-espiao-es" ${i.assignedFlowId === 'fluxo-espiao-es' ? 'selected' : ''}>🇪🇸 Funil Oficial (Español)</option>
-                <option value="fluxo-espiao-en" ${i.assignedFlowId === 'fluxo-espiao-en' ? 'selected' : ''}>🇺🇸 Funil Oficial (English)</option>
-              </select>
-              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
-                As conversas deste número acionam <strong>exclusivamente</strong> este fluxo para evitar qualquer mistura.
-              </div>
-            </div>
-            
-            <div style="font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); margin-bottom: 16px;">
-              <div><strong>Phone Number ID:</strong> ${i.phoneNumberId || 'Não informado'}</div>
-              <div><strong>WABA ID:</strong> ${i.wabaId || 'Não informado'}</div>
-              <div><strong>Mensagens Enviadas:</strong> ${i.totalSent || 0}</div>
-            </div>
-
-            <div style="display: flex; gap: 8px;">
-              <button class="btn btn-secondary" style="flex: 1; font-size: 12px;" onclick="testChip('${i.id}')">Testar Envio</button>
-              <button class="btn btn-danger" style="padding: 8px 12px;" onclick="deleteChip('${i.id}')">Excluir</button>
-            </div>
+              `;
+            }).join('')}
           </div>
-        `).join('')}
+        `}
       </div>
     </div>
   `;
@@ -2333,10 +2389,82 @@ async function runSimulation(e) {
    ========================================================================= */
 let currentConnectionType = 'meta';
 let lastEmbeddedSignupData = null;
+let uazapiPollInterval = null;
+let uazapiCountdownInterval = null;
+let uazapiSecondsRemaining = 120;
+let currentUazapiInstanceId = null;
+
+function toggleUazapiMode(mode) {
+  const groupAdmin = document.getElementById('group-uazapi-admintoken');
+  const groupKey = document.getElementById('group-uazapi-key');
+  if (groupAdmin) {
+    groupAdmin.style.display = (mode === 'create') ? 'block' : 'none';
+  }
+  if (groupKey) {
+    groupKey.style.display = (mode === 'key') ? 'block' : 'none';
+  }
+}
+
+function toggleUazapiConnectType(type) {
+  const groupPhone = document.getElementById('group-uazapi-phone');
+  if (groupPhone) {
+    groupPhone.style.display = (type === 'phone') ? 'block' : 'none';
+  }
+}
+
+function resetUazapiModalState() {
+  if (uazapiPollInterval) {
+    clearInterval(uazapiPollInterval);
+    uazapiPollInterval = null;
+  }
+  if (uazapiCountdownInterval) {
+    clearInterval(uazapiCountdownInterval);
+    uazapiCountdownInterval = null;
+  }
+  currentUazapiInstanceId = null;
+  uazapiSecondsRemaining = 120;
+
+  const liveArea = document.getElementById('uazapi-live-area');
+  const errorAlert = document.getElementById('uazapi-error-alert');
+  const formInputs = document.getElementById('uazapi-form-inputs');
+  const btnConnect = document.getElementById('btn-connect-uazapi');
+  const btnText = document.getElementById('btn-uazapi-text');
+  const btnBack = document.getElementById('btn-uazapi-back');
+  const qrImg = document.getElementById('uazapi-qr-img');
+  const qrPlaceholder = document.getElementById('uazapi-qr-placeholder');
+  const refreshNotice = document.getElementById('uazapi-refresh-notice');
+
+  if (liveArea) liveArea.style.display = 'none';
+  if (errorAlert) errorAlert.style.display = 'none';
+  if (formInputs) formInputs.style.display = 'block';
+  if (btnBack) btnBack.style.display = 'none';
+  if (refreshNotice) refreshNotice.style.display = 'none';
+  if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+  if (qrImg) {
+    qrImg.src = '';
+    qrImg.style.display = 'block';
+  }
+  if (btnConnect) btnConnect.disabled = false;
+  if (btnText) btnText.textContent = 'Conectar uazapi';
+
+  const statusBox = document.getElementById('uazapi-status-box');
+  const statusSpinner = document.getElementById('uazapi-status-spinner');
+  const statusText = document.getElementById('uazapi-status-text');
+  if (statusBox) {
+    statusBox.style.background = 'rgba(59, 130, 246, 0.1)';
+    statusBox.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+  }
+  if (statusSpinner) statusSpinner.style.display = 'inline-block';
+  if (statusText) {
+    statusText.style.color = '#93c5fd';
+    statusText.textContent = 'Iniciando conexão na uazapi...';
+  }
+}
 
 function openAddChipModal() {
   const modal = document.getElementById('chip-modal');
   if (modal) modal.style.display = 'flex';
+  resetUazapiModalState();
   selectConnectionType('meta');
   const manualForm = document.getElementById('form-manual-chip');
   if (manualForm) manualForm.style.display = 'none';
@@ -2344,6 +2472,7 @@ function openAddChipModal() {
 }
 
 function closeAddChipModal() {
+  resetUazapiModalState();
   const modal = document.getElementById('chip-modal');
   if (modal) modal.style.display = 'none';
 }
@@ -2485,19 +2614,395 @@ function openMetaEmbeddedPopupDirect(name, coexistence, appId, configId) {
   showToast('Janela oficial da Meta aberta! Conclua a validação do número nela.', 'info');
 }
 
-function handleSaveUazapi() {
-  const name = document.getElementById('conn-name')?.value.trim() || 'Conexão uazapi';
-  const url = document.getElementById('uazapi-url')?.value.trim();
-  const key = document.getElementById('uazapi-key')?.value.trim();
+/**
+ * Normaliza qualquer formato de QR code (base64 com/sem prefixo data:, url, ou texto)
+ */
+function formatQrSrc(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (str.startsWith('data:image')) return str;
+  if (str.startsWith('http://') || str.startsWith('https://')) return str;
+  if (str.startsWith('iVBORw0KGg') || str.length > 100) {
+    return `data:image/png;base64,${str}`;
+  }
+  // Se for texto cru (ex: 2@...) gera código QR via CDN seguro
+  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(str)}`;
+}
 
-  if (!url || !key) {
-    showToast('Informe a URL e a API Key do uazapi', 'error');
+/**
+ * Inicia contagem regressiva e polling unificado para monitorar status do QR Code
+ */
+function startUazapiPollingAndCountdown(instanceId) {
+  if (uazapiPollInterval) clearInterval(uazapiPollInterval);
+  if (uazapiCountdownInterval) clearInterval(uazapiCountdownInterval);
+
+  const qrImg = document.getElementById('uazapi-qr-img');
+  const qrPlaceholder = document.getElementById('uazapi-qr-placeholder');
+  const statusText = document.getElementById('uazapi-status-text');
+  const statusSpinner = document.getElementById('uazapi-status-spinner');
+  const timerVal = document.getElementById('uazapi-timer-val');
+  const refreshNotice = document.getElementById('uazapi-refresh-notice');
+  const errorAlert = document.getElementById('uazapi-error-alert');
+  const errorMsg = document.getElementById('uazapi-error-message');
+  const btnConnect = document.getElementById('btn-connect-uazapi');
+  const btnText = document.getElementById('btn-uazapi-text');
+
+  uazapiCountdownInterval = setInterval(async () => {
+    uazapiSecondsRemaining--;
+    if (uazapiSecondsRemaining <= 0) {
+      if (refreshNotice) refreshNotice.style.display = 'block';
+      if (statusText) statusText.textContent = '🔄 Renovando QR Code expirado...';
+
+      try {
+        const refreshRes = await fetch(`/api/uazapi/refresh-qr/${instanceId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshData.success && refreshData.qrcode && qrImg) {
+          qrImg.src = formatQrSrc(refreshData.qrcode);
+          qrImg.style.display = 'block';
+          if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+          uazapiSecondsRemaining = 120;
+          if (refreshNotice) refreshNotice.style.display = 'none';
+          if (statusText) statusText.textContent = 'QR Code renovado! Aponte a câmera do WhatsApp:';
+        }
+      } catch (refrErr) {
+        console.warn('[uazapi] Erro ao renovar QR:', refrErr);
+      }
+    } else {
+      const mins = String(Math.floor(uazapiSecondsRemaining / 60)).padStart(2, '0');
+      const secs = String(uazapiSecondsRemaining % 60).padStart(2, '0');
+      if (timerVal) timerVal.textContent = `${mins}:${secs}`;
+    }
+  }, 1000);
+
+  uazapiPollInterval = setInterval(async () => {
+    if (!instanceId) return;
+
+    try {
+      const checkRes = await fetch(`/api/uazapi/status/${instanceId}`);
+      const checkData = await checkRes.json();
+
+      if (checkRes.status === 503) {
+        const waitSecs = checkData.details?.retryAfter || 5;
+        if (statusText) statusText.textContent = `Aguardando capacidade do servidor (${waitSecs}s)...`;
+        return;
+      }
+
+      if (!checkRes.ok) {
+        if (checkRes.status === 401 || checkRes.status === 404) {
+          clearInterval(uazapiPollInterval);
+          clearInterval(uazapiCountdownInterval);
+          throw new Error(checkData.error || 'Autenticação da instância expirou.');
+        }
+        return;
+      }
+
+      // Atualiza QR code se vier na resposta
+      if (checkData.qrcode && qrImg) {
+        const newSrc = formatQrSrc(checkData.qrcode);
+        if (qrImg.src !== newSrc) {
+          qrImg.src = newSrc;
+          qrImg.style.display = 'block';
+          if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+          if (statusText && !checkData.connected) {
+            statusText.textContent = 'Aponte o WhatsApp do celular para o QR Code abaixo:';
+          }
+        }
+      }
+
+      // Conexão bem-sucedida confirmada!
+      const connectedPhone = checkData.numero_conectado || checkData.instance?.numero_conectado || checkData.jid?.user || '';
+      const isConfirmedConnected = Boolean(checkData.connected === true && connectedPhone);
+
+      if (isConfirmedConnected) {
+        clearInterval(uazapiPollInterval);
+        clearInterval(uazapiCountdownInterval);
+        uazapiPollInterval = null;
+        uazapiCountdownInterval = null;
+
+        const statusBox = document.getElementById('uazapi-status-box');
+        if (statusBox) {
+          statusBox.style.background = 'rgba(16, 185, 129, 0.2)';
+          statusBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        }
+        if (statusSpinner) statusSpinner.style.display = 'none';
+        if (statusText) {
+          statusText.style.color = '#10b981';
+          statusText.textContent = `✅ WhatsApp Conectado com Sucesso! (+${connectedPhone})`;
+        }
+
+        showToast(`✓ WhatsApp Conectado com sucesso! (+${connectedPhone})`, 'success');
+
+        setTimeout(async () => {
+          closeAddChipModal();
+          window.location.hash = '#instances';
+          state.currentView = 'instances';
+          await renderInstances();
+        }, 1300);
+      }
+    } catch (pollErr) {
+      console.warn('[uazapi Polling Error]', pollErr);
+      if (pollErr.message && (pollErr.message.includes('401') || pollErr.message.includes('Token inválido'))) {
+        clearInterval(uazapiPollInterval);
+        clearInterval(uazapiCountdownInterval);
+        if (errorAlert) {
+          errorAlert.style.display = 'block';
+          if (errorMsg) errorMsg.textContent = pollErr.message;
+        }
+        if (btnConnect) btnConnect.disabled = false;
+        if (btnText) btnText.textContent = 'Tentar Novamente';
+      }
+    }
+  }, 2000);
+}
+
+/**
+ * Abre o modal direto na tela de QR Code para reconectar ou visualizar
+ */
+window.openUazapiQrModal = async function(instanceId) {
+  openAddChipModal();
+  selectConnectionType('web');
+
+  const liveArea = document.getElementById('uazapi-live-area');
+  const formInputs = document.getElementById('uazapi-form-inputs');
+  const qrPlaceholder = document.getElementById('uazapi-qr-placeholder');
+  const qrImg = document.getElementById('uazapi-qr-img');
+  const qrContainer = document.getElementById('uazapi-qr-container');
+  const statusText = document.getElementById('uazapi-status-text');
+  const timerVal = document.getElementById('uazapi-timer-val');
+
+  if (formInputs) formInputs.style.display = 'none';
+  if (liveArea) liveArea.style.display = 'block';
+  if (qrContainer) qrContainer.style.display = 'inline-block';
+  if (qrPlaceholder) qrPlaceholder.style.display = 'block';
+  if (qrImg) qrImg.style.display = 'none';
+  if (statusText) statusText.textContent = 'Buscando QR Code atualizado...';
+
+  currentUazapiInstanceId = instanceId;
+
+  try {
+    const res = await fetch(`/api/uazapi/status/${instanceId}`);
+    const data = await res.json();
+
+    if (data.qrcode) {
+      qrImg.src = formatQrSrc(data.qrcode);
+      qrImg.style.display = 'block';
+      if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+      if (statusText) statusText.textContent = 'Aponte o WhatsApp do celular para o QR Code abaixo:';
+    } else {
+      const refRes = await fetch(`/api/uazapi/refresh-qr/${instanceId}`, { method: 'POST' });
+      const refData = await refRes.json();
+      if (refData.qrcode) {
+        qrImg.src = formatQrSrc(refData.qrcode);
+        qrImg.style.display = 'block';
+        if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+        if (statusText) statusText.textContent = 'Aponte o WhatsApp do celular para o QR Code abaixo:';
+      }
+    }
+  } catch (err) {
+    if (statusText) statusText.textContent = 'Falha ao buscar QR Code. Tente novamente.';
+  }
+
+  uazapiSecondsRemaining = 120;
+  if (timerVal) timerVal.textContent = '02:00';
+  startUazapiPollingAndCountdown(instanceId);
+};
+
+/**
+ * Fluxo de Conexão Real com a uazapi:
+ * 1. POST /api/uazapi/init-connect
+ * 2. Renderiza QR code e inicia timer de expiração de 2 minutos
+ * 3. Polling em /api/uazapi/status/:id a cada 2s
+ * 4. Auto-renovação de QR code após 2 minutos
+ * 5. Conexão detectada -> fecha modal e salva como ativo
+ */
+async function handleSaveUazapi() {
+  const connNameInput = document.getElementById('conn-name');
+  const name = connNameInput?.value.trim();
+  if (!name) {
+    showToast('Informe o Nome da Conexão antes de continuar', 'error');
+    connNameInput?.focus();
     return;
   }
 
-  showToast('✓ Instância uazapi configurada com sucesso!', 'success');
-  closeAddChipModal();
+  const serverUrl = document.getElementById('uazapi-url')?.value.trim() || 'https://free.uazapi.com';
+  const mode = document.querySelector('input[name="uazapi-mode"]:checked')?.value || 'create';
+  const connectType = document.querySelector('input[name="uazapi-connect-type"]:checked')?.value || 'qr';
+  const adminToken = document.getElementById('uazapi-admintoken')?.value.trim() || '';
+  const instanceKey = mode === 'key' ? document.getElementById('uazapi-key')?.value.trim() : '';
+  const phone = connectType === 'phone' ? document.getElementById('uazapi-phone-input')?.value.trim() : '';
+  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
+
+  if (mode === 'key' && !instanceKey) {
+    showToast('Informe a API Key da Instância existente', 'error');
+    document.getElementById('uazapi-key')?.focus();
+    return;
+  }
+
+  if (mode === 'create' && !adminToken) {
+    showToast('Para criar uma nova instância, informe o admintoken ou selecione "Já Tenho Chave".', 'warning');
+    const adminInput = document.getElementById('uazapi-admintoken');
+    if (adminInput) {
+      adminInput.focus();
+      adminInput.style.borderColor = '#f59e0b';
+    }
+    return;
+  }
+
+  if (connectType === 'phone' && !phone) {
+    showToast('Informe o número de telefone para pareamento com DDI e DDD', 'error');
+    document.getElementById('uazapi-phone-input')?.focus();
+    return;
+  }
+
+  // Prepara UI para conexão
+  const btnConnect = document.getElementById('btn-connect-uazapi');
+  const btnText = document.getElementById('btn-uazapi-text');
+  const btnBack = document.getElementById('btn-uazapi-back');
+  const liveArea = document.getElementById('uazapi-live-area');
+  const formInputs = document.getElementById('uazapi-form-inputs');
+  const errorAlert = document.getElementById('uazapi-error-alert');
+  const errorMsg = document.getElementById('uazapi-error-message');
+  const statusText = document.getElementById('uazapi-status-text');
+  const statusSpinner = document.getElementById('uazapi-status-spinner');
+  const qrImg = document.getElementById('uazapi-qr-img');
+  const qrPlaceholder = document.getElementById('uazapi-qr-placeholder');
+  const qrContainer = document.getElementById('uazapi-qr-container');
+  const pairContainer = document.getElementById('uazapi-paircode-container');
+  const pairText = document.getElementById('uazapi-paircode-text');
+  const timerVal = document.getElementById('uazapi-timer-val');
+  const refreshNotice = document.getElementById('uazapi-refresh-notice');
+
+  if (errorAlert) errorAlert.style.display = 'none';
+  if (refreshNotice) refreshNotice.style.display = 'none';
+  if (formInputs) formInputs.style.display = 'none';
+  if (liveArea) liveArea.style.display = 'block';
+  if (btnBack) btnBack.style.display = 'inline-block';
+  if (qrPlaceholder) qrPlaceholder.style.display = 'block';
+  if (qrImg) qrImg.style.display = 'none';
+  if (btnConnect) btnConnect.disabled = true;
+  if (btnText) btnText.innerHTML = '<div class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></div> Conectando...';
+
+  if (statusText) statusText.textContent = 'Iniciando conexão na uazapi e gerando QR Code...';
+  if (statusSpinner) statusSpinner.style.display = 'inline-block';
+
+  try {
+    const res = await fetch('/api/uazapi/init-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        serverUrl,
+        adminToken,
+        instanceKey,
+        phone,
+        assignedFlowId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Falha ao conectar com o servidor uazapi');
+    }
+
+    currentUazapiInstanceId = data.instanceId;
+
+    // Se a instância já veio 100% autenticada com número físico conectado
+    const isAlreadyConnected = Boolean(data.connected && (data.numero_conectado || data.status?.jid?.user));
+    if (isAlreadyConnected) {
+      if (statusText) statusText.textContent = `✅ WhatsApp já autenticado! (+${data.numero_conectado})`;
+      showToast('✓ WhatsApp conectado com sucesso via uazapi!', 'success');
+      setTimeout(async () => {
+        closeAddChipModal();
+        window.location.hash = '#instances';
+        state.currentView = 'instances';
+        await renderInstances();
+      }, 1200);
+      return;
+    }
+
+    // Renderiza QR Code ou Código de Pareamento
+    if (data.qrcode && qrImg) {
+      const src = formatQrSrc(data.qrcode);
+      qrImg.src = src;
+      qrImg.style.display = 'block';
+      if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+      if (qrContainer) qrContainer.style.display = 'inline-block';
+      if (pairContainer) pairContainer.style.display = 'none';
+      if (statusText) statusText.textContent = 'Aponte o WhatsApp do celular para o QR Code abaixo:';
+      if (btnConnect) btnConnect.disabled = false;
+      if (btnText) btnText.textContent = '🔄 Atualizar QR Code';
+    } else if (data.paircode && pairText) {
+      pairText.textContent = data.paircode;
+      if (pairContainer) pairContainer.style.display = 'block';
+      if (qrContainer) qrContainer.style.display = 'none';
+      if (statusText) statusText.textContent = 'Digite o código de pareamento no WhatsApp do celular:';
+      if (btnConnect) btnConnect.disabled = false;
+      if (btnText) btnText.textContent = '🔄 Gerar Novo Código';
+    } else {
+      // QR Code ainda em inicialização na uazapi: exibe placeholder animado
+      if (qrImg) qrImg.style.display = 'none';
+      if (qrPlaceholder) qrPlaceholder.style.display = 'block';
+      if (qrContainer) qrContainer.style.display = 'inline-block';
+      if (statusText) statusText.textContent = '⏳ Inicializando WhatsApp... Carregando QR Code da uazapi...';
+    }
+
+    // Atualiza a lista no background imediatamente para o usuário ver a instância criada como '⏳ Conectando'
+    if (state.currentView === 'instances') {
+      renderInstances().catch(() => {});
+    }
+
+    // Inicia contador regressivo de 2 minutos e Polling em tempo real
+    uazapiSecondsRemaining = 120;
+    if (timerVal) timerVal.textContent = '02:00';
+    startUazapiPollingAndCountdown(currentUazapiInstanceId);
+
+  } catch (err) {
+    console.error('[uazapi Save Error]', err);
+    if (uazapiPollInterval) clearInterval(uazapiPollInterval);
+    if (uazapiCountdownInterval) clearInterval(uazapiCountdownInterval);
+
+    if (errorAlert) {
+      errorAlert.style.display = 'block';
+      if (errorMsg) errorMsg.textContent = err.message || 'Erro ao comunicar com a uazapi.';
+    }
+    if (statusText) statusText.textContent = '⚠️ Falha na inicialização da conexão.';
+    if (statusSpinner) statusSpinner.style.display = 'none';
+    if (btnConnect) btnConnect.disabled = false;
+    if (btnText) btnText.textContent = 'Tentar Novamente';
+    showToast(err.message || 'Erro ao conectar uazapi', 'error');
+  }
 }
+
+window.backToUazapiForm = function() {
+  if (uazapiPollInterval) {
+    clearInterval(uazapiPollInterval);
+    uazapiPollInterval = null;
+  }
+  if (uazapiCountdownInterval) {
+    clearInterval(uazapiCountdownInterval);
+    uazapiCountdownInterval = null;
+  }
+  const formInputs = document.getElementById('uazapi-form-inputs');
+  const liveArea = document.getElementById('uazapi-live-area');
+  const btnConnect = document.getElementById('btn-connect-uazapi');
+  const btnText = document.getElementById('btn-uazapi-text');
+  const btnBack = document.getElementById('btn-uazapi-back');
+  const errorAlert = document.getElementById('uazapi-error-alert');
+
+  if (formInputs) formInputs.style.display = 'block';
+  if (liveArea) liveArea.style.display = 'none';
+  if (errorAlert) errorAlert.style.display = 'none';
+  if (btnBack) btnBack.style.display = 'none';
+  if (btnConnect) {
+    btnConnect.disabled = false;
+    btnConnect.style.display = 'inline-flex';
+  }
+  if (btnText) btnText.textContent = 'Conectar uazapi';
+};
 
 async function saveNewChip(e) {
   e.preventDefault();

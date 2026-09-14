@@ -3,12 +3,79 @@ const { composeProofImage } = require('./imageComposer');
 const metaService = require('./metaService');
 const tiktokService = require('./tiktokService');
 const aiService = require('./aiService');
+const uazapiService = require('./uazapiService');
+const cryptoService = require('./cryptoService');
 const EventEmitter = require('events');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 
 const eventBus = new EventEmitter();
+
+/**
+ * Abstração unificada de envio de mensagem de texto (suporta uazapi e Meta Cloud API)
+ */
+async function sendOutgoingTextMessage(inst, cleanPhone, text) {
+  if (!inst) return;
+
+  if (inst.tipo === 'uazapi' && inst.instance_token) {
+    try {
+      const decToken = cryptoService.decrypt(inst.instance_token);
+      await uazapiService.sendTextMessage(inst.url_servidor, decToken, cleanPhone, text);
+    } catch (err) {
+      console.error(`[FlowEngine] Erro ao enviar texto via uazapi para ${cleanPhone}:`, err.message);
+    }
+  } else if (inst.phoneNumberId && inst.accessToken) {
+    try {
+      await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, text);
+    } catch (err) {
+      console.error(`[FlowEngine] Erro ao enviar texto via Meta para ${cleanPhone}:`, err.message);
+    }
+  }
+}
+
+/**
+ * Abstração unificada de envio de imagem (suporta uazapi e Meta Cloud API)
+ */
+async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, mimeType, caption) {
+  if (!inst) return;
+
+  if (inst.tipo === 'uazapi' && inst.instance_token) {
+    try {
+      const decToken = cryptoService.decrypt(inst.instance_token);
+      const dataUri = `data:${mimeType || 'image/png'};base64,${imgBuffer.toString('base64')}`;
+      await uazapiService.sendMediaMessage(
+        inst.url_servidor,
+        decToken,
+        cleanPhone,
+        dataUri,
+        caption || '',
+        filename || 'foto.png',
+        'image'
+      );
+    } catch (err) {
+      console.error(`[FlowEngine] Erro ao enviar imagem via uazapi para ${cleanPhone}:`, err.message);
+    }
+  } else if (inst.phoneNumberId && inst.accessToken) {
+    try {
+      const mediaId = await metaService.uploadMedia(
+        inst.phoneNumberId,
+        inst.accessToken,
+        imgBuffer,
+        filename,
+        mimeType || 'image/png'
+      );
+      await metaService.sendImageMessage(
+        inst.phoneNumberId,
+        inst.accessToken,
+        cleanPhone,
+        mediaId
+      );
+    } catch (err) {
+      console.error(`[FlowEngine] Erro ao enviar imagem via Meta para ${cleanPhone}:`, err.message);
+    }
+  }
+}
 
 /**
  * Consulta a foto do perfil do número alvo via API oficial do stalkea.app
@@ -221,7 +288,7 @@ function getCurrentStageInfo(stageKey, funnel, language = 'pt') {
  */
 async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachment = null) {
   const instances = db.getInstances();
-  const inst = instances.find(i => i.id === instance?.id || i.phoneNumberId === instance?.phoneNumberId) || instance || instances[0] || { id: 'inst_1' };
+  const inst = instances.find(i => i.id === instance?.id || i.instance_id === instance?.id || (instance?.instance_id && i.instance_id === instance.instance_id) || (instance?.phoneNumberId && i.phoneNumberId === instance.phoneNumberId)) || instance || instances[0] || { id: 'inst_1' };
   
   // 1. Vinculação Estrita: localiza o fluxo configurado para ESTE chip específico
   const targetFlowId = inst.assignedFlowId || 'fluxo-espiao-foto';
@@ -298,9 +365,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       const reply = defaultNoReceipt.replace(/\{currentValue\}/g, stageInfo.value);
       
       db.addChatMessage(cleanPhone, { from: 'bot', text: reply, instanceId: inst.id });
-      if (inst.phoneNumberId && inst.accessToken) {
-        await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, reply);
-      }
+      await sendOutgoingTextMessage(inst, cleanPhone, reply);
       eventBus.emit('chat_updated', { phone: cleanPhone });
       return;
     }
@@ -321,14 +386,11 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
           : (flowLanguage === 'en'
             ? "Payment of $49.90 received ✅\n\nNext payment to unlock everything: $100 👇\n\n{checkoutUrl100}\n\nPlease proceed and send me the receipt as soon as it's completed!"
             : "Pagamento de R$ 49,90 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 100 👇\n\n{checkoutUrl100}\n\nPode seguir e me enviar o comprovante assim que finalizar!");
-
         const upsellText = getNodeText('node-upsell-100', fallback100);
         const finalText = interpolateVariables(upsellText, chatData.variables);
 
         db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        if (inst.phoneNumberId && inst.accessToken) {
-          await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, finalText);
-        }
+        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
       } else if (chatData.upsellStage === 'stage_100') {
         chatData.upsellStage = 'stage_200';
         chatData.variables.checkoutUrl = funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200';
@@ -346,9 +408,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         const finalText = interpolateVariables(upsellText, chatData.variables);
 
         db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        if (inst.phoneNumberId && inst.accessToken) {
-          await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, finalText);
-        }
+        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
       } else if (chatData.upsellStage === 'stage_200') {
         chatData.upsellStage = 'stage_400';
         chatData.variables.checkoutUrl = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
@@ -357,7 +417,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         chatData.variables.proximo_valor = 'Finalizado';
 
         const fallback400 = flowLanguage === 'es'
-          ? "Pago de $200 recibido ✅\n\nSiguiente pago para desbloquear todo: $400 👇\n\n{checkoutUrl400}\n\n¡Puedes continuar y enviarme el comprobante en cuanto termines!"
+          ? "Pago de $200 recibido ✅\n\nSiguiente pago para desbloquear todo: $400 👇\n\n{checkoutUrl400}\n\n¡Puedes continuar e enviarme el comprobante en cuanto termines!"
           : (flowLanguage === 'en'
             ? "Payment of $200 received ✅\n\nNext payment to unlock everything: $400 👇\n\n{checkoutUrl400}\n\nPlease proceed and send me the receipt as soon as it's completed!"
             : "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl400}\n\nPode seguir e me enviar o comprovante assim que finalizar!");
@@ -366,9 +426,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         const finalText = interpolateVariables(upsellText, chatData.variables);
 
         db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        if (inst.phoneNumberId && inst.accessToken) {
-          await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, finalText);
-        }
+        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
       } else if (chatData.upsellStage === 'stage_400') {
         chatData.upsellStage = 'stage_finalizado';
         chatData.state = 'FINALIZADO';
@@ -381,9 +439,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
         const finalText = getNodeText('node-access-released', fallbackMaster);
         db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        if (inst.phoneNumberId && inst.accessToken) {
-          await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, finalText);
-        }
+        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
       }
 
       // Se houver nós de Pixel TikTok no fluxo ativo, dispara evento CompletePayment
@@ -473,9 +529,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
 
     db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id });
-    if (inst.phoneNumberId && inst.accessToken) {
-      await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, aiReply);
-    }
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply);
     eventBus.emit('chat_updated', { phone: cleanPhone });
     return;
   }
@@ -489,9 +543,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     if (welcomeDecision.type !== 'PHONE') {
       console.log(`[FlowEngine] Resposta pós-boas-vindas classificada como: ${welcomeDecision.type}`);
       db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeDecision.reply, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-      if (inst.phoneNumberId && inst.accessToken) {
-        await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, welcomeDecision.reply);
-      }
+      await sendOutgoingTextMessage(inst, cleanPhone, welcomeDecision.reply);
       eventBus.emit('chat_updated', { phone: cleanPhone });
       return;
     }
@@ -510,9 +562,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
     const analyzingMsg = getNodeText('node-analyzing-msg', fallbackAnalyzing);
     db.addChatMessage(cleanPhone, { from: 'bot', text: analyzingMsg, instanceId: inst.id }, 'ANALISANDO');
-    if (inst.phoneNumberId && inst.accessToken) {
-      await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, analyzingMsg);
-    }
+    await sendOutgoingTextMessage(inst, cleanPhone, analyzingMsg);
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
     // Delay inteligente de 3 segundos
@@ -544,21 +594,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       instanceId: inst.id
     });
 
-    if (inst.phoneNumberId && inst.accessToken) {
-      const mediaId = await metaService.uploadMedia(
-        inst.phoneNumberId,
-        inst.accessToken,
-        imgBuffer,
-        filename,
-        'image/png'
-      );
-      await metaService.sendImageMessage(
-        inst.phoneNumberId,
-        inst.accessToken,
-        cleanPhone,
-        mediaId
-      );
-    }
+    await sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, 'image/png', proofCaption);
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
     // Envia o link de pagamento da oferta inicial (Kirvano / Checkout Seguro)
@@ -572,9 +608,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     const finalOffer = interpolateVariables(offerText, chatData.variables);
 
     db.addChatMessage(cleanPhone, { from: 'bot', text: finalOffer, instanceId: inst.id });
-    if (inst.phoneNumberId && inst.accessToken) {
-      await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, finalOffer);
-    }
+    await sendOutgoingTextMessage(inst, cleanPhone, finalOffer);
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
     // Envia a instrução de comprovante
@@ -586,9 +620,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
     const proofInstruction = getNodeText('node-msg-comprovante', fallbackProofInstruction);
     db.addChatMessage(cleanPhone, { from: 'bot', text: proofInstruction, instanceId: inst.id }, 'OFERTA_ENVIADA');
-    if (inst.phoneNumberId && inst.accessToken) {
-      await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, proofInstruction);
-    }
+    await sendOutgoingTextMessage(inst, cleanPhone, proofInstruction);
 
     chatData.state = 'OFERTA_ENVIADA';
     chats[cleanPhone] = chatData;
@@ -612,9 +644,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   db.saveChats(chats);
 
   db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-  if (inst.phoneNumberId && inst.accessToken) {
-    await metaService.sendTextMessage(inst.phoneNumberId, inst.accessToken, cleanPhone, welcomeText);
-  }
+  await sendOutgoingTextMessage(inst, cleanPhone, welcomeText);
   eventBus.emit('chat_updated', { phone: cleanPhone });
 }
 
