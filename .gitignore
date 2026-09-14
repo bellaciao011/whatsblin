@@ -5,3 +5,8 @@ Thumbs.db
 npm-debug.log*
 public/generated/*.png
 !public/generated/.gitkeep
+
+# Historicos locais (nunca subir para o git)
+HISTORICO_COMPLETO_CHAT.md
+*HISTORICO*.md
+*historico*.md
