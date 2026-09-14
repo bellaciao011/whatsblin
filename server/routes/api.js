@@ -87,21 +87,276 @@ router.get('/stats', (req, res) => {
 /**
  * Helper para construir a URL pública do Webhook para registro na uazapi
  */
-function getPublicWebhookUrl(req) {
+function getPublicWebhookUrl(req, instanceId = '') {
   const settings = db.getSettings();
+  let base = '';
+
   if (settings.webhookBaseUrl && String(settings.webhookBaseUrl).startsWith('http')) {
-    return `${settings.webhookBaseUrl.replace(/\/+$/, '')}/api/webhooks/uazapi`;
+    base = settings.webhookBaseUrl.replace(/\/+$/, '');
+  } else {
+    let host = req ? (req.get('x-forwarded-host') || req.get('host') || '') : '';
+    let proto = req ? (req.get('x-forwarded-proto') || req.protocol || 'https') : 'https';
+    if (proto.includes(',')) proto = proto.split(',')[0].trim();
+
+    if (!host || host.includes('localhost') || host.includes('127.0.0.1')) {
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        host = process.env.RAILWAY_PUBLIC_DOMAIN;
+        proto = 'https';
+      } else if (process.env.RAILWAY_STATIC_URL) {
+        host = process.env.RAILWAY_STATIC_URL;
+        proto = 'https';
+      } else if (settings.lastKnownPublicBaseUrl) {
+        base = settings.lastKnownPublicBaseUrl.replace(/\/+$/, '');
+      }
+    }
+
+    if (!base) {
+      if (host.includes('railway.app') || host.includes('herokuapp.com') || host.includes('vercel.app') || (!host.includes('localhost') && !host.includes('127.0.0.1') && host.length > 0)) {
+        proto = 'https';
+      }
+      if (!host) {
+        host = 'localhost:3000';
+        proto = 'http';
+      }
+      base = `${proto}://${host}`;
+      if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
+        settings.lastKnownPublicBaseUrl = base;
+        db.saveSettings(settings);
+      }
+    }
   }
-  const host = req.get('host') || 'localhost:3000';
-  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
-  return `${proto}://${host}/api/webhooks/uazapi`;
+
+  const cleanBase = base.replace(/\/+$/, '');
+  return instanceId ? `${cleanBase}/api/webhooks/uazapi?instanceId=${encodeURIComponent(instanceId)}` : `${cleanBase}/api/webhooks/uazapi`;
+}
+
+/**
+ * Helpers para extração flexível e robusta de dados de conexão da uazapi / Baileys
+ */
+function extractQrCode(primaryObj, fallbackObj) {
+  const getVal = (obj) => {
+    if (!obj) return null;
+    return obj.qrcode || 
+           obj.instance?.qrcode || 
+           obj.base64 || 
+           obj.instance?.base64 || 
+           obj.qr || 
+           obj.instance?.qr || 
+           (typeof obj.status === 'object' ? (obj.status?.qrcode || obj.status?.base64) : null) || 
+           null;
+  };
+  return getVal(primaryObj) || getVal(fallbackObj) || null;
+}
+
+function extractPairCode(primaryObj, fallbackObj) {
+  const getVal = (obj) => {
+    if (!obj) return null;
+    return obj.paircode || 
+           obj.instance?.paircode || 
+           (typeof obj.status === 'object' ? obj.status?.paircode : null) || 
+           null;
+  };
+  return getVal(primaryObj) || getVal(fallbackObj) || null;
+}
+
+function extractConnectedUser(statusRes, connectRes) {
+  // 1. Objeto jid.user
+  if (statusRes?.status?.jid?.user) return String(statusRes.status.jid.user).replace(/\D/g, '');
+  if (statusRes?.jid?.user) return String(statusRes.jid.user).replace(/\D/g, '');
+  if (connectRes?.status?.jid?.user) return String(connectRes.status.jid.user).replace(/\D/g, '');
+  if (connectRes?.jid?.user) return String(connectRes.jid.user).replace(/\D/g, '');
+
+  // 2. String jid (ex: "5511999999999@s.whatsapp.net" ou "5511999999999:1@s.whatsapp.net")
+  const rawJid = (typeof statusRes?.status?.jid === 'string' ? statusRes.status.jid : '') ||
+                 (typeof statusRes?.jid === 'string' ? statusRes.jid : '') ||
+                 (typeof connectRes?.jid === 'string' ? connectRes.jid : '');
+  if (rawJid) {
+    const clean = rawJid.split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (clean.length >= 8) return clean;
+  }
+
+  // 3. owner da instância (campo oficial da uazapi OpenAPI spec: owner)
+  const rawOwner = statusRes?.instance?.owner || statusRes?.owner || connectRes?.instance?.owner;
+  if (rawOwner) {
+    const clean = String(rawOwner).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (clean.length >= 8) return clean;
+  }
+
+  // 4. Campos diretos de telefone
+  const directPhone = statusRes?.instance?.numero_conectado || 
+                      statusRes?.numero_conectado || 
+                      statusRes?.instance?.phoneNumber ||
+                      statusRes?.phoneNumber ||
+                      connectRes?.instance?.numero_conectado;
+  if (directPhone) {
+    const clean = String(directPhone).replace(/\D/g, '');
+    if (clean.length >= 8) return clean;
+  }
+
+  // 5. Fallback para profileName se disponível
+  if (statusRes?.instance?.profileName) {
+    return statusRes.instance.profileName;
+  }
+
+  return null;
+}
+
+function checkIsConnected(statusRes, connectRes) {
+  const instanceStatus = statusRes?.instance?.status || connectRes?.instance?.status;
+  const rawStatus = typeof statusRes?.status === 'string' ? statusRes.status : '';
+  const objStatus = typeof statusRes?.status === 'object' ? statusRes.status : {};
+
+  return Boolean(
+    instanceStatus === 'connected' ||
+    rawStatus === 'connected' ||
+    objStatus?.connected === true ||
+    statusRes?.connected === true ||
+    connectRes?.connected === true ||
+    (objStatus?.loggedIn === true && objStatus?.connected !== false)
+  );
+}
+
+/**
+ * Sincroniza dados e status da instância uazapi e reconfigura webhook
+ */
+async function syncUazapiInstanceData(inst, req = null) {
+  if (!inst || inst.tipo !== 'uazapi' || !inst.instance_token) return false;
+  try {
+    const decToken = cryptoService.decrypt(inst.instance_token);
+    const statusRes = await uazapiService.getInstanceStatus(inst.url_servidor, decToken);
+    const isConnected = checkIsConnected(statusRes, null);
+    const connectedUser = extractConnectedUser(statusRes, null);
+
+    inst.lastSyncedAt = new Date().toISOString();
+
+    if (isConnected) {
+      const wasConnected = inst.status === 'connected';
+      inst.status = 'connected';
+      if (connectedUser && /\d{8,}/.test(connectedUser)) {
+        inst.numero_conectado = connectedUser;
+        inst.phoneNumber = connectedUser;
+      }
+      db.saveInstance(inst);
+
+      // Garante que o Webhook está configurado na uazapi com URL pública
+      try {
+        const webhookUrl = getPublicWebhookUrl(req, inst.id);
+        await uazapiService.configureWebhook(inst.url_servidor, decToken, webhookUrl);
+        console.log(`[uazapi Sync] ✓ Webhook ativo para ${inst.name}: ${webhookUrl}`);
+      } catch (wErr) {
+        console.warn(`[uazapi Sync] Aviso ao configurar webhook para ${inst.name}:`, wErr.message);
+      }
+
+      if (!wasConnected) {
+        eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
+      }
+      return true;
+    } else if (statusRes?.instance?.status === 'disconnected' && inst.status === 'connected') {
+      inst.status = 'disconnected';
+      db.saveInstance(inst);
+      eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
+      return true;
+    }
+  } catch (err) {
+    console.warn(`[uazapi Sync Error] Falha ao consultar uazapi para ${inst.name}:`, err.message);
+  }
+  return false;
+}
+
+/**
+ * Sincroniza conversas e mensagens existentes da uazapi para o banco local
+ */
+async function syncChatsFromUazapi(inst) {
+  if (!inst || inst.tipo !== 'uazapi' || !inst.instance_token) return { importedChats: 0, importedMessages: 0 };
+  try {
+    const decToken = cryptoService.decrypt(inst.instance_token);
+    const chats = await uazapiService.findChats(inst.url_servidor, decToken, 30);
+    if (!Array.isArray(chats) || chats.length === 0) return { importedChats: 0, importedMessages: 0 };
+
+    let importedChats = 0;
+    let importedMessages = 0;
+    const allChats = db.getChats();
+
+    for (const c of chats) {
+      if (!c.wa_chatid || c.wa_isGroup) continue;
+      const cleanPhone = String(c.wa_chatid).split('@')[0].replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 8) continue;
+
+      const leadName = c.name || c.wa_name || c.wa_contactName || `Lead +${cleanPhone}`;
+
+      if (!allChats[cleanPhone]) {
+        allChats[cleanPhone] = {
+          leadPhone: cleanPhone,
+          leadName,
+          instanceId: inst.id,
+          state: 'NOVO',
+          lastMessageTime: c.wa_lastMsgTimestamp ? new Date(c.wa_lastMsgTimestamp * 1000).toISOString() : new Date().toISOString(),
+          messages: []
+        };
+        importedChats++;
+      } else if (c.name && (!allChats[cleanPhone].leadName || allChats[cleanPhone].leadName.startsWith('Lead '))) {
+        allChats[cleanPhone].leadName = leadName;
+      }
+
+      // Busca mensagens recentes desta conversa se vazia
+      if (allChats[cleanPhone].messages.length === 0) {
+        try {
+          const msgs = await uazapiService.findMessages(inst.url_servidor, decToken, c.wa_chatid, 10);
+          if (Array.isArray(msgs)) {
+            for (const m of msgs) {
+              const text = (m.text || m.body || m.content || m.message?.conversation || '').trim();
+              if (text || m.fileURL) {
+                allChats[cleanPhone].messages.push({
+                  id: m.id || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                  timestamp: m.timestamp ? new Date(m.timestamp * 1000).toISOString() : new Date().toISOString(),
+                  from: m.fromMe ? 'agent' : 'lead',
+                  text: text || '[Mídia]',
+                  mediaUrl: m.fileURL || null,
+                  mediaType: m.messageType || null,
+                  instanceId: inst.id
+                });
+                importedMessages++;
+              }
+            }
+          }
+        } catch (mErr) {}
+      }
+    }
+
+    db.saveChats(allChats);
+    eventBus.emit('chat_updated', { total: Object.keys(allChats).length });
+    return { importedChats, importedMessages };
+  } catch (err) {
+    console.warn(`[uazapi Chat Sync Error]`, err.message);
+    return { importedChats: 0, importedMessages: 0 };
+  }
 }
 
 /**
  * Instâncias / Chips (CRUD)
+ * Sincroniza automaticamente instâncias uazapi pendentes em segundo plano
  */
-router.get('/instances', (req, res) => {
-  const instances = db.getInstances();
+router.get('/instances', async (req, res) => {
+  let instances = db.getInstances();
+  let updatedAny = false;
+
+  // Auto-sincroniza instâncias uazapi que estão 'connecting' ou com status desatualizado
+  for (let i = 0; i < instances.length; i++) {
+    const inst = instances[i];
+    if (inst.tipo === 'uazapi' && inst.instance_token) {
+      const isPending = inst.status === 'connecting';
+      const isStale = !inst.lastSyncedAt || (Date.now() - new Date(inst.lastSyncedAt).getTime() > 40000);
+      if (isPending || isStale) {
+        const changed = await syncUazapiInstanceData(inst, req);
+        if (changed) updatedAny = true;
+      }
+    }
+  }
+
+  if (updatedAny) {
+    instances = db.getInstances();
+  }
+
   // Mascara tokens para não expor segredos sensíveis no frontend
   const safe = instances.map(i => {
     const copy = { ...i };
@@ -117,6 +372,7 @@ router.get('/instances', (req, res) => {
   });
   res.json(safe);
 });
+
 
 router.post('/instances', (req, res) => {
   const instances = db.getInstances();
@@ -188,48 +444,6 @@ router.delete('/instances/:id', async (req, res) => {
  * ENDPOINTS uazapi (WHATSAPP API WEB)
  * =========================================================================
  */
-
-/**
- * Inicia o fluxo de conexão da uazapi:
- * 1. Cria a instância se necessário (usando UAZAPI_ADMIN_TOKEN) OU valida chave existente
-/**
- * Helpers para extração flexível e robusta de QR code, paircode e número conectado
- * Compatível com múltiplos formatos e versões da uazapi / Baileys
- */
-function extractQrCode(primaryObj, fallbackObj) {
-  const getVal = (obj) => {
-    if (!obj) return null;
-    return obj.qrcode || 
-           obj.instance?.qrcode || 
-           obj.base64 || 
-           obj.instance?.base64 || 
-           obj.qr || 
-           obj.instance?.qr || 
-           (typeof obj.status === 'object' ? (obj.status?.qrcode || obj.status?.base64) : null) || 
-           null;
-  };
-  return getVal(primaryObj) || getVal(fallbackObj) || null;
-}
-
-function extractPairCode(primaryObj, fallbackObj) {
-  const getVal = (obj) => {
-    if (!obj) return null;
-    return obj.paircode || 
-           obj.instance?.paircode || 
-           (typeof obj.status === 'object' ? obj.status?.paircode : null) || 
-           null;
-  };
-  return getVal(primaryObj) || getVal(fallbackObj) || null;
-}
-
-function extractConnectedUser(statusRes, connectRes) {
-  return statusRes?.status?.jid?.user ||
-         statusRes?.jid?.user ||
-         statusRes?.instance?.numero_conectado ||
-         connectRes?.jid?.user ||
-         connectRes?.instance?.numero_conectado ||
-         null;
-}
 
 /**
  * 1. POST /api/uazapi/init-connect
@@ -306,13 +520,9 @@ router.post('/uazapi/init-connect', async (req, res) => {
       statusRes = { status: { connected: false, loggedIn: false } };
     }
 
-    // Identifica se realmente há um número de WhatsApp conectado
+    // Identifica se realmente há conexão
+    const isFullyConnected = checkIsConnected(statusRes, connectRes);
     const connectedUser = extractConnectedUser(statusRes, connectRes);
-    const isFullyConnected = Boolean(
-      (statusRes?.status?.connected || statusRes?.connected || connectRes?.connected) &&
-      (statusRes?.status?.loggedIn || statusRes?.loggedIn || connectRes?.loggedIn || statusRes?.instance?.status === 'connected') &&
-      connectedUser
-    );
 
     // Extrai QR code e paircode de qualquer campo retornado pela uazapi
     const qrcode = extractQrCode(statusRes, connectRes);
@@ -330,7 +540,7 @@ router.post('/uazapi/init-connect', async (req, res) => {
       url_servidor: cleanServerUrl,
       instance_id: instanceId,
       instance_token: encryptedToken,
-      phoneNumber: connectedUser || cleanPhone || '',
+      phoneNumber: (connectedUser && /\d{8,}/.test(connectedUser)) ? connectedUser : (cleanPhone || ''),
       numero_conectado: connectedUser || '',
       status: isFullyConnected ? 'connected' : 'connecting',
       assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
@@ -345,7 +555,7 @@ router.post('/uazapi/init-connect', async (req, res) => {
 
     // Se a instância já estava autenticada anteriormente, ativa o webhook
     if (isFullyConnected) {
-      const webhookUrl = getPublicWebhookUrl(req);
+      const webhookUrl = getPublicWebhookUrl(req, connectionId);
       uazapiService.configureWebhook(cleanServerUrl, instanceToken, webhookUrl).catch(e => {
         console.warn('[uazapi Init] Aviso ao configurar webhook para instância pré-conectada:', e.message);
       });
@@ -373,10 +583,11 @@ router.post('/uazapi/init-connect', async (req, res) => {
 
 /**
  * Consulta o status da instância em polling (a cada 2-3s)
- * Se connected: true e loggedIn: true e número autenticado:
+ * Se conectada:
  * - Atualiza status no banco para 'connected'
- * - Salva numero_conectado a partir de status.jid.user
- * - Configura automaticamente o webhook na uazapi com excludeMessages: ["wasSentByApi"]
+ * - Salva número conectado
+ * - Configura automaticamente o webhook na uazapi com events: messages, messages_update, connection, chats
+ * - Dispara busca de conversas em segundo plano
  */
 router.get('/uazapi/status/:instanceId', async (req, res) => {
   try {
@@ -396,26 +607,30 @@ router.get('/uazapi/status/:instanceId', async (req, res) => {
     const decryptedToken = cryptoService.decrypt(inst.instance_token);
     const statusRes = await uazapiService.getInstanceStatus(inst.url_servidor, decryptedToken);
 
+    const isFullyConnected = checkIsConnected(statusRes, null);
     const connectedUser = extractConnectedUser(statusRes, null);
-    const isFullyConnected = Boolean(
-      (statusRes?.status?.connected || statusRes?.connected) &&
-      (statusRes?.status?.loggedIn || statusRes?.loggedIn || statusRes?.instance?.status === 'connected') &&
-      connectedUser
-    );
 
     if (isFullyConnected) {
+      const wasConnected = inst.status === 'connected';
       inst.status = 'connected';
-      inst.numero_conectado = connectedUser;
-      inst.phoneNumber = connectedUser;
+      if (connectedUser && /\d{8,}/.test(connectedUser)) {
+        inst.numero_conectado = connectedUser;
+        inst.phoneNumber = connectedUser;
+      }
       db.saveInstance(inst);
 
-      // Configuração automática do Webhook em Modo Simples
+      // Configuração automática do Webhook com URL pública + instanceId na query
       try {
-        const webhookUrl = getPublicWebhookUrl(req);
+        const webhookUrl = getPublicWebhookUrl(req, inst.id);
         await uazapiService.configureWebhook(inst.url_servidor, decryptedToken, webhookUrl);
         console.log(`[uazapi Status] ✓ Webhook configurado com sucesso para ${inst.name}: ${webhookUrl}`);
       } catch (webhookErr) {
         console.warn(`[uazapi Status] Aviso ao configurar webhook: ${webhookErr.message}`);
+      }
+
+      if (!wasConnected) {
+        eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
+        syncChatsFromUazapi(inst).catch(e => console.warn('[uazapi] Auto-sync chats aviso:', e.message));
       }
     } else {
       if (inst.status !== 'connecting') {
@@ -453,6 +668,40 @@ router.get('/uazapi/status/:instanceId', async (req, res) => {
 });
 
 /**
+ * Força sincronização de status e reconfiguração de webhook da uazapi manualmente
+ */
+router.post('/uazapi/sync/:instanceId', async (req, res) => {
+  try {
+    const inst = db.getInstance(req.params.instanceId);
+    if (!inst) return res.status(404).json({ success: false, error: 'Instância não encontrada' });
+    if (inst.tipo !== 'uazapi' || !inst.instance_token) {
+      return res.json({ success: true, instance: inst });
+    }
+
+    await syncUazapiInstanceData(inst, req);
+    const updated = db.getInstance(req.params.instanceId);
+    res.json({ success: true, instance: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Força sincronização de conversas e mensagens existentes da uazapi para o banco local
+ */
+router.post('/uazapi/sync-chats/:instanceId', async (req, res) => {
+  try {
+    const inst = db.getInstance(req.params.instanceId) || db.getInstances().find(i => i.tipo === 'uazapi' && i.status === 'connected');
+    if (!inst) return res.status(404).json({ success: false, error: 'Instância conectada não encontrada' });
+
+    const result = await syncChatsFromUazapi(inst);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * Renovação automática do QR Code quando atingir o timeout de 2 minutos
  */
 router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
@@ -471,12 +720,8 @@ router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
     
     const statusRes = await uazapiService.getInstanceStatus(inst.url_servidor, decryptedToken);
 
+    const isFullyConnected = checkIsConnected(statusRes, connectRes);
     const connectedUser = extractConnectedUser(statusRes, connectRes);
-    const isFullyConnected = Boolean(
-      (statusRes?.status?.connected || statusRes?.connected) &&
-      (statusRes?.status?.loggedIn || statusRes?.loggedIn) &&
-      connectedUser
-    );
 
     const qrcode = extractQrCode(statusRes, connectRes);
     const paircode = extractPairCode(statusRes, connectRes);
@@ -784,12 +1029,30 @@ router.get('/events', (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'chat_updated', data })}\n\n`);
   };
 
+  const onInstancesUpdated = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'instances_updated', data })}\n\n`);
+  };
+
+  const onConnectionStatus = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'connection_status', data })}\n\n`);
+  };
+
   eventBus.on('new_message', onNewMessage);
   eventBus.on('chat_updated', onChatUpdated);
+  eventBus.on('instances_updated', onInstancesUpdated);
+  eventBus.on('connection_status', onConnectionStatus);
+
+  // Keep-alive a cada 25 segundos para evitar timeout de proxies (Railway)
+  const pingInterval = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 25000);
 
   req.on('close', () => {
+    clearInterval(pingInterval);
     eventBus.removeListener('new_message', onNewMessage);
     eventBus.removeListener('chat_updated', onChatUpdated);
+    eventBus.removeListener('instances_updated', onInstancesUpdated);
+    eventBus.removeListener('connection_status', onConnectionStatus);
   });
 });
 

@@ -258,6 +258,11 @@ function initRealtimeEvents() {
           }
           // Atualiza contadores
           updateBadges();
+        } else if (payload.type === 'instances_updated' || payload.type === 'connection_status') {
+          if (state.currentView === 'instances') {
+            renderInstances();
+          }
+          updateBadges();
         }
       } catch (err) {
         console.error(err);
@@ -1636,6 +1641,12 @@ async function testTikTokPixelManual(code, token) {
    VIEW 2: INSTANCES (CHIPS DA META)
    ========================================================================= */
 async function renderInstances() {
+  // Limpa intervalo anterior de polling de conexões se existir
+  if (window.instancesConnectingPollInterval) {
+    clearInterval(window.instancesConnectingPollInterval);
+    window.instancesConnectingPollInterval = null;
+  }
+
   let instances = [];
   try {
     const res = await fetch('/api/instances');
@@ -1649,6 +1660,33 @@ async function renderInstances() {
   const badgeChips = document.getElementById('badge-chips');
   if (badgeChips) badgeChips.textContent = instances.length;
 
+  // Se houver algum chip uazapi conectando, inicia auto-polling a cada 3s para atualizar automaticamente
+  const hasConnecting = instances.some(i => i.tipo === 'uazapi' && i.status === 'connecting');
+  if (hasConnecting) {
+    window.instancesConnectingPollInterval = setInterval(async () => {
+      if (state.currentView !== 'instances') {
+        clearInterval(window.instancesConnectingPollInterval);
+        window.instancesConnectingPollInterval = null;
+        return;
+      }
+      try {
+        const pollRes = await fetch('/api/instances');
+        const pollData = await pollRes.json();
+        if (Array.isArray(pollData)) {
+          const changed = pollData.some((p, idx) => {
+            const old = instances[idx];
+            return !old || old.status !== p.status || old.numero_conectado !== p.numero_conectado;
+          });
+          if (changed) {
+            clearInterval(window.instancesConnectingPollInterval);
+            window.instancesConnectingPollInterval = null;
+            await renderInstances();
+          }
+        }
+      } catch (e) {}
+    }, 3200);
+  }
+
   const html = `
     <div class="card">
       <div class="card-header">
@@ -1659,6 +1697,9 @@ async function renderInstances() {
           </p>
         </div>
         <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" style="padding: 7px 13px; font-size: 12.5px; display: flex; align-items: center; gap: 5px;" onclick="renderInstances()">
+            <span>🔄</span> <span>Atualizar</span>
+          </button>
           <button class="btn-meta-register" style="padding: 7px 15px; font-size: 12.5px;" onclick="openAddChipModal()">
             🔌 Nova Conexão
           </button>
@@ -1682,7 +1723,7 @@ async function renderInstances() {
             ${instances.map(i => {
               const isUazapi = i.tipo === 'uazapi';
               const isConnected = i.status === 'connected';
-              const displayPhone = i.numero_conectado || i.phoneNumber || 'Aguardando pareamento';
+              const displayPhone = i.numero_conectado || i.phoneNumber || (isUazapi && isConnected ? '● Conectado' : 'Aguardando pareamento');
               return `
               <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
@@ -1739,10 +1780,15 @@ async function renderInstances() {
                   <div><strong>Mensagens Enviadas:</strong> ${i.totalSent || 0}</div>
                 </div>
 
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   ${isUazapi && !isConnected ? `
-                    <button class="btn btn-primary" style="flex: 1; font-size: 12px; padding: 8px 10px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="openUazapiQrModal('${i.id}')">
+                    <button class="btn btn-primary" style="flex: 1; min-width: 110px; font-size: 12px; padding: 8px 10px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="openUazapiQrModal('${i.id}')">
                       <span>📷</span> <span>Ver QR Code</span>
+                    </button>
+                  ` : ''}
+                  ${isUazapi ? `
+                    <button class="btn btn-secondary" style="font-size: 12px; padding: 8px 10px; display: flex; align-items: center; gap: 5px;" title="Sincronizar status live com a uazapi" onclick="syncUazapiChip('${i.id}')">
+                      <span>🔄</span> <span>Sincronizar</span>
                     </button>
                   ` : ''}
                   <button class="btn btn-secondary" style="${(isUazapi && !isConnected) ? '' : 'flex: 1;'} font-size: 12px;" onclick="testChip('${i.id}')">Testar Envio</button>
@@ -1758,6 +1804,27 @@ async function renderInstances() {
   `;
   document.getElementById('view-container').innerHTML = html;
 }
+
+window.syncUazapiChip = async function(id) {
+  showToast('Consultando status na uazapi...', 'info');
+  try {
+    const res = await fetch(`/api/uazapi/sync/${id}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success && data.instance) {
+      if (data.instance.status === 'connected') {
+        showToast(`✓ Chip sincronizado e conectado! (${data.instance.numero_conectado || 'Ativo'})`, 'success');
+      } else {
+        showToast(`Status: ${data.instance.status}. Aguardando pareamento no celular.`, 'warning');
+      }
+      await renderInstances();
+    } else {
+      showToast(data.error || 'Falha ao sincronizar chip', 'error');
+    }
+  } catch (err) {
+    showToast('Erro de rede ao sincronizar chip', 'error');
+  }
+};
+
 
 window.updateChipFlow = async function(instanceId, flowId) {
   try {
@@ -1803,9 +1870,20 @@ async function renderInbox(showLoading = true) {
       <div class="inbox-sidebar">
         <div class="inbox-search">
           <input type="text" class="form-input" placeholder="🔍 Buscar lead por número..." oninput="filterInbox(this.value)">
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 8px; font-size: 11.5px; padding: 7px 10px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="syncUazapiChats()">
+            <span>🔄</span> <span>Sincronizar WhatsApp</span>
+          </button>
         </div>
         <div class="chat-list" id="inbox-list">
-          ${phones.map(p => {
+          ${phones.length === 0 ? `
+            <div style="text-align: center; padding: 30px 14px; color: var(--text-muted); font-size: 12.5px;">
+              <div style="font-size: 30px; margin-bottom: 8px;">💬</div>
+              <p style="margin-bottom: 10px;">Nenhuma conversa recebida ainda.</p>
+              <button class="btn btn-primary" style="font-size: 11.5px; padding: 7px 12px;" onclick="syncUazapiChats()">
+                🔄 Buscar Conversas do WhatsApp
+              </button>
+            </div>
+          ` : phones.map(p => {
             const c = chats[p];
             const lastMsg = c.messages[c.messages.length - 1];
             const isActive = p === state.activeChatPhone;
@@ -1892,6 +1970,22 @@ async function sendManualMessage(e) {
 
   renderInbox(false);
 }
+
+window.syncUazapiChats = async function() {
+  showToast('🔄 Importando conversas do WhatsApp...', 'info');
+  try {
+    const res = await fetch('/api/uazapi/sync-chats/active', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ ${data.importedChats || 0} conversa(s) e ${data.importedMessages || 0} mensagem(ns) sincronizadas!`, 'success');
+      await renderInbox(false);
+    } else {
+      showToast(data.error || 'Nenhum chip ativo para sincronizar', 'warning');
+    }
+  } catch (err) {
+    showToast('Falha ao sincronizar conversas do WhatsApp', 'error');
+  }
+};
 
 /* =========================================================================
    VIEW 4: STUDIO (CALIBRADOR VISUAL DO PRINT)
@@ -2713,8 +2807,8 @@ function startUazapiPollingAndCountdown(instanceId) {
       }
 
       // Conexão bem-sucedida confirmada!
-      const connectedPhone = checkData.numero_conectado || checkData.instance?.numero_conectado || checkData.jid?.user || '';
-      const isConfirmedConnected = Boolean(checkData.connected === true && connectedPhone);
+      const connectedPhone = checkData.numero_conectado || checkData.instance?.numero_conectado || checkData.jid?.user || checkData.instance?.phoneNumber || checkData.instance?.profileName || '';
+      const isConfirmedConnected = Boolean(checkData.connected === true);
 
       if (isConfirmedConnected) {
         clearInterval(uazapiPollInterval);
@@ -2728,12 +2822,13 @@ function startUazapiPollingAndCountdown(instanceId) {
           statusBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
         }
         if (statusSpinner) statusSpinner.style.display = 'none';
+        const displayInfo = (connectedPhone && /\d{8,}/.test(connectedPhone)) ? `(+${connectedPhone})` : (connectedPhone || 'Conectado');
         if (statusText) {
           statusText.style.color = '#10b981';
-          statusText.textContent = `✅ WhatsApp Conectado com Sucesso! (+${connectedPhone})`;
+          statusText.textContent = `✅ WhatsApp Conectado com Sucesso! ${displayInfo}`;
         }
 
-        showToast(`✓ WhatsApp Conectado com sucesso! (+${connectedPhone})`, 'success');
+        showToast(`✓ WhatsApp Conectado com sucesso! ${displayInfo}`, 'success');
 
         setTimeout(async () => {
           closeAddChipModal();

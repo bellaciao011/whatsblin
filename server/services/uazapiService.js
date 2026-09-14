@@ -206,7 +206,7 @@ async function configureWebhook(serverUrl, instanceToken, webhookUrl) {
 
   const payload = {
     url: webhookUrl,
-    events: ['messages', 'connection'],
+    events: ['messages', 'messages_update', 'connection', 'chats'],
     excludeMessages: ['wasSentByApi']
   };
 
@@ -345,6 +345,71 @@ async function disconnectInstance(serverUrl, instanceToken) {
   }
 }
 
+/**
+ * 8. Busca conversas recentes da instância
+ * POST /chat/find
+ */
+async function findChats(serverUrl, instanceToken, limit = 50) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) throw new Error('Token da instância não informado.');
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/chat/find`,
+      {
+        operator: 'AND',
+        sort: '-wa_lastMsgTimestamp',
+        limit: Math.min(limit, 100),
+        offset: 0
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 15000
+      }
+    );
+    return res.data?.chats || [];
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.warn(`[uazapiService] Aviso ao buscar chats:`, parsed.message);
+    return [];
+  }
+}
+
+/**
+ * 9. Busca mensagens de um chat
+ * POST /message/find
+ */
+async function findMessages(serverUrl, instanceToken, chatId, limit = 20) {
+  const baseUrl = normalizeServerUrl(serverUrl);
+  if (!instanceToken) throw new Error('Token da instância não informado.');
+  if (!chatId) return [];
+
+  try {
+    const res = await axios.post(
+      `${baseUrl}/message/find`,
+      {
+        chatid: chatId,
+        limit: Math.min(limit, 50)
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceToken.trim()
+        },
+        timeout: 15000
+      }
+    );
+    return res.data?.messages || res.data || [];
+  } catch (err) {
+    const parsed = parseApiError(err);
+    console.warn(`[uazapiService] Aviso ao buscar mensagens para ${chatId}:`, parsed.message);
+    return [];
+  }
+}
+
 module.exports = {
   normalizeServerUrl,
   parseApiError,
@@ -354,5 +419,8 @@ module.exports = {
   configureWebhook,
   sendTextMessage,
   sendMediaMessage,
-  disconnectInstance
+  disconnectInstance,
+  findChats,
+  findMessages
 };
+

@@ -68,10 +68,11 @@ router.post('/uazapi', async (req, res) => {
       if (instance) {
         if (connStatus === 'connected' || connStatus === 'open' || data.connected === true) {
           instance.status = 'connected';
-          const userPhone = data.jid?.user || data.user || (typeof data.jid === 'string' ? data.jid.replace(/\D/g, '') : null);
-          if (userPhone) {
-            instance.numero_conectado = userPhone;
-            instance.phoneNumber = userPhone;
+          const userPhone = data.jid?.user || data.user || data.owner || data.instance?.owner || (typeof data.jid === 'string' ? data.jid.split('@')[0].replace(/\D/g, '') : null);
+          if (userPhone && String(userPhone).replace(/\D/g, '').length >= 8) {
+            const cleanDigits = String(userPhone).replace(/\D/g, '');
+            instance.numero_conectado = cleanDigits;
+            instance.phoneNumber = cleanDigits;
           }
           db.saveInstance(instance);
           console.log(`[uazapi Webhook] ✓ Instância ${instance.name} marcada como CONECTADA (${instance.numero_conectado || 'sem número'})`);
@@ -81,6 +82,7 @@ router.post('/uazapi', async (req, res) => {
           console.warn(`[uazapi Webhook] ⚠️ Instância ${instance.name} marcada como DESCONECTADA`);
         }
         eventBus.emit('connection_status', { instanceId: instance.id, status: instance.status });
+        eventBus.emit('instances_updated', { instanceId: instance.id, status: instance.status });
       }
       return;
     }
@@ -88,7 +90,7 @@ router.post('/uazapi', async (req, res) => {
     // =========================================================================
     // 2. TRATAMENTO DE EVENTOS DE MENSAGENS (LEADS)
     // =========================================================================
-    if (eventType === 'messages' || eventType === 'message') {
+    if (eventType === 'messages' || eventType === 'message' || eventType === 'messages_update') {
       const messagesList = Array.isArray(data) ? data : (data.messages || [data]);
 
       for (const msg of messagesList) {

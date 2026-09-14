@@ -12,6 +12,9 @@ const domainRoutes = require('./routes/domainRoutes');
 
 const app = express();
 
+// Habilita trust proxy para Railway e proxies reversos
+app.set('trust proxy', true);
+
 // Middlewares globais
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
