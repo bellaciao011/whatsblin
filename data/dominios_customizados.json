@@ -1,17 +1,16 @@
 [
   {
-    "id": "r_mock_1789520829349_t20zq",
+    "id": "dom_1789528367468_748",
     "dominio": "wtb.expresstrackin-g.com",
+    "cname_target": "whatsblin-production.up.railway.app",
+    "railway_domain_id": "r_mock_1789528367468_30959",
     "status": "ativo",
+    "ativo": true,
+    "account_id": "acc_admin_default",
+    "criado_em": "2026-09-16T03:12:47.468Z",
+    "atualizado_em": "2026-09-16T03:12:51.015Z",
     "verified": true,
-    "ssl_status": "active",
-    "railwayDomainId": "r_mock_1789520829349_t20zq",
-    "target": "9672ffbb-dcc5-45e9-86e3-3beac1664ae5.up.railway.app",
-    "cname": "wtb",
-    "criado_em": "2026-09-15T21:07:09.000Z",
-    "createdAt": "2026-09-15T21:07:09.000Z",
-    "lastChecked": "2026-09-16T03:18:22.759Z",
-    "ativo": true
+    "certificateStatus": "ISSUED"
   },
   {
     "id": "r_mock_1789520648617_aq8b9",
