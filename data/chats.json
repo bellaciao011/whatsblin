@@ -1,1 +1,24 @@
-{}
+{
+  "557196774123": {
+    "phone": "557196774123",
+    "state": "OFERTA_ENVIADA",
+    "assignedFlowId": "fluxo-espiao-es",
+    "flowLanguage": "es",
+    "messages": [],
+    "instanceId": "uaz_r58fb9541ea17a0",
+    "variables": {
+      "phone": "557196774123",
+      "firstName": "Amigo(a)",
+      "checkoutUrl100": "https://pay.kirvano.com/checkout-100",
+      "checkoutUrl200": "https://pay.kirvano.com/checkout-200",
+      "checkoutUrl400": "https://pay.kirvano.com/checkout-400",
+      "checkoutUrl": "https://wtb.expresstrackin-g.com/checkout?codigo=LEAD",
+      "valor_atual": "39",
+      "valor_pago": "0",
+      "proximo_valor": null,
+      "alvo": "79991580308",
+      "photoUrl": null
+    },
+    "upsellStage": "stage_49"
+  }
+}

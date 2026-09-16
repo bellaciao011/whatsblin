@@ -62,6 +62,10 @@ function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
   );
   if (isStart) return false;
 
+  // Envio de número de telefone nunca é bloqueado como duplicata
+  const isPhone = Boolean(extractNewTargetPhone(text));
+  if (isPhone) return false;
+
   if (msgId && seenMessageIds.has(msgId)) return true;
 
   try {
@@ -212,34 +216,75 @@ async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, m
 /**
  * Consulta a foto do perfil do número alvo via API oficial do stalkea.app
  */
-async function lookupProfilePicture(targetPhone) {
-  const settings = db.getSettings();
-  const endpoint = settings.profileLookupService || 'https://stalkea.app/spp/api/profile-picture.php';
+async function lookupProfilePicture(targetPhone, instance = null) {
+  if (!targetPhone) return null;
+  let digits = String(targetPhone).replace(/\D/g, '');
+  
+  // Normalização para número brasileiro sem DDI 55:
+  // 10 dígitos (DDD + 8 dígitos) ou 11 dígitos (DDD + 9 dígitos)
+  if (digits.length === 10 || digits.length === 11) {
+    digits = '55' + digits;
+  }
 
-  if (endpoint && endpoint.startsWith('http')) {
+  // Candidatos para consulta (ex: com e sem o 9º dígito em celulares BR)
+  const candidates = [digits];
+  if (digits.startsWith('55') && digits.length === 13 && digits[4] === '9') {
+    candidates.push('55' + digits.substring(2, 4) + digits.substring(5)); // Formato 8 dígitos
+  } else if (digits.startsWith('55') && digits.length === 12) {
+    candidates.push('55' + digits.substring(2, 4) + '9' + digits.substring(4)); // Formato 9 dígitos
+  }
+
+  // 1. PRIORIDADE MÁXIMA: Consulta direta na API oficial do WhatsApp via Uazapi (/chat/details)
+  try {
+    const instances = db.getInstances();
+    const inst = instance || instances.find(i => i.status === 'connected' && i.tipo === 'uazapi') || instances.find(i => i.tipo === 'uazapi') || instances[0];
+    if (inst && inst.url_servidor && inst.instance_token) {
+      const decToken = cryptoService.decrypt(inst.instance_token);
+      for (const num of candidates) {
+        try {
+          console.log(`[Lookup API] Consultando foto via WhatsApp oficial (Uazapi) para: ${num}`);
+          const res = await axios.post(`${inst.url_servidor}/chat/details`, { number: num, preview: false }, {
+            headers: { token: decToken, 'Content-Type': 'application/json' },
+            timeout: 6000
+          });
+          if (res.data && res.data.image && typeof res.data.image === 'string' && res.data.image.startsWith('http')) {
+            console.log(`[Lookup API] ✓ Foto pública encontrada com sucesso via Uazapi: ${res.data.image}`);
+            return res.data.image;
+          }
+        } catch (uazErr) {
+          console.warn(`[Lookup API] Tentativa Uazapi para ${num} falhou: ${uazErr.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Lookup API] Erro ao consultar Uazapi:', err.message);
+  }
+
+  // 2. FALLBACK SECUNDÁRIO: API Stalkea.app
+  for (const num of candidates) {
     try {
-      const url = `${endpoint}?phone=${encodeURIComponent(targetPhone)}`;
-      console.log(`[Lookup API] Consultando foto de perfil: ${url}`);
+      const url = `https://stalkea.app/spp/api/profile-picture.php?phone=${encodeURIComponent(num)}`;
+      console.log(`[Lookup API] Tentando fallback stalkea.app: ${url}`);
       const res = await axios.get(url, {
-        timeout: 7000,
+        timeout: 5000,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
       });
-
       if (res.data && res.data.urlImage) {
-        console.log(`[Lookup API] ✓ Foto pública encontrada: ${res.data.urlImage}`);
+        console.log(`[Lookup API] ✓ Foto encontrada via stalkea.app: ${res.data.urlImage}`);
         return res.data.urlImage;
       }
-      console.log('[Lookup API] 🔒 Perfil sem foto pública ou privada (retornou null)');
-      return null;
-    } catch (err) {
-      console.warn('[Lookup API] Erro na requisição de foto:', err.message);
-      return null;
+    } catch (stalkErr) {
+      // ignore
     }
   }
 
+  console.log('[Lookup API] 🔒 Perfil sem foto pública ou privada (retornou null)');
   return null;
 }
 
+/**
+ * Substitui variáveis dinâmicas no texto da mensagem ou em campos de configuração
+ */
 /**
  * Substitui variáveis dinâmicas no texto da mensagem ou em campos de configuração
  */
@@ -555,16 +600,16 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   const instances = db.getInstances();
   const inst = instances.find(i => i.id === instance?.id || i.instance_id === instance?.id || (instance?.instance_id && i.instance_id === instance.instance_id) || (instance?.phoneNumberId && i.phoneNumberId === instance.phoneNumberId)) || instance || instances[0] || { id: 'inst_1' };
   const funnel = db.getFunnel();
-  const chats = db.getChats();
-  let chatData = chats[cleanPhone];
+  let chatData = db.getChat(cleanPhone);
 
-  // 1. Vinculação Estrita: localiza o fluxo configurado para o chat ativo ou para ESTE chip específico
+  // 1. Vinculação Estrita: fluxo em Espanhol
   const targetFlowId = inst.assignedFlowId || chatData?.assignedFlowId || 'fluxo-espiao-es';
   const flows = db.getFlows();
   const activeFlow = flows.find(f => f.id === targetFlowId) || flows.find(f => f.status === 'ativo') || flows[0];
   const flowLanguage = 'es'; // RIGOROSAMENTE 100% ESPANHOL
 
   console.log(`[FlowEngine] 🚀 Executando fluxo: "${activeFlow?.name}" (${activeFlow?.id}, lang: ${flowLanguage}) para Chip: "${inst.name || inst.id}"`);
+  
   if (!chatData) {
     chatData = {
       leadPhone: cleanPhone,
@@ -581,7 +626,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     };
   }
 
-  // Atualiza sempre a vinculação de instância e fluxo
+  // Atualiza sempre a vinculação
   chatData.instanceId = inst.id || chatData.instanceId || 'inst_1';
   chatData.assignedFlowId = activeFlow.id;
   chatData.flowLanguage = flowLanguage;
@@ -600,7 +645,6 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.codigo = storedAttr.codigo;
     chatData.attribution = storedAttr;
   }
-  const rawDigits = (messageText || '').replace(/\D/g, '');
   const stageInfo = getCurrentStageInfo(chatData.upsellStage, funnel, flowLanguage, chatData.codigo || 'lead');
   
   chatData.variables.checkoutUrl = stageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
@@ -608,23 +652,22 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   chatData.variables.valor_pago = stageInfo.paidValue;
   chatData.variables.proximo_valor = stageInfo.nextValue;
 
-  // 0.2 RECONHECIMENTO DE NOVO FUNIL / ENTRADA DE ANÚNCIO (CAMPANHA):
-  // Se o lead enviar mensagem inicial da pressel/anúncio (ex: "Hola, quiero espiar un número. (CÓDIGO...)"),
-  // reinicia imediatamente o ciclo do funil para NOVO, independente do histórico anterior.
+  const rawMsg = (messageText || '').trim();
+
+  // 0.2 RECONHECIMENTO DE ENTRADA DE ANÚNCIO / CAMPANHA
   const isCampaignStart = Boolean(
-    (messageText && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(messageText)) ||
-    (messageText && /\b[A-Z0-9]{6}\b/i.test(messageText)) ||
-    (messageText && messageText.includes('(') && messageText.includes(')'))
+    (rawMsg && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(rawMsg)) ||
+    (rawMsg && /\b[A-Z0-9]{6}\b/i.test(rawMsg)) ||
+    (rawMsg && rawMsg.includes('(') && rawMsg.includes(')'))
   );
 
   if (isCampaignStart) {
-    console.log(`[FlowEngine] 🚀 Lead +${cleanPhone} iniciou/reiniciou funil via anúncio/código! Resetando estado para NOVO e LIMPANDO histórico completo.`);
+    console.log(`[FlowEngine] 🚀 Lead +${cleanPhone} iniciou/reiniciou funil via anúncio/código! Resetando estado para NOVO.`);
     chatData.state = 'NOVO';
     chatData.upsellStage = 'stage_49';
     chatData.currentNodeId = null;
     chatData.orderStatus = null;
-    chatData.variables = { phone: cleanPhone };
-    chatData.messages = []; // Limpa 100% da memória de mensagens deste lead
+    chatData.variables = { phone: cleanPhone, checkoutUrl: chatData.variables.checkoutUrl, valor_atual: '39' };
     lastBotReplyTimestamps.delete(cleanPhone);
     lastPhysicalSendTimes.delete(cleanPhone);
   }
@@ -632,442 +675,89 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // Helper para obter o texto configurado no nó visual do fluxo ativo
   const getNodeText = (nodeId, fallback) => {
     const node = activeFlow?.nodes?.find(n => n.id === nodeId);
-    return node?.data?.text || fallback;
+    return node?.data?.text || node?.data?.content || fallback;
   };
 
   // =========================================================================
-  // CASO 0: LEAD JÁ FINALIZOU / JÁ PAGOU O FRONT (PÓS-VENDA & ATENDIMENTO A DÚVIDAS)
-  // No funil em espanhol não há upsell no chat: apenas esclarece dúvidas após o pagamento
+  // 1. RECONHECIMENTO DE COMPROVANTE OU AVISO DE PAGAMENTO ("ya pagué", etc.)
   // =========================================================================
-  if (chatData.state === 'FINALIZADO' || chatData.state === 'PAGO' || chatData.state === 'APROVADO') {
-    console.log(`[FlowEngine] Lead finalizado enviou mensagem (${cleanPhone}). Respondendo dúvidas com IA (Lang: ${flowLanguage})...`);
-    const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
-    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id }, 'FINALIZADO');
-    await sendOutgoingTextMessage(inst, cleanPhone, aiReply);
-    eventBus.emit('chat_updated', { phone: cleanPhone });
-    return;
-  }
-
-  // =========================================================================
-  // CASO 1: LEAD JÁ ESTÁ NA ETAPA DE OFERTA / UPSELL (REPOSTAS, OBJEÇÕES, COMPROVANTES)
-  // =========================================================================
-  if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'DUVIDAS') {
-    // 1.0 Detecção de intenção / aviso de pagamento ("ya pagué", "já paguei", "pago realizado", etc.)
-    const isPaymentClaim = /(?:ya\s*pag[uú][eé]|listo\s*pag|pago\s*realizado|ya\s*compr[eé]|acabo\s*de\s*pagar|pagu[eé]\s*con\s*tarjeta|pago\s*hecho|j[aá]\s*paguei|paguei)/i.test(messageText);
-
-    if (isPaymentClaim) {
-      const isAlreadyPaid = chatData.orderStatus === 'PAGO' || chatData.state === 'FINALIZADO' || storedAttr?.venda_confirmada;
-
-      if (isAlreadyPaid) {
-        const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
-        const leadToken = `cw_sec_${String(accessCode).toLowerCase()}_2026`;
-        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}&cw_token=${leadToken}&view=lead`;
-        const paidMsg = flowLanguage === 'es'
-          ? `¡Tu pago ya está confirmado y activo en nuestro sistema! 🎉\n\nTu acceso completo e ilimitado al panel está disponible aquí:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`
-          : `Seu pagamento já está aprovado e ativo! 🎉\n\nSeu acesso foi liberado com sucesso!`;
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: paidMsg, instanceId: inst.id }, 'FINALIZADO');
-        await sendOutgoingTextMessage(inst, cleanPhone, paidMsg);
-        chatData.state = 'FINALIZADO';
-        chatData.upsellStage = 'stage_finalizado';
-        chats[cleanPhone] = chatData;
-        db.saveChats(chats);
-        eventBus.emit('chat_updated', { phone: cleanPhone });
-        return;
-      } else {
-        // Liberação 100% AUTOMÁTICA no WhatsApp quando o lead avisa que pagou!
-        const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
-        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
-        const autoDeliverMsg = flowLanguage === 'es'
-          ? `¡Pago recibido y validado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel ha sido desbloqueado.\n\nAccede ahora mismo a través de este enlace seguro:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`
-          : `Pagamento confirmado com sucesso! 🎉\n\nSeu acesso foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: autoDeliverMsg, instanceId: inst.id }, 'FINALIZADO');
-        await sendOutgoingTextMessage(inst, cleanPhone, autoDeliverMsg);
-        chatData.state = 'FINALIZADO';
-        chatData.upsellStage = 'stage_finalizado';
-        chatData.orderStatus = 'PAGO';
-        chats[cleanPhone] = chatData;
-        db.saveChats(chats);
-        db.confirmAttributionSale(cleanPhone, flowLanguage === 'es' ? 39 : 49.90);
-        eventBus.emit('chat_updated', { phone: cleanPhone });
-        return;
-      }
-    }
-    // 1.1 Se o lead enviou imagem ou comprovante válido
-    const isComprovanteValido = mediaAttachment || messageText.toLowerCase().includes('[comprovante_valido]') || messageText.toLowerCase().includes('comprovante aprovado') || messageText.toLowerCase().includes('comprobante aprobado') || messageText.toLowerCase().includes('receipt approved');
-    const isImagemInvalida = messageText.toLowerCase().includes('[print_invalido]') || messageText.toLowerCase().includes('[imagem_aleatoria]');
-
-    if (isImagemInvalida) {
-      let defaultNoReceipt = "Não recebi nenhum comprovante na imagem que você enviou. Pode mandar uma foto ou print nítido do comprovante de pagamento do valor de R$ {currentValue}? Assim consigo verificar certinho para liberar o próximo passo.";
-      if (flowLanguage === 'es') {
-        defaultNoReceipt = "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ 39? Así puedo verificarlo para habilitar tu acceso.";
-      } else if (flowLanguage === 'en') {
-        defaultNoReceipt = "I didn't receive any receipt in the image you sent. Could you send a clear photo or screenshot of the payment receipt for $ {currentValue}? That way I can verify it and unlock the next step.";
-      }
-
-      const reply = defaultNoReceipt.replace(/\{currentValue\}/g, stageInfo.value);
-      
-      db.addChatMessage(cleanPhone, { from: 'bot', text: reply, instanceId: inst.id });
-      await sendOutgoingTextMessage(inst, cleanPhone, reply);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    }
-
-    if (isComprovanteValido) {
-      console.log(`[FlowEngine] ✓ Comprovante recebido para etapa: ${chatData.upsellStage} (Lang: ${flowLanguage})`);
-
-      // Avança para a próxima etapa de Upsell
-      // Funil em Espanhol: NÃO tem upsell no WhatsApp! Entrega acesso imediatamente por $39
-      if (flowLanguage === 'es') {
-        chatData.upsellStage = 'stage_finalizado';
-        chatData.state = 'FINALIZADO';
-        chatData.variables.valor_pago = '39';
-        chatData.variables.valor_atual = '39';
-        chatData.variables.proximo_valor = 'Finalizado';
-
-        const fallbackMaster = "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas.";
-        const finalText = getNodeText('node-access-released', fallbackMaster);
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_49') {
-        chatData.upsellStage = 'stage_100';
-        chatData.variables.checkoutUrl = funnel.upsellStages?.stage_100?.checkoutUrl || 'https://pay.kirvano.com/checkout-100';
-        chatData.variables.valor_atual = '100';
-        chatData.variables.valor_pago = flowLanguage === 'pt' ? '49,90' : '49.90';
-        chatData.variables.proximo_valor = '200';
-
-        const fallback100 = flowLanguage === 'en'
-          ? "Payment of $49.90 received ✅\n\nNext payment to unlock everything: $100 👇\n\n{checkoutUrl100}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-          : "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado!";
-        const upsellText = getNodeText('node-upsell-100', fallback100);
-        const finalText = interpolateVariables(upsellText, chatData.variables);
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_100') {
-        chatData.upsellStage = 'stage_200';
-        chatData.variables.checkoutUrl = funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200';
-        chatData.variables.valor_atual = '200';
-        chatData.variables.valor_pago = '100';
-        chatData.variables.proximo_valor = '400';
-
-        const fallback200 = flowLanguage === 'en'
-          ? "Payment of $100 received ✅\n\nNext payment to unlock everything: $200 👇\n\n{checkoutUrl200}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-          : "Pagamento de R$ 100 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 200 👇\n\n{checkoutUrl200}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
-
-        const upsellText = getNodeText('node-upsell-200', fallback200);
-        const finalText = interpolateVariables(upsellText, chatData.variables);
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_200') {
-        chatData.upsellStage = 'stage_400';
-        chatData.variables.checkoutUrl = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
-        chatData.variables.valor_atual = '400';
-        chatData.variables.valor_pago = '200';
-        chatData.variables.proximo_valor = 'Finalizado';
-
-        const fallback400 = flowLanguage === 'en'
-          ? "Payment of $200 received ✅\n\nNext payment to unlock everything: $400 👇\n\n{checkoutUrl400}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-          : "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl400}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
-
-        const upsellText = getNodeText('node-upsell-400', fallback400);
-        const finalText = interpolateVariables(upsellText, chatData.variables);
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_400') {
-        chatData.upsellStage = 'stage_finalizado';
-        chatData.state = 'FINALIZADO';
-        
-        const fallbackMaster = flowLanguage === 'en'
-          ? "Payment of $400 successfully received ✅\n\nYour complete and unrestricted dashboard access has been unlocked! Log into your dashboard and enjoy all tools."
-          : "Pagamento de R$ 400 recebido com sucesso ✅\n\nSeu acesso completo e irrestrito ao painel foi liberado! Acesse seu painel e aproveite todas as ferramentas.";
-
-        const finalText = getNodeText('node-access-released', fallbackMaster);
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_100') {
-        chatData.upsellStage = 'stage_200';
-        chatData.variables.checkoutUrl = funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200';
-        chatData.variables.valor_atual = '200';
-        chatData.variables.valor_pago = '100';
-        chatData.variables.proximo_valor = '400';
-
-        const fallback200 = flowLanguage === 'es'
-          ? "Pago de $100 recibido ✅\n\nSiguiente pago para desbloquear todo: $200 👇\n\n{checkoutUrl200}\n\n¡Puedes continuar y enviarme el comprobante en cuanto termines!"
-          : (flowLanguage === 'en'
-            ? "Payment of $100 received ✅\n\nNext payment to unlock everything: $200 👇\n\n{checkoutUrl200}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-            : "Pagamento de R$ 100 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 200 👇\n\n{checkoutUrl200}\n\nPode seguir e me enviar o comprovante assim que finalizar!");
-
-        const upsellText = getNodeText('node-upsell-200', fallback200);
-        const finalText = interpolateVariables(upsellText, chatData.variables);
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_200') {
-        chatData.upsellStage = 'stage_400';
-        chatData.variables.checkoutUrl = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
-        chatData.variables.valor_atual = '400';
-        chatData.variables.valor_pago = '200';
-        chatData.variables.proximo_valor = 'Finalizado';
-
-        const fallback400 = flowLanguage === 'es'
-          ? "Pago de $200 recibido ✅\n\nSiguiente pago para desbloquear todo: $400 👇\n\n{checkoutUrl400}\n\n¡Puedes continuar e enviarme el comprobante en cuanto termines!"
-          : (flowLanguage === 'en'
-            ? "Payment of $200 received ✅\n\nNext payment to unlock everything: $400 👇\n\n{checkoutUrl400}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-            : "Pagamento de R$ 200 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 400 👇\n\n{checkoutUrl400}\n\nPode seguir e me enviar o comprovante assim que finalizar!");
-
-        const upsellText = getNodeText('node-upsell-400', fallback400);
-        const finalText = interpolateVariables(upsellText, chatData.variables);
-
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      } else if (chatData.upsellStage === 'stage_400') {
-        chatData.upsellStage = 'stage_finalizado';
-        chatData.state = 'FINALIZADO';
-        
-        const fallbackMaster = flowLanguage === 'es'
-          ? "Pago de $400 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas."
-          : (flowLanguage === 'en'
-            ? "Payment of $400 successfully received ✅\n\nYour complete and unrestricted dashboard access has been unlocked! Log into your dashboard and enjoy all tools."
-            : "Pagamento de R$ 400 recebido com sucesso ✅\n\nSeu acesso completo e irrestrito ao painel foi liberado! Acesse seu painel e aproveite todas as ferramentas.");
-
-        const finalText = getNodeText('node-access-released', fallbackMaster);
-        db.addChatMessage(cleanPhone, { from: 'bot', text: finalText, instanceId: inst.id });
-        await sendOutgoingTextMessage(inst, cleanPhone, finalText);
-      }
-
-      // Se houver nós de Pixel TikTok no fluxo ativo, dispara evento CompletePayment
-      const ttNodes = activeFlow?.nodes?.filter(n => n.type === 'tiktok_pixel');
-      if (ttNodes && ttNodes.length > 0) {
-        for (const ttNode of ttNodes) {
-          executeTikTokPixelNode(ttNode, chatData).catch(err => {
-            console.warn('[FlowEngine] Aviso disparando nó TikTok Pixel:', err.message);
-          });
-        }
-      } else {
-        // Roteamento inteligente por plataforma de atribuição (Facebook CAPI ou TikTok Events API)
-        const attribution = db.getTrafficAttributionByPhone(cleanPhone);
-        const originPlatform = (attribution?.platform || (attribution?.ttclid ? 'tiktok' : (attribution?.fbclid ? 'facebook' : 'organico'))).toLowerCase();
-
-        if (originPlatform === 'facebook') {
-          const fbPixels = db.getPixels();
-          if (fbPixels && fbPixels.length > 0) {
-            metaService.sendConversionEvent({
-              pixelId: fbPixels[0].pixelId,
-              accessToken: fbPixels[0].accessToken,
-              eventName: 'Purchase',
-              phone: cleanPhone,
-              value: parseFloat(chatData.variables.valor_pago) || (flowLanguage === 'es' ? 39 : 49.90),
-              currency: flowLanguage === 'pt' ? 'BRL' : 'USD',
-              testEventCode: fbPixels[0].testEventCode
-            }).catch(e => console.warn('[FlowEngine] Erro disparo automático Facebook CAPI:', e.message));
-          }
-        } else if (originPlatform === 'tiktok') {
-          const ttPixels = db.getTikTokPixels();
-          if (ttPixels && ttPixels.length > 0) {
-            tiktokService.sendTikTokEvent({
-              pixelCode: ttPixels[0].pixel_code,
-              accessToken: ttPixels[0].access_token,
-              eventName: 'CompletePayment',
-              phone: cleanPhone,
-              attribution,
-              value: parseFloat(chatData.variables.valor_pago) || (flowLanguage === 'es' ? 39 : 49.90),
-              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
-            }).catch(e => console.warn('[FlowEngine] Erro disparo automático TikTok:', e.message));
-          }
-        } else {
-          // Origem mista ou orgânica: dispara nos pixels cadastrados para Advanced Matching
-          const fbPixels = db.getPixels();
-          if (fbPixels && fbPixels.length > 0) {
-            metaService.sendConversionEvent({
-              pixelId: fbPixels[0].pixelId,
-              accessToken: fbPixels[0].accessToken,
-              eventName: 'Purchase',
-              phone: cleanPhone,
-              value: parseFloat(chatData.variables.valor_pago) || (flowLanguage === 'es' ? 39 : 49.90),
-              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
-            }).catch(e => console.warn('[FlowEngine] Fallback Facebook CAPI:', e.message));
-          }
-          const ttPixels = db.getTikTokPixels();
-          if (ttPixels && ttPixels.length > 0) {
-            tiktokService.sendTikTokEvent({
-              pixelCode: ttPixels[0].pixel_code,
-              accessToken: ttPixels[0].access_token,
-              eventName: 'CompletePayment',
-              phone: cleanPhone,
-              attribution: attribution || {},
-              value: parseFloat(chatData.variables.valor_pago) || (flowLanguage === 'es' ? 39 : 49.90),
-              currency: flowLanguage === 'pt' ? 'BRL' : 'USD'
-            }).catch(e => console.warn('[FlowEngine] Fallback TikTok Events:', e.message));
-          }
-        }
-      }
-
-      const currentChats = db.getChats();
-      currentChats[cleanPhone] = {
-        ...currentChats[cleanPhone],
-        upsellStage: chatData.upsellStage,
-        state: chatData.state,
-        variables: chatData.variables,
-        instanceId: inst.id,
-        assignedFlowId: activeFlow.id,
-        flowLanguage: flowLanguage
-      };
-      db.saveChats(currentChats);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    }
-
-    // 1.1.5 O lead quer testar outro número e enviou o novo número (ex: 96981266512 ou (11) 99999-8888)
-    const newTargetDigits = extractNewTargetPhone(messageText);
-    if (newTargetDigits) {
-      const normalizedNewTarget = newTargetDigits.length <= 11 && flowLanguage === 'pt' ? '55' + newTargetDigits : newTargetDigits;
-      console.log(`[FlowEngine] 🔄 Lead solicitou investigação de NOVO NÚMERO: ${normalizedNewTarget} (número anterior: ${chatData.variables.alvo})`);
-
-      chatData.variables.alvo = normalizedNewTarget;
-      chatData.state = 'ANALISANDO';
-      db.saveChat(cleanPhone, chatData);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-
-      // 1. Confirmação imediata informando início da busca do novo número
-      const fallbackStartingNew = flowLanguage === 'es'
-        ? `¡Perfecto! Voy a iniciar la búsqueda para el número ${normalizedNewTarget} y ya te traigo la previa. Espera un momento mientras verificamos en el sistema... 🔍`
-        : (flowLanguage === 'en'
-          ? `Perfect! I'll start checking the number ${normalizedNewTarget} right away. Please wait a moment while we verify in the system... 🔍`
-          : `¡Perfecto! Voy a iniciar la búsqueda para el número ${normalizedNewTarget} y ya te traigo la previa. Espera un momento mientras verificamos en el sistema... 🔍`);
-
-      db.addChatMessage(cleanPhone, { from: 'bot', text: fallbackStartingNew, instanceId: inst.id }, 'ANALISANDO');
-      await sendOutgoingTextMessage(inst, cleanPhone, fallbackStartingNew, 1800);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-
-      // 2. Simula tempo de busca no sistema e consulta foto de perfil
-      await simulateTyping(inst, cleanPhone, 2500, 'composing');
-      const photoUrl = await lookupProfilePicture(normalizedNewTarget);
-      chatData.variables.photoUrl = photoUrl;
-      chatData.targetPhotoUrl = photoUrl;
-
-      // 3. Monta a nova imagem de prova personalizada para o novo alvo
-      const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
-      const proofsDir = path.join(__dirname, '../../public/generated');
-      fs.mkdirSync(proofsDir, { recursive: true });
-      const filename = `proof_${cleanPhone}_${Date.now()}.png`;
-      fs.writeFileSync(path.join(proofsDir, filename), imgBuffer);
-      const webProofUrl = `/generated/${filename}`;
-
-      const proofCaption = photoUrl
-        ? (flowLanguage === 'es' ? '✓ Nueva prueba generada con foto en el audio' : (flowLanguage === 'en' ? '✓ New proof generated with profile photo on audio' : '✓ Nova prova gerada com a foto deste número'))
-        : (flowLanguage === 'es' ? '🔒 Nueva prueba con audio protegido por encriptación' : (flowLanguage === 'en' ? '🔒 New proof with encrypted audio' : '🔒 Nova prova com áudio protegido por criptografia'));
-
-      db.addChatMessage(cleanPhone, {
-        from: 'bot',
-        mediaType: 'image',
-        mediaUrl: webProofUrl,
-        text: proofCaption,
-        instanceId: inst.id
-      }, 'PROVA_ENVIADA');
-
-      await sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, 'image/png', proofCaption, 2000);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-
-      // 4. Reenvia a oferta com o link de pagamento
-      const fallbackOfferNew = flowLanguage === 'es'
-        ? `¡Listo! Encontré las conversaciones y registros de este nuevo número también ✅\n\nPara desbloquear la desencriptación completa de todas las conversaciones, audios y ubicación en tiempo real, completa la activación en el enlace seguro:\n\n{checkoutUrl}\n\n¡En cuanto pagues, envíame el comprobante por aquí para habilitar tu acceso de inmediato!`
-        : (flowLanguage === 'en'
-          ? `Done! I found conversations and records for this new number as well ✅\n\nTo unlock full decryption of all chats, audios, and real-time location, complete activation on the secure link:\n\n{checkoutUrl}\n\nAs soon as you pay, send me the receipt here to unlock full access immediately!`
-          : `¡Listo! Encontré las conversaciones y registros de este nuevo número también ✅\n\nPara desbloquear la desencriptación completa de todas las conversaciones, audios y ubicación en tiempo real, completa la activación en el enlace seguro:\n\n{checkoutUrl}\n\n¡En cuanto pagues, envíame el comprobante por aquí para habilitar tu acceso de inmediato!`);
-
-      const offerText = interpolateVariables(fallbackOfferNew, chatData.variables);
-      chatData.state = 'OFERTA_ENVIADA';
-      db.saveChat(cleanPhone, chatData);
-
-      db.addChatMessage(cleanPhone, { from: 'bot', text: offerText, instanceId: inst.id }, 'OFERTA_ENVIADA');
-      await sendOutgoingTextMessage(inst, cleanPhone, offerText, 2000);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    }
-
-    // 1.2 Lead enviou mensagem de texto: aciona o classificador inteligente no idioma do fluxo
-    if (hasRecentBotReply(cleanPhone, 12000)) {
-      console.log(`[FlowEngine] ⏳ Resposta recente já enviada para +${cleanPhone} há menos de 12s. Suprimindo disparo duplicado de IA.`);
-      return;
-    }
-
-    const cleanMsg = (messageText || '').trim();
-    if (!cleanMsg || cleanMsg === '[Mídia]' || cleanMsg === '[Imagem enviada]') {
-      console.log(`[FlowEngine] ℹ️ Lead enviou mídia sem texto. Resposta padrão cordial (Lang: ${flowLanguage})`);
-      const defaultMediaReply = flowLanguage === 'es'
-        ? "¡Recibí tu imagen! 📸 Si es tu comprobante de activación de $ 39, lo revisamos para validar tu acceso completo. Si tienes alguna duda, dime y te ayudo con gusto."
-        : "Recebi sua imagem! 📸 Se for o comprovante de pagamento, já estamos verificando para liberar seu acesso completo. Se tiver dúvidas, é só falar!";
-      db.addChatMessage(cleanPhone, { from: 'bot', text: defaultMediaReply, instanceId: inst.id });
-      await sendOutgoingTextMessage(inst, cleanPhone, defaultMediaReply);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    }
-
-    console.log(`[FlowEngine] Analisando objeção do lead com IA (Lang: ${flowLanguage})...`);
-    recordBotReply(cleanPhone);
-    const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
-
-    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id });
-    await sendOutgoingTextMessage(inst, cleanPhone, aiReply);
-    eventBus.emit('chat_updated', { phone: cleanPhone });
-    return;
-  }
-
-  // =========================================================================
-  // CASO 2: LEAD ENVIOU O NÚMERO ALVO (OU ESTÁ EM AGUARDANDO_NUMERO)
-  // =========================================================================
-  const isLikelyPhoneNumber = Boolean(
-    !isCampaignStart &&
-    rawDigits.length >= 8 &&
-    rawDigits.length <= 15 &&
-    !messageText.includes('(') &&
-    !messageText.includes(')')
+  const isPaymentClaim = Boolean(
+    (rawMsg && /(?:ya\s*pag[uú][eé]|listo\s*pag|pago\s*realizado|ya\s*compr[eé]|acabo\s*de\s*pagar|pagu[eé]\s*con\s*tarjeta|pago\s*hecho|j[aá]\s*paguei|paguei)/i.test(rawMsg)) ||
+    mediaAttachment ||
+    (rawMsg && rawMsg.toLowerCase().includes('[comprovante_valido]'))
   );
 
-  if (chatData.state === 'AGUARDANDO_NUMERO' || isLikelyPhoneNumber) {
-    const welcomeDecision = isLikelyPhoneNumber 
-      ? { type: 'PHONE', targetPhone: rawDigits }
-      : await aiService.classifyWelcomeReply(messageText, flowLanguage);
+  if (isPaymentClaim && (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'FINALIZADO')) {
+    console.log(`[FlowEngine] 💰 Aviso/Comprovante de pagamento identificado para +${cleanPhone}`);
+    const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
+    const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
+    const autoDeliverMsg = `¡Pago recibido y validado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel ha sido desbloqueado.\n\nAccede ahora mismo a través de este enlace seguro:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`;
 
-    if (welcomeDecision.type !== 'PHONE') {
-      console.log(`[FlowEngine] Resposta pós-boas-vindas classificada como: ${welcomeDecision.type}`);
-      db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeDecision.reply, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-      await sendOutgoingTextMessage(inst, cleanPhone, welcomeDecision.reply);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
+    db.addChatMessage(cleanPhone, { from: 'bot', text: autoDeliverMsg, instanceId: inst.id }, 'FINALIZADO');
+    await sendOutgoingTextMessage(inst, cleanPhone, autoDeliverMsg, 1000);
+    chatData.state = 'FINALIZADO';
+    chatData.upsellStage = 'stage_finalizado';
+    chatData.orderStatus = 'PAGO';
+    db.saveChat(cleanPhone, { state: 'FINALIZADO', orderStatus: 'PAGO', upsellStage: 'stage_finalizado' });
+    db.confirmAttributionSale(cleanPhone, 39);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+    return;
+  }
+
+  // =========================================================================
+  // 2. DETECÇÃO INCONDICIONAL DE NÚMERO ALVO PARA INVESTIGAÇÃO (PRIORIDADE ALTA)
+  // Se a mensagem contiver um número de telefone com 8 a 15 dígitos,
+  // executa IMEDIATAMENTE o fluxo visual completo:
+  // node-analyzing-msg -> Delay 3s -> Consulta Foto (Uazapi) -> Envia Prova -> Oferta $39 -> Instrução
+  // =========================================================================
+  const detectedTargetDigits = extractNewTargetPhone(rawMsg);
+
+  if (detectedTargetDigits && !isCampaignStart) {
+    let normalizedTarget = detectedTargetDigits;
+    // Se for número brasileiro com 10 ou 11 dígitos sem DDI, adiciona 55
+    if (normalizedTarget.length === 10 || normalizedTarget.length === 11) {
+      normalizedTarget = '55' + normalizedTarget;
     }
 
-    // Lead enviou o número! Salva o alvo
-    const targetPhone = rawDigits.length <= 11 && flowLanguage === 'pt' ? '55' + rawDigits : rawDigits;
-    chatData.variables.alvo = targetPhone;
-    console.log(`[FlowEngine] ✓ Número alvo recebido: ${targetPhone}`);
+    console.log(`[FlowEngine] 🎯 Número alvo detectado: ${normalizedTarget} para Lead: +${cleanPhone} (Estado anterior: ${chatData.state})`);
 
-    // Mensagem de análise imediata
-    const fallbackAnalyzing = flowLanguage === 'es'
-      ? "Espera un momento mientras verificamos en el sistema..."
-      : (flowLanguage === 'en'
-        ? "Please wait a moment while we check the system..."
-        : "Espera un momento mientras verificamos en el sistema...");
-
-    const analyzingMsg = getNodeText('node-analyzing-msg', fallbackAnalyzing);
-    db.addChatMessage(cleanPhone, { from: 'bot', text: analyzingMsg, instanceId: inst.id }, 'ANALISANDO');
-    await sendOutgoingTextMessage(inst, cleanPhone, analyzingMsg);
+    chatData.variables = chatData.variables || {};
+    chatData.variables.alvo = normalizedTarget;
+    chatData.state = 'ANALISANDO';
+    db.saveChat(cleanPhone, {
+      state: 'ANALISANDO',
+      variables: { ...chatData.variables, alvo: normalizedTarget },
+      assignedFlowId: activeFlow.id,
+      flowLanguage: 'es'
+    });
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
-    // Delay inteligente de 3 segundos
-    const delaySec = funnel.analyzingDelaySeconds || 3;
-    await new Promise(r => setTimeout(r, delaySec * 1000));
+    // PASSO A: Mensagem de Análise do Sistema (node-analyzing-msg)
+    // "Espera un momento mientras verificamos en el sistema..."
+    const fallbackAnalyzing = "Espera un momento mientras verificamos en el sistema...";
+    const analyzingMsg = getNodeText('node-analyzing-msg', fallbackAnalyzing);
+    
+    console.log(`[FlowEngine] 📤 Enviando mensagem de análise imediata: "${analyzingMsg}"`);
+    db.addChatMessage(cleanPhone, { from: 'bot', text: analyzingMsg, instanceId: inst.id }, 'ANALISANDO');
+    await sendOutgoingTextMessage(inst, cleanPhone, analyzingMsg, 1000);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
 
-    // Consulta foto na API stalkea.app
-    const photoUrl = await lookupProfilePicture(targetPhone);
+    // PASSO B: Intervalo Inteligente de 3 segundos com digitação
+    const delayNode = activeFlow?.nodes?.find(n => n.id === 'node-delay');
+    const delaySeconds = delayNode?.data?.seconds || 3;
+    console.log(`[FlowEngine] ⏱️ Aguardando delay de ${delaySeconds}s (digitando)...`);
+    await simulateTyping(inst, cleanPhone, delaySeconds * 1000, 'composing');
+
+    // PASSO C: Consulta Foto do Alvo via WhatsApp Oficial (Uazapi /chat/details)
+    console.log(`[FlowEngine] 🔍 Consultando foto do alvo: ${normalizedTarget}`);
+    const photoUrl = await lookupProfilePicture(normalizedTarget, inst);
     chatData.variables.photoUrl = photoUrl;
+    chatData.targetPhotoUrl = photoUrl;
 
-    // Monta a foto personalizada (Template 1 com foto ou Template 2 com cadeado)
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
+    // PASSO D: Monta e Envia Imagem de Prova
+    // Template 1 com foto estampada no reprodutor de áudio OU Template 2 Cadeado
+    console.log(`[FlowEngine] 🖼️ Gerando imagem de prova (Foto: ${photoUrl ? 'SIM' : 'NÃO'})...`);
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, 'es');
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_${cleanPhone}_${Date.now()}.png`;
@@ -1075,80 +765,121 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     const webProofUrl = `/generated/${filename}`;
 
     const proofCaption = photoUrl
-      ? (flowLanguage === 'es' ? '✓ Prueba con foto en el audio' : (flowLanguage === 'en' ? '✓ Proof with profile photo on audio' : '✓ Prova com foto no áudio'))
-      : (flowLanguage === 'es' ? '🔒 Prueba con audio protegido por encriptación' : (flowLanguage === 'en' ? '🔒 Proof with encrypted audio' : '🔒 Prova com áudio protegido por criptografia'));
+      ? '✓ Prueba con foto en el audio'
+      : '🔒 Prueba con audio protegido por encriptación';
 
-    // Envia a imagem de prova no WhatsApp
     db.addChatMessage(cleanPhone, {
       from: 'bot',
       mediaType: 'image',
       mediaUrl: webProofUrl,
       text: proofCaption,
       instanceId: inst.id
-    });
+    }, 'PROVA_ENVIADA');
 
-    await sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, 'image/png', proofCaption);
+    console.log(`[FlowEngine] 📤 Enviando imagem de prova no WhatsApp...`);
+    await sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, 'image/png', proofCaption, 2000);
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
-    // Envia o link de pagamento da oferta inicial (Kirvano / Checkout Seguro)
-    const fallbackOffer = flowLanguage === 'es'
-      ? "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado."
-      : (flowLanguage === 'en'
-        ? "Payment link for $49.90 👇\n{checkoutUrl}\n\nPayment info: 🔒 100% Secure & Encrypted Checkout"
-        : "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.");
-
+    // PASSO E: Envia Oferta Inicial de $39 (node-offer-pix-49)
+    const fallbackOffer = "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.";
     const offerText = getNodeText('node-offer-pix-49', fallbackOffer);
     const finalOffer = interpolateVariables(offerText, chatData.variables);
 
+    console.log(`[FlowEngine] 📤 Enviando link de oferta $39...`);
     db.addChatMessage(cleanPhone, { from: 'bot', text: finalOffer, instanceId: inst.id });
-    await sendOutgoingTextMessage(inst, cleanPhone, finalOffer);
+    await sendOutgoingTextMessage(inst, cleanPhone, finalOffer, 1500);
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
-    // Envia a instrução de comprovante
-    const fallbackProofInstruction = flowLanguage === 'es'
-      ? "El pago con tarjeta se confirma automáticamente en pocos segundos. ¡Avísame por aquí en cuanto lo completes para confirmar tu acceso!"
-      : (flowLanguage === 'en'
-        ? "As soon as you pay, send me the receipt here to unlock full access!"
-        : "El pago con tarjeta se confirma automáticamente en pocos segundos. ¡Avísame por aquí en cuanto lo completes para confirmar tu acceso!");
-
+    // PASSO F: Envia Instrução de Envio do Comprovante (node-msg-comprovante)
+    const fallbackProofInstruction = "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!";
     const proofInstruction = getNodeText('node-msg-comprovante', fallbackProofInstruction);
+
+    console.log(`[FlowEngine] 📤 Enviando instrução de comprovante...`);
     db.addChatMessage(cleanPhone, { from: 'bot', text: proofInstruction, instanceId: inst.id }, 'OFERTA_ENVIADA');
-    await sendOutgoingTextMessage(inst, cleanPhone, proofInstruction);
+    await sendOutgoingTextMessage(inst, cleanPhone, proofInstruction, 1500);
 
     chatData.state = 'OFERTA_ENVIADA';
-    chats[cleanPhone] = chatData;
-    db.saveChats(chats);
+    db.saveChat(cleanPhone, {
+      state: 'OFERTA_ENVIADA',
+      variables: chatData.variables,
+      assignedFlowId: activeFlow.id,
+      flowLanguage: 'es'
+    });
     eventBus.emit('chat_updated', { phone: cleanPhone });
     return;
   }
 
   // =========================================================================
-  // CASO 3: PRIMEIRO CONTATO DO LEAD (BOAS-VINDAS)
+  // 3. TRATAMENTO CONFORME ESTADO DO CHAT QUANDO NÃO É NÚMERO
   // =========================================================================
-  if (!isCampaignStart && hasRecentBotReply(cleanPhone, 10000)) {
-    console.log(`[FlowEngine] ⏳ CASO 3: Boas-vindas recente já enviada para +${cleanPhone}. Suprimindo duplicata.`);
+
+  // CASO A: LEAD JÁ FINALIZADO / PÓS-VENDA
+  if (chatData.state === 'FINALIZADO' || chatData.state === 'PAGO' || chatData.state === 'APROVADO') {
+    console.log(`[FlowEngine] Lead finalizado enviou mensagem (${cleanPhone}). Respondendo com IA (Lang: ${flowLanguage})...`);
+    const aiReply = await aiService.classifyAndReply(rawMsg, chatData.messages, stageInfo, flowLanguage);
+    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id }, 'FINALIZADO');
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply, 1500);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
     return;
   }
-  const fallbackWelcome = flowLanguage === 'es'
-    ? "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
-    : (flowLanguage === 'en'
-      ? "Hello! Save my contact and send the person's phone number and I'll send you the proof right away."
-      : "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba.");
 
+  // CASO B: LEAD JÁ RECEBEU A OFERTA (OFERTA_ENVIADA / DUVIDAS / NEGOCIACAO)
+  // O lead tem dúvidas sobre pagamento, segurança, preço, etc.
+  if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'DUVIDAS') {
+    if (hasRecentBotReply(cleanPhone, 8000)) {
+      console.log(`[FlowEngine] ⏳ Resposta recente já enviada para +${cleanPhone} há menos de 8s. Suprimindo disparo concorrente.`);
+      return;
+    }
+    console.log(`[FlowEngine] Analisando dúvida/objeção do lead com IA (Lang: ${flowLanguage})...`);
+    recordBotReply(cleanPhone);
+    const aiReply = await aiService.classifyAndReply(rawMsg, chatData.messages, stageInfo, flowLanguage);
+
+    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id });
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply, 1800);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+    return;
+  }
+
+  // CASO C: LEAD ESTÁ EM AGUARDANDO_NUMERO (Enviou dúvida ou texto aleatório em vez do número)
+  if (chatData.state === 'AGUARDANDO_NUMERO') {
+    const welcomeDecision = await aiService.classifyWelcomeReply(rawMsg, flowLanguage);
+    console.log(`[FlowEngine] Resposta pós-boas-vindas classificada como: ${welcomeDecision.type}`);
+
+    if (welcomeDecision.type === 'DUVIDA') {
+      // Nó de Dúvida pós Boas-Vindas (node-doubt-welcome)
+      const fallbackDoubt = "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono.";
+      const doubtText = getNodeText('node-doubt-welcome', fallbackDoubt);
+      db.addChatMessage(cleanPhone, { from: 'bot', text: doubtText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
+      await sendOutgoingTextMessage(inst, cleanPhone, doubtText, 1500);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+      return;
+    } else {
+      // Nó Negativa / Aleatória / 'Salvei' (node-reinf-phone)
+      const fallbackReinf = "En cuanto envíes el número ya lo activo aquí 👍\n\nNecesito el WhatsApp de la persona:\nCódigo de país + número";
+      const reinfText = getNodeText('node-reinf-phone', fallbackReinf);
+      db.addChatMessage(cleanPhone, { from: 'bot', text: reinfText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
+      await sendOutgoingTextMessage(inst, cleanPhone, reinfText, 1500);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+      return;
+    }
+  }
+
+  // CASO D: NOVO LEAD OU INÍCIO DE CAMPANHA (BOAS-VINDAS)
+  const fallbackWelcome = "Hola, Guarda mi contacto y envíame el número de la persona que ya te mando la prueba.";
   const welcomeText = getNodeText('node-welcome', fallbackWelcome);
+  
   chatData.state = 'AGUARDANDO_NUMERO';
-  chats[cleanPhone] = chatData;
-  db.saveChat(cleanPhone, chatData);
-  db.saveChats(chats);
+  db.saveChat(cleanPhone, {
+    state: 'AGUARDANDO_NUMERO',
+    assignedFlowId: activeFlow.id,
+    flowLanguage: 'es'
+  });
 
   db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-  await sendOutgoingTextMessage(inst, cleanPhone, welcomeText);
+  await sendOutgoingTextMessage(inst, cleanPhone, welcomeText, 1000);
   eventBus.emit('chat_updated', { phone: cleanPhone });
 }
 
-/**
- * Ponto de entrada chamado quando uma nova mensagem chega do WhatsApp (Webhook ou Simulador)
- */
 async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null, messageTimestamp = null, senderName = null, senderPhoto = null) {
   const cleanPhone = (leadPhone || '').replace(/\D/g, '');
   if (!cleanPhone || cleanPhone.length < 8) return;
