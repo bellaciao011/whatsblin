@@ -2207,15 +2207,35 @@ async function renderInbox(showLoading = true) {
           </div>
 
           <div class="chat-messages" id="chat-messages-container">
-            ${(activeChat.messages || []).map(m => `
-              <div class="msg-bubble ${m.from}">
+            ${(() => {
+              const msgs = activeChat.messages || [];
+              const unique = [];
+              const seen = new Set();
+              for (const m of msgs) {
+                const normFrom = (m.from === 'bot' || m.from === 'agent') ? 'out' : 'in';
+                const cleanTxt = (m.text || '').trim();
+                const timeBlock = m.timestamp ? Math.floor(new Date(m.timestamp).getTime() / 20000) : 0;
+                const idKey = m.id ? `id_${m.id}` : null;
+                const txtKey = cleanTxt ? `${normFrom}_${cleanTxt}_${timeBlock}` : null;
+
+                if (idKey && seen.has(idKey)) continue;
+                if (txtKey && seen.has(txtKey)) continue;
+
+                if (idKey) seen.add(idKey);
+                if (txtKey) seen.add(txtKey);
+                unique.push(m);
+              }
+
+              return unique.map(m => `
+                <div class="msg-bubble ${m.from}">
                 ${m.mediaType === 'image' && m.mediaUrl ? `
                   <img src="${m.mediaUrl}" class="msg-proof-img" onclick="window.open('${m.mediaUrl}', '_blank')" alt="Prova">
                 ` : ''}
                 ${m.text ? `<div>${m.text.replace(/\n/g, '<br>')}</div>` : ''}
                 <span class="msg-time">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
               </div>
-            `).join('')}
+              `).join('');
+            })()}
             ${activeChat.isTyping ? `
               <div class="msg-bubble lead msg-typing">
                 <span class="typing-dot"></span>

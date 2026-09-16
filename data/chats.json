@@ -129,15 +129,6 @@
         "instanceId": "uaz_r6b42c61158e910"
       },
       {
-        "id": "557193768941:3EB0A717AD2F4E6E6C6029",
-        "timestamp": "2026-09-14T03:18:19.334Z",
-        "from": "agent",
-        "text": "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova",
-        "mediaUrl": null,
-        "mediaType": "ExtendedTextMessage",
-        "instanceId": "uaz_r6b42c61158e910"
-      },
-      {
         "id": "msg_1789356979312_331",
         "timestamp": "2026-09-14T03:36:19.312Z",
         "from": "bot",
@@ -776,15 +767,6 @@
         "instanceId": "uaz_re9e832d34a43e1"
       },
       {
-        "id": "557193768941:3EB0D8A8B92AA8DA53424B",
-        "timestamp": "2026-09-14T17:01:29.880Z",
-        "from": "agent",
-        "text": "Nosso sistema localiza mensagens, áudios apagados e registros nos servidores pelo número de telefone. É 100% sigiloso e a pessoa não fica sabendo.\n\nPara eu gerar a prévia e te mandar a prova, só me envie o número dela com DDD aqui.",
-        "mediaUrl": null,
-        "mediaType": "ExtendedTextMessage",
-        "instanceId": "uaz_re9e832d34a43e1"
-      },
-      {
         "id": "557193768941:3EB08FEB62EC9C891BB3CF",
         "timestamp": "2026-09-14T17:01:32.646Z",
         "from": "agent",
@@ -821,15 +803,6 @@
         "instanceId": "uaz_re9e832d34a43e1"
       },
       {
-        "id": "557193768941:3EB0F184C209A0D682B662",
-        "timestamp": "2026-09-14T17:01:53.132Z",
-        "from": "agent",
-        "text": "Claro! 😊 Por favor, me envie o novo número que você gostaria de investigar, e eu já começo a busca para você!",
-        "mediaUrl": null,
-        "mediaType": "ExtendedTextMessage",
-        "instanceId": "uaz_re9e832d34a43e1"
-      },
-      {
         "id": "557193768941:3EB078DEDCFE785A50FD3E",
         "timestamp": "2026-09-14T17:01:55.741Z",
         "from": "agent",
@@ -845,15 +818,6 @@
         "text": "",
         "mediaUrl": null,
         "mediaType": "ImageMessage",
-        "instanceId": "uaz_re9e832d34a43e1"
-      },
-      {
-        "id": "557193768941:3EB07301BD7AC4CA4A4241",
-        "timestamp": "2026-09-14T17:02:06.156Z",
-        "from": "agent",
-        "text": "Pronto! Encontrei as conversas e registros desse novo número também ✅\n\nPara liberar a descriptografia completa de todas as conversas, áudios e localização em tempo real, conclua a ativação no link seguro abaixo:\n\nhttps://pay.kirvano.com/checkout-49\n\nAssim que pagar, me envia o comprovante por aqui para eu liberar seu acesso imediatamente!",
-        "mediaUrl": null,
-        "mediaType": "ExtendedTextMessage",
         "instanceId": "uaz_re9e832d34a43e1"
       }
     ],

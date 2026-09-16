@@ -541,15 +541,21 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         eventBus.emit('chat_updated', { phone: cleanPhone });
         return;
       } else {
-        const pendingMsg = flowLanguage === 'es'
-          ? `¡Excelente! Los pagos con tarjeta se confirman de forma automática en pocos segundos por el procesador bancario. En cuanto el banco lo valide, tu acceso quedará activo de inmediato.\n\nSi ya completaste la compra, por favor indícame el correo electrónico que usaste para verificarlo en el sistema.`
-          : `Que ótimo! Os pagamentos com cartão são confirmados automaticamente pelo banco em poucos instantes. Qual foi o e-mail cadastrado na compra para acelerar a liberação?`;
+        // Liberação 100% AUTOMÁTICA no WhatsApp quando o lead avisa que pagou!
+        const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
+        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
+        const autoDeliverMsg = flowLanguage === 'es'
+          ? `¡Pago recibido y validado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel ha sido desbloqueado.\n\nAccede ahora mismo a través de este enlace seguro:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`
+          : `Pagamento confirmado com sucesso! 🎉\n\nSeu acesso foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
-        db.addChatMessage(cleanPhone, { from: 'bot', text: pendingMsg, instanceId: inst.id }, 'DUVIDAS');
-        await sendOutgoingTextMessage(inst, cleanPhone, pendingMsg);
-        chatData.state = 'DUVIDAS';
+        db.addChatMessage(cleanPhone, { from: 'bot', text: autoDeliverMsg, instanceId: inst.id }, 'FINALIZADO');
+        await sendOutgoingTextMessage(inst, cleanPhone, autoDeliverMsg);
+        chatData.state = 'FINALIZADO';
+        chatData.upsellStage = 'stage_finalizado';
+        chatData.orderStatus = 'PAGO';
         chats[cleanPhone] = chatData;
         db.saveChats(chats);
+        db.confirmAttributionSale(cleanPhone, flowLanguage === 'es' ? 39 : 49.90);
         eventBus.emit('chat_updated', { phone: cleanPhone });
         return;
       }

@@ -158,11 +158,34 @@ module.exports = {
     chats[phone].lastMessageTime = messageData.timestamp || new Date().toISOString();
     
     const msgId = messageData.id || ('msg_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
-    
-    // Evita duplicatas por ID se já foi registrada
-    const existingMsg = chats[phone].messages.find(m => m.id === msgId);
-    if (existingMsg) {
-      return { chat: chats[phone], newMessage: existingMsg };
+    const cleanText = (messageData.text || '').trim();
+    const isOutbound = messageData.from === 'bot' || messageData.from === 'agent';
+    const msgTime = new Date(messageData.timestamp || Date.now()).getTime();
+
+    // 1. Evita duplicata exata por ID de mensagem
+    const existingById = chats[phone].messages.find(m => m.id === msgId);
+    if (existingById) {
+      return { chat: chats[phone], newMessage: existingById };
+    }
+
+    // 2. Evita duplicata por conteúdo recente (mesmo emissor e mesmo texto dentro de 45 segundos)
+    if (cleanText) {
+      const existingByContent = chats[phone].messages.find(m => {
+        const mIsOutbound = m.from === 'bot' || m.from === 'agent';
+        if (mIsOutbound !== isOutbound) return false;
+        if ((m.text || '').trim() !== cleanText) return false;
+        const mTime = new Date(m.timestamp).getTime();
+        return Math.abs(msgTime - mTime) < 45000;
+      });
+
+      if (existingByContent) {
+        // Se a mensagem anterior tinha ID temporário local e a nova tem ID oficial do WhatsApp, atualiza o ID
+        if (existingByContent.id.startsWith('msg_') && !msgId.startsWith('msg_')) {
+          existingByContent.id = msgId;
+          writeJson('chats.json', chats);
+        }
+        return { chat: chats[phone], newMessage: existingByContent };
+      }
     }
 
     const msg = {
