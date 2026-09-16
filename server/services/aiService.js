@@ -121,7 +121,7 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
     else paidValue = '0';
   }
   const nextValue = currentStageInfo.nextValue || '100';
-  const checkoutUrl = currentStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
+  const checkoutUrl = (lang === 'es' ? (funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL') : (currentStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49'));
 
   const formatText = (template) => {
     if (!template) return '';

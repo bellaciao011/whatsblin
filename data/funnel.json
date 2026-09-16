@@ -53,5 +53,22 @@
     "x": 139,
     "y": 664,
     "radius": 23
+  },
+  "checkoutUrlEs": "https://go.centerpag.com/PPU38CQG5EL",
+  "checkouts": {
+    "es": {
+      "frontUrl": "https://go.centerpag.com/PPU38CQG5EL",
+      "value": "39",
+      "currency": "USD",
+      "platform": "CenterPag"
+    },
+    "br": {
+      "frontUrl": "https://pay.kirvano.com/checkout-49",
+      "value": "49,90",
+      "currency": "BRL",
+      "upsell100": "https://pay.kirvano.com/checkout-100",
+      "upsell200": "https://pay.kirvano.com/checkout-200",
+      "upsell400": "https://pay.kirvano.com/checkout-400"
+    }
   }
 }

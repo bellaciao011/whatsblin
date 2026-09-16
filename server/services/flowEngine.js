@@ -299,7 +299,7 @@ function getCurrentStageInfo(stageKey, funnel, language = 'pt') {
     return {
       stage: stageKey || 'stage_49',
       value: '39',
-      checkoutUrl: funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49',
+      checkoutUrl: funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL',
       nextStage: null,
       nextValue: null,
       paidValue: stageKey === 'stage_finalizado' ? '39' : '0'

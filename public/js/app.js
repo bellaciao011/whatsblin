@@ -3763,48 +3763,90 @@ async function renderSettings() {
         </form>
       </div>
 
-      <!-- Coluna 2: Checkouts de Upsell & Kirvano -->
+      <!-- Coluna 2: Checkouts por Funil (Espanhol e Brasil) -->
       <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">💳 Checkouts & Escala de Pagamentos</h3>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <h3 class="card-title">💳 Checkouts por Funil</h3>
+          <!-- Abas de Funil -->
+          <div style="display: flex; gap: 6px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn" id="tab-btn-funnel-es" onclick="switchFunnelCheckoutTab('es')" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; background: #fe2c55; color: #fff; border: none; border-radius: 6px;">
+              🇪🇸 Funil Espanhol
+            </button>
+            <button type="button" class="btn" id="tab-btn-funnel-br" onclick="switchFunnelCheckoutTab('br')" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; background: transparent; color: var(--text-secondary); border: none; border-radius: 6px;">
+              🇧🇷 Funil Brasil
+            </button>
+          </div>
         </div>
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-          Configure os links dos seus checkouts para cada etapa do funil e os dados da instituição recebedora.
-        </p>
 
         <form onsubmit="saveCheckoutSettings(event)">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <!-- PAINEL FUNIL ESPANHOL -->
+          <div id="pane-funnel-es">
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+              Configuração do link de checkout exclusivo para o <strong>Funil em Espanhol (LATAM e Internacional)</strong>.
+            </p>
+
             <div class="form-group">
-              <label class="form-label">Nome do Beneficiário</label>
-              <input type="text" class="form-input" id="set-benef-name" value="${funnel.paymentRecipient?.name || 'KIRVANO PAGAMENTOS LTDA'}">
+              <label class="form-label" style="font-weight: 700; color: #fff;">
+                Link Checkout Front ($ 39 USD) *
+              </label>
+              <input type="url" class="form-input" id="set-chk-es-front" value="${funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL'}" placeholder="https://go.centerpag.com/PPU38CQG5EL" style="font-family: monospace; border-color: rgba(254, 44, 85, 0.4);" required>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Link enviado pelo bot e pela IA aos leads de campanhas em espanhol.</div>
             </div>
+
             <div class="form-group">
-              <label class="form-label">Instituição Financeira</label>
-              <input type="text" class="form-input" id="set-benef-bank" value="${funnel.paymentRecipient?.bank || 'PICPAY'}">
+              <label class="form-label">Plataforma / Gateway</label>
+              <input type="text" class="form-input" id="set-chk-es-platform" value="${funnel.checkouts?.es?.platform || 'CenterPag'}" placeholder="CenterPag / Stripe">
+            </div>
+
+            <div style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 10px; padding: 12px; margin-top: 14px; margin-bottom: 18px;">
+              <div style="font-size: 12px; color: #c4b5fd; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span>ℹ️</span> Upsell 1-Click Direto na CenterPag
+              </div>
+              <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">
+                Neste funil em espanhol, o WhatsApp cobra unicamente o valor de <strong>$39 USD</strong>. Não há cobranças repetidas de upsell no chat: o cliente conclui o pagamento do front e é direcionado pela própria plataforma em 1 clique para os produtos adicionais.
+              </div>
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Link Checkout - Etapa 1 (R$ 49,90)</label>
-            <input type="text" class="form-input" id="set-chk-49" value="${funnel.upsellStages?.stage_49?.checkoutUrl || 'https://pay.kirvano.com/checkout-49'}">
+          <!-- PAINEL FUNIL BRASIL -->
+          <div id="pane-funnel-br" style="display: none;">
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+              Configuração dos links de checkout e escada de upsells para o <strong>Funil Brasil (Kirvano / PIX)</strong>.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label class="form-label">Nome do Beneficiário</label>
+                <input type="text" class="form-input" id="set-benef-name" value="${funnel.paymentRecipient?.name || 'KIRVANO PAGAMENTOS LTDA'}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Instituição Financeira</label>
+                <input type="text" class="form-input" id="set-benef-bank" value="${funnel.paymentRecipient?.bank || 'PICPAY'}">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Link Checkout - Etapa 1 (R$ 49,90)</label>
+              <input type="text" class="form-input" id="set-chk-49" value="${funnel.upsellStages?.stage_49?.checkoutUrl || 'https://pay.kirvano.com/checkout-49'}">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Link Checkout - Upsell 1 (R$ 100,00)</label>
+              <input type="text" class="form-input" id="set-chk-100" value="${funnel.upsellStages?.stage_100?.checkoutUrl || 'https://pay.kirvano.com/checkout-100'}">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Link Checkout - Upsell 2 (R$ 200,00)</label>
+              <input type="text" class="form-input" id="set-chk-200" value="${funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200'}">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Link Checkout - Upsell 3 (R$ 400,00)</label>
+              <input type="text" class="form-input" id="set-chk-400" value="${funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400'}">
+            </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Link Checkout - Upsell 1 (R$ 100,00)</label>
-            <input type="text" class="form-input" id="set-chk-100" value="${funnel.upsellStages?.stage_100?.checkoutUrl || 'https://pay.kirvano.com/checkout-100'}">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Link Checkout - Upsell 2 (R$ 200,00)</label>
-            <input type="text" class="form-input" id="set-chk-200" value="${funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200'}">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Link Checkout - Upsell 3 (R$ 400,00)</label>
-            <input type="text" class="form-input" id="set-chk-400" value="${funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400'}">
-          </div>
-
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Salvar Checkouts & Pagamentos</button>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 6px;">Salvar Checkouts dos Funis</button>
         </form>
       </div>
     </div>
@@ -3989,26 +4031,69 @@ async function saveAiSettings(e) {
   showToast('Configurações de IA salvas com sucesso!');
 }
 
+function switchFunnelCheckoutTab(tab) {
+  const isEs = tab === 'es';
+  const paneEs = document.getElementById('pane-funnel-es');
+  const paneBr = document.getElementById('pane-funnel-br');
+  const btnEs = document.getElementById('tab-btn-funnel-es');
+  const btnBr = document.getElementById('tab-btn-funnel-br');
+
+  if (paneEs && paneBr) {
+    paneEs.style.display = isEs ? 'block' : 'none';
+    paneBr.style.display = isEs ? 'none' : 'block';
+  }
+  if (btnEs && btnBr) {
+    btnEs.style.background = isEs ? '#fe2c55' : 'transparent';
+    btnEs.style.color = isEs ? '#fff' : 'var(--text-secondary)';
+    btnBr.style.background = isEs ? 'transparent' : '#10b981';
+    btnBr.style.color = isEs ? 'var(--text-secondary)' : '#fff';
+  }
+}
+
 async function saveCheckoutSettings(e) {
   e.preventDefault();
   const funnel = state.funnel || {};
   if (!funnel.paymentRecipient) funnel.paymentRecipient = {};
   if (!funnel.upsellStages) funnel.upsellStages = {};
+  if (!funnel.checkouts) funnel.checkouts = {};
 
-  funnel.paymentRecipient.name = document.getElementById('set-benef-name').value;
-  funnel.paymentRecipient.bank = document.getElementById('set-benef-bank').value;
+  // Funil Espanhol (CenterPag)
+  const esFront = (document.getElementById('set-chk-es-front')?.value || '').trim() || 'https://go.centerpag.com/PPU38CQG5EL';
+  const esPlatform = (document.getElementById('set-chk-es-platform')?.value || '').trim() || 'CenterPag';
+  funnel.checkoutUrlEs = esFront;
+  funnel.checkouts.es = {
+    frontUrl: esFront,
+    value: '39',
+    currency: 'USD',
+    platform: esPlatform
+  };
 
-  if (!funnel.upsellStages.stage_49) funnel.upsellStages.stage_49 = {};
-  funnel.upsellStages.stage_49.checkoutUrl = document.getElementById('set-chk-49').value;
+  // Funil Brasil (Kirvano)
+  if (document.getElementById('set-benef-name')) {
+    funnel.paymentRecipient.name = document.getElementById('set-benef-name').value;
+    funnel.paymentRecipient.bank = document.getElementById('set-benef-bank').value;
 
-  if (!funnel.upsellStages.stage_100) funnel.upsellStages.stage_100 = {};
-  funnel.upsellStages.stage_100.checkoutUrl = document.getElementById('set-chk-100').value;
+    if (!funnel.upsellStages.stage_49) funnel.upsellStages.stage_49 = {};
+    funnel.upsellStages.stage_49.checkoutUrl = document.getElementById('set-chk-49').value;
 
-  if (!funnel.upsellStages.stage_200) funnel.upsellStages.stage_200 = {};
-  funnel.upsellStages.stage_200.checkoutUrl = document.getElementById('set-chk-200').value;
+    if (!funnel.upsellStages.stage_100) funnel.upsellStages.stage_100 = {};
+    funnel.upsellStages.stage_100.checkoutUrl = document.getElementById('set-chk-100').value;
 
-  if (!funnel.upsellStages.stage_400) funnel.upsellStages.stage_400 = {};
-  funnel.upsellStages.stage_400.checkoutUrl = document.getElementById('set-chk-400').value;
+    if (!funnel.upsellStages.stage_200) funnel.upsellStages.stage_200 = {};
+    funnel.upsellStages.stage_200.checkoutUrl = document.getElementById('set-chk-200').value;
+
+    if (!funnel.upsellStages.stage_400) funnel.upsellStages.stage_400 = {};
+    funnel.upsellStages.stage_400.checkoutUrl = document.getElementById('set-chk-400').value;
+
+    funnel.checkouts.br = {
+      frontUrl: funnel.upsellStages.stage_49.checkoutUrl,
+      value: '49,90',
+      currency: 'BRL',
+      upsell100: funnel.upsellStages.stage_100.checkoutUrl,
+      upsell200: funnel.upsellStages.stage_200.checkoutUrl,
+      upsell400: funnel.upsellStages.stage_400.checkoutUrl
+    };
+  }
 
   await fetch('/api/funnel', {
     method: 'POST',
@@ -4016,7 +4101,8 @@ async function saveCheckoutSettings(e) {
     body: JSON.stringify(funnel)
   });
 
-  showToast('Checkouts e dados de pagamento atualizados com sucesso!');
+  state.funnel = funnel;
+  showToast('✓ Checkouts dos funis atualizados com sucesso!');
 }
 
 /* =========================================================================
