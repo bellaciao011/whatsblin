@@ -267,7 +267,7 @@ async function syncUazapiInstanceData(inst, req = null) {
       if (!wasConnected) {
         eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
         // Auto-sincroniza conversas existentes ao conectar
-        syncChatsFromUazapi(inst).catch(cErr => console.warn('[uazapi Chat Sync Auto Error]', cErr.message));
+        // syncChatsFromUazapi auto desativado
       }
       return !wasConnected;
     } else {
@@ -339,8 +339,11 @@ async function syncChatsFromUazapi(inst) {
           leadName,
           leadPhotoUrl: leadPhoto,
           instanceId: inst.id,
+          assignedFlowId: 'fluxo-espiao-es',
+          flowLanguage: 'es',
           state: 'NOVO',
           lastMessageTime: parseUazapiTimestamp(c.wa_lastMsgTimestamp),
+          lastProcessedTimestamp: Date.now(), // Watermark no presente para NUNCA disparar mensagens históricas
           messages: []
         };
         importedChats++;
@@ -365,6 +368,7 @@ async function syncChatsFromUazapi(inst) {
             if (!exists) {
               const text = (m.text || m.body || m.content?.text || (typeof m.content === 'string' ? m.content : '') || m.message?.conversation || '').trim();
               if (text || m.fileURL) {
+                seenMessageIds.add(msgId); // Marca como tratada no motor de fluxo
                 allChats[cleanPhone].messages.push({
                   id: msgId,
                   timestamp: parseUazapiTimestamp(m.messageTimestamp || m.timestamp),
@@ -382,6 +386,11 @@ async function syncChatsFromUazapi(inst) {
       } catch (mErr) {}
     }
 
+    for (const phone of Object.keys(allChats)) {
+      if (!allChats[phone].lastProcessedTimestamp) {
+        allChats[phone].lastProcessedTimestamp = Date.now();
+      }
+    }
     db.saveChats(allChats);
     eventBus.emit('chat_updated', { total: Object.keys(allChats).length });
     return { importedChats, importedMessages };
@@ -463,7 +472,7 @@ async function autoRestoreUazapiInstances(req = null) {
           } catch (wErr) {
             console.warn('[Auto-Restore] Aviso webhook:', wErr.message);
           }
-          syncChatsFromUazapi(newInst).catch(() => {});
+          // syncChatsFromUazapi desativado no auto-restore para evitar importação indesejada de histórico antigo
         }
       } else {
         let changed = false;
@@ -1023,6 +1032,8 @@ router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
  */
 router.post('/chats/clear-all', async (req, res) => {
   try {
+    seenMessageIds.clear();
+    lastPhysicalSendTimes.clear();
     db.saveChats({});
     eventBus.emit('chat_updated', { total: 0 });
     console.log('[API] 🧹 TODOS os chats e mensagens foram completamente apagados do sistema!');
@@ -1032,20 +1043,8 @@ router.post('/chats/clear-all', async (req, res) => {
   }
 });
 
-router.get('/chats', async (req, res) => {
-  try {
-    const existing = db.getChats() || {};
-    if (Object.keys(existing).length === 0) {
-      const instances = db.getInstances();
-      const connectedInst = instances.find(i => i.tipo === 'uazapi' && i.status === 'connected' && i.instance_token);
-      if (connectedInst) {
-        await syncChatsFromUazapi(connectedInst);
-      }
-    }
-  } catch (e) {
-    console.warn('[Chats Sync on Fetch Warning]', e.message);
-  }
-  res.json(db.getChats());
+router.get('/chats', (req, res) => {
+  res.json(db.getChats() || {});
 });
 
 router.get('/chats/:phone', (req, res) => {
