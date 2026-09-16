@@ -136,11 +136,6 @@ async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 200
   }
 
   const now = Date.now();
-  const lastSend = lastPhysicalSendTimes.get(cleanPhone) || 0;
-  if (now - lastSend < 8000) {
-    console.log(`[FlowEngine] 🛑 GATEWAY BLOCK: Envio físico para +${cleanPhone} bloqueado! Último envio há ${now - lastSend}ms.`);
-    return;
-  }
   lastPhysicalSendTimes.set(cleanPhone, now);
   recordBotReply(cleanPhone);
 
@@ -170,11 +165,6 @@ async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 200
 async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, mimeType, caption, typingDelay = 2500) {
   if (!inst || !cleanPhone) return;
   const now = Date.now();
-  const lastSend = lastPhysicalSendTimes.get(cleanPhone) || 0;
-  if (now - lastSend < 8000) {
-    console.log(`[FlowEngine] 🛑 GATEWAY BLOCK: Envio de imagem para +${cleanPhone} bloqueado! Último envio há ${now - lastSend}ms.`);
-    return;
-  }
   lastPhysicalSendTimes.set(cleanPhone, now);
   recordBotReply(cleanPhone);
 
@@ -1031,10 +1021,6 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // CASO 2: LEAD ESTÁ AGUARDANDO O NÚMERO
   // =========================================================================
   if (chatData.state === 'AGUARDANDO_NUMERO') {
-    if (hasRecentBotReply(cleanPhone, 10000)) {
-      console.log(`[FlowEngine] ⏳ CASO 2: Resposta recente já enviada para +${cleanPhone}. Suprimindo duplicata.`);
-      return;
-    }
     const welcomeDecision = await aiService.classifyWelcomeReply(messageText, flowLanguage);
 
     if (welcomeDecision.type !== 'PHONE') {
