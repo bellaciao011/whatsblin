@@ -121,6 +121,12 @@ async function simulateTyping(inst, cleanPhone, durationMs = 2000, presenceType 
 async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 2000) {
   if (!inst || !cleanPhone || !text) return;
 
+  // SANITIZADOR DE IDIOMA RIGOROSO: NUNCA envia mensagens em português do funil antigo
+  if (text.includes('R$ 49,90') || text.startsWith('Oi!') || text.includes('áudios descriptografados') || text.includes('você') || text.includes('preciso que me envie o número da pessoa')) {
+    console.warn(`[FlowEngine] 🛑 BLOQUEIO DE IDIOMA: Tentativa de envio em português barrada para +${cleanPhone}!`);
+    return;
+  }
+
   const now = Date.now();
   const lastSend = lastPhysicalSendTimes.get(cleanPhone) || 0;
   if (now - lastSend < 8000) {
@@ -558,7 +564,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   const targetFlowId = inst.assignedFlowId || chatData?.assignedFlowId || 'fluxo-espiao-foto';
   const flows = db.getFlows();
   const activeFlow = flows.find(f => f.id === targetFlowId) || flows.find(f => f.status === 'ativo') || flows[0];
-  const flowLanguage = activeFlow?.language || (activeFlow?.id?.includes('-es') ? 'es' : (activeFlow?.id?.includes('-en') ? 'en' : 'pt'));
+  const flowLanguage = 'es'; // RIGOROSAMENTE 100% ESPANHOL
 
   console.log(`[FlowEngine] 🚀 Executando fluxo: "${activeFlow?.name}" (${activeFlow?.id}, lang: ${flowLanguage}) para Chip: "${inst.name || inst.id}"`);
   if (!chatData) {
@@ -608,21 +614,19 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // Se o lead enviar mensagem inicial da pressel/anúncio (ex: "Hola, quiero espiar un número. (CÓDIGO...)"),
   // reinicia imediatamente o ciclo do funil para NOVO, independente do histórico anterior.
   const isCampaignStart = Boolean(
-    (messageText && /(?:quieros*espiar|queros*espiar|iniciars*investigaci[oó]n|iniciars*rastreo|come[çc]ars*investiga)/i.test(messageText)) ||
-    (messageText && messageText.match(/\(([A-Z0-9]{6})\)/i))
+    (messageText && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(messageText)) ||
+    (messageText && /\b[A-Z0-9]{6}\b/i.test(messageText)) ||
+    (messageText && messageText.includes('(') && messageText.includes(')'))
   );
 
   if (isCampaignStart) {
-    console.log(`[FlowEngine] 🚀 Lead +${cleanPhone} iniciou/reiniciou funil via anúncio/código! Resetando estado para NOVO.`);
+    console.log(`[FlowEngine] 🚀 Lead +${cleanPhone} iniciou/reiniciou funil via anúncio/código! Resetando estado para NOVO e LIMPANDO histórico completo.`);
     chatData.state = 'NOVO';
     chatData.upsellStage = 'stage_49';
     chatData.currentNodeId = null;
     chatData.orderStatus = null;
     chatData.variables = { phone: cleanPhone };
-    // Limpa histórico antigo de mensagens para não contaminar o contexto da IA
-    if (Array.isArray(chatData.messages) && chatData.messages.length > 5) {
-      chatData.messages = chatData.messages.slice(-2);
-    }
+    chatData.messages = []; // Limpa 100% da memória de mensagens deste lead
   }
 
   // Helper para obter o texto configurado no nó visual do fluxo ativo

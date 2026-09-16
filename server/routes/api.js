@@ -473,7 +473,16 @@ async function autoRestoreUazapiInstances(req = null) {
           if (remStatus === 'connected') {
             existing.connectedAt = Date.now();
             console.log(`[Auto-Restore] ✓ Chip ${existing.name} conectou! connectedAt definido para ${existing.connectedAt}`);
+            // Reseta watermark de todos os chats existentes para NUNCA disparar mensagens antigas
+            const allC = db.getChats();
+            for (const c of Object.values(allC)) {
+              c.lastProcessedTimestamp = Date.now();
+            }
+            db.saveChats(allC);
           }
+          changed = true;
+        } else if (existing.status === 'connected' && !existing.connectedAt) {
+          existing.connectedAt = Date.now();
           changed = true;
         }
         existing.assignedFlowId = 'fluxo-espiao-es';
@@ -1008,6 +1017,21 @@ router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
 /**
  * Live Chat (Inbox)
  */
+
+/**
+ * Limpa todo o histórico de conversas e reseta memória do bot
+ */
+router.post('/chats/clear-all', async (req, res) => {
+  try {
+    db.saveChats({});
+    eventBus.emit('chat_updated', { total: 0 });
+    console.log('[API] 🧹 TODOS os chats e mensagens foram completamente apagados do sistema!');
+    res.json({ success: true, message: 'Todos os chats e históricos foram limpos com sucesso.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/chats', async (req, res) => {
   try {
     const existing = db.getChats() || {};

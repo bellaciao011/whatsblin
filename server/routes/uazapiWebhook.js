@@ -53,6 +53,10 @@ router.post('/uazapi', async (req, res) => {
     const body = req.body || {};
     const eventType = (body.event || body.EventType || body.type || '').toLowerCase();
     const instance = findInstance(req);
+    if (instance && instance.status === 'connected' && !instance.connectedAt) {
+      instance.connectedAt = Date.now();
+      db.saveInstance(instance);
+    }
     const instLogName = instance ? `${instance.name} (${instance.id})` : 'Desconhecida';
 
     console.log(`[uazapi Webhook] Evento: "${eventType}" recebido para instância: ${instLogName}`);
@@ -227,7 +231,7 @@ router.post('/uazapi', async (req, res) => {
         console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} <= connectedAt: ${instance.connectedAt})`);
         continue;
       }
-      if (Date.now() - msgTimeMs > 45000) {
+      if (Date.now() - msgTimeMs > 20000) {
         console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 45s) ignorada para não disparar automações atrasadas.`);
         continue;
       }
@@ -259,10 +263,11 @@ router.post('/uazapi', async (req, res) => {
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
-        // Atualiza imediatamente o watermark local para o poller não re-capturar
+        // Marca imediatamente o ID e o watermark local para o poller não re-capturar
+        seenMessageIds.add(msgId);
         const chatBefore = db.getChat(cleanPhone);
         if (chatBefore) {
-          chatBefore.lastProcessedTimestamp = Date.now();
+          chatBefore.lastProcessedTimestamp = Math.max(chatBefore.lastProcessedTimestamp || 0, msgTimeMs, Date.now());
           db.saveChat(cleanPhone, chatBefore);
         }
         await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment, msgId, null, senderName, senderPhoto);

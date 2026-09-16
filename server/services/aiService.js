@@ -35,11 +35,11 @@ function getOpenAiApiKey() {
 /**
  * Classifica a resposta do lead logo após a mensagem de Boas-Vindas
  */
-async function classifyWelcomeReply(userMessage, language = 'pt') {
+async function classifyWelcomeReply(userMessage, language = 'es') {
+  const lang = 'es';
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
   const funnel = db.getFunnel();
-  const lang = (language === 'en') ? 'en' : 'es';
 
   const welcomeTexts = {
     pt: {
@@ -125,11 +125,11 @@ async function classifyWelcomeReply(userMessage, language = 'pt') {
 /**
  * Classifica a mensagem do lead em qualquer etapa do funil/upsell e retorna a resposta oficial exata
  */
-async function classifyAndReply(userMessage, conversationHistory = [], currentStageInfo = {}, language = 'pt') {
+async function classifyAndReply(userMessage, conversationHistory = [], currentStageInfo = {}, language = 'es') {
+  const lang = 'es';
   const funnel = db.getFunnel();
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
-  const lang = (language === 'en') ? 'en' : 'es';
 
   const currentValue = currentStageInfo.value || (lang === 'es' ? '39' : (lang === 'pt' ? '49,90' : '49.90'));
   let paidValue = currentStageInfo.paidValue;
@@ -300,9 +300,13 @@ Regras:
         }
       );
 
-      const reply = response.data.choices[0]?.message?.content?.trim();
+      let reply = response.data.choices[0]?.message?.content?.trim();
       if (reply) {
-        console.log(`[AI Generator (OpenAI)] "${userMessage}" -> "${reply.slice(0, 80)}..."`);
+        if (reply.includes('R$') || reply.startsWith('Oi!') || reply.includes('você') || reply.includes('áudios descriptografados') || reply.includes('relatório')) {
+          console.warn('[AI Service] ⚠️ Resposta em português detectada da OpenAI! Substituindo por resposta oficial em espanhol.');
+          reply = "¡Hola! Para ayudarte con la verificación, envíame el número de WhatsApp de la persona que deseas investigar con su código de país. Estoy aquí para asistirte 🔒";
+        }
+        console.log('[AI Generator (OpenAI)] ' + userMessage + ' -> ' + reply.slice(0, 80) + '...');
         return reply;
       }
     } catch (err) {

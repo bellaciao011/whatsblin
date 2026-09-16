@@ -85,6 +85,12 @@ async function syncUazapiInstancesNow() {
           const decToken = cryptoService.decrypt(inst.instance_token);
           const serverUrl = inst.url_servidor || 'https://whatsblin.uazapi.com';
 
+          // Garante connectedAt sempre definido quando conectado
+          if (inst.status === 'connected' && !inst.connectedAt) {
+            inst.connectedAt = Date.now();
+            db.saveInstance(inst);
+          }
+
           // Se estiver desconectado, tenta detectar reconexão a cada ciclo
           if (inst.status !== 'connected') {
             const statusRes = await uazapiService.getInstanceStatus(serverUrl, decToken);
@@ -295,7 +301,7 @@ async function syncUazapiInstancesNow() {
             const connTimestamp = inst.connectedAt || 0;
             const isBeforeConnection = connTimestamp > 0 && msgTimestampMs <= connTimestamp;
             const msgAgeMs = Date.now() - msgTimestampMs;
-            const isTooOld = msgAgeMs > 30000; // 30 segundos
+            const isTooOld = msgAgeMs > 20000; // 20 segundos máximo
 
             if (isHistoricalMessage || isTooOld || isBeforeConnection) {
               seenMessageIds.add(msgId);
@@ -333,6 +339,14 @@ async function syncUazapiInstancesNow() {
 
             try {
               console.log(`[uazapi Poller] 📩 Nova mensagem real identificada de lead +${cleanPhone}: "${text || '[Mídia]'}" (ID: ${msgId})`);
+
+              // Atualiza o watermark ANTES para evitar que o próximo ciclo capture a mesma mensagem enquanto a IA processa
+              chat.lastProcessedTimestamp = Math.max(chat.lastProcessedTimestamp || 0, msgTimestampMs, Date.now());
+              const cc = db.getChats();
+              if (cc[cleanPhone]) {
+                cc[cleanPhone].lastProcessedTimestamp = chat.lastProcessedTimestamp;
+                db.saveChats(cc);
+              }
 
               // Executa o processIncomingMessage passando msgId e timestamp originais
               await processIncomingMessage(
