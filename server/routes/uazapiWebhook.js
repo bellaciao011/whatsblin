@@ -265,8 +265,6 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
-        // Marca imediatamente o ID e o watermark local para o poller não re-capturar
-        seenMessageIds.add(msgId);
         const chatBefore = db.getChat(cleanPhone);
         if (chatBefore) {
           chatBefore.lastProcessedTimestamp = Math.max(chatBefore.lastProcessedTimestamp || 0, msgTimeMs, Date.now());

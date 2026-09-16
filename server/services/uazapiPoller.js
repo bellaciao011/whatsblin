@@ -330,8 +330,7 @@ async function syncUazapiInstancesNow() {
               continue;
             }
 
-            // Marca imediatamente para não ser re-capturado em loops
-            seenMessageIds.add(msgId);
+            // Registra trava de concorrência por lead durante a execução
             activeLeadProcessing.add(cleanPhone);
 
             try {
@@ -345,21 +344,18 @@ async function syncUazapiInstancesNow() {
                 db.saveChats(cc);
               }
 
-              // O Poller sincroniza a mensagem no banco para o Live Chat
-              // O Webhook é a AUTORIDADE ÚNICA que dispara o motor de fluxo (evitando 100% de duplicação)
-              const existingChat = db.getChat(cleanPhone);
-              const alreadyHasIt = existingChat?.messages?.some(x => x.id === msgId);
-              if (!alreadyHasIt) {
-                db.addChatMessage(cleanPhone, {
-                  id: msgId,
-                  timestamp: parseTimestamp(m.messageTimestamp),
-                  from: 'lead',
-                  text: text || (mediaUrl ? '[Mídia]' : ''),
-                  mediaUrl: mediaUrl,
-                  mediaType: m.messageType || null,
-                  instanceId: inst.id
-                });
-              }
+              // Executa o motor de automação e IA em tempo real com quebra de objeções
+              const mediaAttachment = mediaUrl ? { url: mediaUrl, type: m.messageType || 'image' } : null;
+              await processIncomingMessage(
+                inst.id,
+                cleanPhone,
+                text,
+                mediaAttachment,
+                msgId,
+                parseTimestamp(m.messageTimestamp),
+                leadName,
+                leadPhoto
+              );
 
               anyUpdate = true;
             } catch (procErr) {

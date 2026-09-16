@@ -66,26 +66,8 @@ function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
   const isPhone = Boolean(extractNewTargetPhone(text));
   if (isPhone) return false;
 
+  // Mensagem com o mesmo ID exato que já foi completamente tratada
   if (msgId && seenMessageIds.has(msgId)) return true;
-
-  try {
-    const chat = db.getChat(cleanPhone);
-    if (chat && Array.isArray(chat.messages)) {
-      const cleanT = (text || '').trim();
-      const exists = chat.messages.some(m => {
-        if (msgId && m.id === msgId) return true;
-        if (cleanT && (m.text || '').trim() === cleanT) {
-          const t = new Date(m.timestamp).getTime();
-          if (Math.abs(t - (timestampMs || Date.now())) < 20000) return true;
-        }
-        return false;
-      });
-      if (exists) {
-        if (msgId) seenMessageIds.add(msgId);
-        return true;
-      }
-    }
-  } catch (e) {}
 
   return false;
 }
