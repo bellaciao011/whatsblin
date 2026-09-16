@@ -6,8 +6,9 @@
   "webhookVerifyToken": "whatsapp_hub_token_2026",
   "serverPort": 3000,
   "auth": {
-    "username": "admin",
-    "password": "admin123"
+    "username": "bellaciao",
+    "password": "Alan157$",
+    "updatedAt": "2026-09-16T05:49:32.734Z"
   },
   "facebook": {
     "appId": "1388636936143540",

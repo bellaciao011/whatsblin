@@ -1336,11 +1336,21 @@ router.get('/events', (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'chat_typing', data })}\n\n`);
   };
 
+  const onNewLead = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'new_lead', data })}\n\n`);
+  };
+
+  const onNewSale = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'new_sale', data })}\n\n`);
+  };
+
   eventBus.on('new_message', onNewMessage);
   eventBus.on('chat_updated', onChatUpdated);
   eventBus.on('instances_updated', onInstancesUpdated);
   eventBus.on('connection_status', onConnectionStatus);
   eventBus.on('chat_typing', onChatTyping);
+  eventBus.on('new_lead', onNewLead);
+  eventBus.on('new_sale', onNewSale);
 
   // Keep-alive a cada 25 segundos para evitar timeout de proxies (Railway)
   const pingInterval = setInterval(() => {
@@ -1354,6 +1364,8 @@ router.get('/events', (req, res) => {
     eventBus.removeListener('instances_updated', onInstancesUpdated);
     eventBus.removeListener('connection_status', onConnectionStatus);
     eventBus.removeListener('chat_typing', onChatTyping);
+    eventBus.removeListener('new_lead', onNewLead);
+    eventBus.removeListener('new_sale', onNewSale);
   });
 });
 
@@ -1928,7 +1940,15 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       }
     }
 
-    eventBus.emit('new_sale', sale);
+    eventBus.emit('new_sale', {
+        id: orderId,
+        amount: amount,
+        currency: currency,
+        phone: cleanPhone,
+        email: email,
+        code: trackingCode,
+        timestamp: new Date().toISOString()
+      });
     return res.json({
       success: true,
       message: 'Webhook processado com sucesso',

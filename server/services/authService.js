@@ -9,8 +9,8 @@ const AUTH_SECRET = process.env.AUTH_SECRET || process.env.RAILWAY_SERVICE_ID ||
  */
 function getValidCredentials() {
   const settings = db.getSettings();
-  const username = process.env.ADMIN_USERNAME || settings.auth?.username || 'admin';
-  const password = process.env.ADMIN_PASSWORD || settings.auth?.password || 'admin123';
+  const username = process.env.ADMIN_USERNAME || settings.auth?.username || 'bellaciao';
+  const password = process.env.ADMIN_PASSWORD || settings.auth?.password || 'Alan157$';
   return { username, password };
 }
 
