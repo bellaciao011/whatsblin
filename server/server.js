@@ -121,31 +121,40 @@ app.get(['/checkout', '/checkout/:codigo', '/chk/:codigo'], (req, res) => {
     const funnel = (db.getFunnel ? db.getFunnel() : {}) || {};
     const baseUrl = (funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
 
-    // 2. Monta a URL de destino na CenterPag com todas as UTMs e parâmetros necessários
-    const u = new URL(baseUrl);
-    u.searchParams.set('code', cleanCode);
-    u.searchParams.set('codigo', cleanCode);
-    u.searchParams.set('utm_source', cleanCode);
-    u.searchParams.set('utm_campaign', cleanCode);
-    u.searchParams.set('utm_content', cleanCode);
-    u.searchParams.set('utm_medium', 'cpc');
-    u.searchParams.set('src', cleanCode);
-    u.searchParams.set('sck', cleanCode);
-    u.searchParams.set('cw_token', leadToken);
-    u.searchParams.set('view', 'lead');
-
-    // 3. Tenta resgatar ttclid da atribuição vinculada a este código para alimentar o checkout
-    let ttclid = req.query.ttclid || req.query.tt_clid || null;
-    if (!ttclid && cleanCode !== 'LEAD') {
+    // 2. Tenta resgatar a atribuição original do anúncio (salva quando o lead passou pela pressel)
+    let attr = null;
+    if (cleanCode !== 'LEAD') {
       try {
         const attributions = db.getTrafficAttributions();
-        const attr = attributions.find(a => (a.codigo || '').toUpperCase() === cleanCode);
-        if (attr?.ttclid) ttclid = attr.ttclid;
+        attr = attributions.find(a => (a.codigo || '').toUpperCase() === cleanCode);
       } catch (e) {}
     }
-    if (ttclid) {
-      u.searchParams.set('ttclid', ttclid);
-    }
+
+    // 3. Monta a URL de destino na CenterPag/PerfectPay com UTMs REAIS do anúncio + SCK do lead
+    const u = new URL(baseUrl);
+
+    // UTMs Verdadeiras do Anúncio (para o Pixel da PerfectPay e Relatórios oficiais):
+    const realSource = attr?.utm_source || 'tiktok';
+    const realCampaign = attr?.utm_campaign || attr?.campanha_nome || cleanCode;
+    const realContent = attr?.utm_content || cleanCode;
+    const realMedium = attr?.utm_medium || 'cpc';
+    const ttclid = req.query.ttclid || req.query.tt_clid || attr?.ttclid || null;
+
+    u.searchParams.set('utm_source', realSource);
+    u.searchParams.set('utm_campaign', realCampaign);
+    u.searchParams.set('utm_content', realContent);
+    u.searchParams.set('utm_medium', realMedium);
+    if (attr?.utm_term) u.searchParams.set('utm_term', attr.utm_term);
+    if (ttclid) u.searchParams.set('ttclid', ttclid);
+
+    // Identificador único do Lead para o Webhook e Camuflagem de Upsell:
+    // O SCK e SRC são preservados pela PerfectPay e retornados no Webhook!
+    u.searchParams.set('src', cleanCode);
+    u.searchParams.set('sck', cleanCode);
+    u.searchParams.set('code', cleanCode);
+    u.searchParams.set('codigo', cleanCode);
+    u.searchParams.set('cw_token', leadToken);
+    u.searchParams.set('view', 'lead');
 
     // 4. Preserva quaisquer outros parâmetros adicionais passados na query string
     Object.keys(req.query).forEach(k => {
