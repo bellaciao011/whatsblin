@@ -418,6 +418,14 @@ function handleRoute() {
     if (mainViewport) mainViewport.classList.remove('inbox-active');
   }
 
+  if (route === 'fluxo-ao-vivo') {
+    container.classList.add('live-flow-view-active');
+    if (mainViewport) mainViewport.classList.add('live-flow-active');
+  } else {
+    container.classList.remove('live-flow-view-active');
+    if (mainViewport) mainViewport.classList.remove('live-flow-active');
+  }
+
   if (route === 'overview') renderOverview();
   else if (route === 'fluxo-ao-vivo') renderLiveFlow();
   else if (route === 'inbox') renderInbox();
@@ -962,7 +970,18 @@ async function renderLiveFlow() {
     liveZoomState.minY = minY;
 
     const html = `
-      <div class="live-flow-container">
+      <div class="live-flow-container" id="live-flow-container">
+        <!-- Segmented Control no Mobile (Mapa vs Feed) -->
+        <div class="mobile-live-switcher">
+          <button type="button" id="btn-live-canvas" class="live-switch-btn active" onclick="switchMobileLiveMode('canvas')">
+            <span>🕸️</span> <span>Mapa do Funil</span>
+          </button>
+          <button type="button" id="btn-live-feed" class="live-switch-btn" onclick="switchMobileLiveMode('feed')">
+            <span>📡</span> <span>Feed ao Vivo</span>
+            <span class="mobile-nav-badge" style="position: static !important; margin-left: 4px;" id="mob-live-events-count">${recentEvents.length}</span>
+          </button>
+        </div>
+
         <!-- Top Bar com Status de Transmissão, Seletor de Funil e Controles de Zoom -->
         <div class="live-topbar">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -2369,12 +2388,12 @@ async function renderInbox(showLoading = true) {
             </div>
 
             <!-- Disparo Manual de Fluxo e Automação -->
-            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-              <select id="inbox-flow-select" class="form-input" style="padding: 6px 10px; font-size: 11.5px; height: 34px; max-width: 190px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); border-radius: 8px;" title="Selecione o fluxo para disparar">
+            <div class="chat-header-actions" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <select id="inbox-flow-select" class="form-input desktop-only-action" style="padding: 6px 10px; font-size: 11.5px; height: 34px; max-width: 190px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); border-radius: 8px;" title="Selecione o fluxo para disparar">
                 ${(state.flows || []).map(f => `<option value="${f.id}" ${f.id === (activeChat.assignedFlowId || 'fluxo-espiao-es') ? 'selected' : ''}>${f.name}</option>`).join('')}
               </select>
 
-              <button class="btn btn-primary" style="font-size: 11.5px; padding: 7px 12px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); display: flex; align-items: center; gap: 6px;" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')" title="Iniciar automação deste fluxo para o contato">
+              <button class="btn btn-primary desktop-only-action" style="font-size: 11.5px; padding: 7px 12px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); display: flex; align-items: center; gap: 6px;" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')" title="Iniciar automação deste fluxo para o contato">
                 <span>⚡</span> <span>Disparar Fluxo</span>
               </button>
 
@@ -2383,6 +2402,9 @@ async function renderInbox(showLoading = true) {
                   <span>⋮</span>
                 </button>
                 <div id="flow-menu-${activeChat.leadPhone}" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); z-index: 100; min-width: 220px; overflow: hidden;">
+                  <button class="mobile-only-menu-item" style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #38bdf8; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 700; transition: background 0.15s; border-bottom: 1px solid rgba(255,255,255,0.08);" onmouseover="this.style.background='rgba(56,189,248,0.1)'" onmouseout="this.style.background='transparent'" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')">
+                    <span>⚡</span> Disparar Fluxo Oficial
+                  </button>
                   <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #34d399; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 700; transition: background 0.15s;" onmouseover="this.style.background='rgba(16,185,129,0.1)'" onmouseout="this.style.background='transparent'" onclick="manualApproveSale('${activeChat.leadPhone}')">
                     <span>✅</span> Aprovar Acesso & Disparar TikTok
                   </button>
@@ -5809,5 +5831,21 @@ window.resendTikTokLog = async function(logId) {
     }
   } catch (err) {
     showToast('Erro na conexão: ' + err.message);
+  }
+};
+
+window.switchMobileLiveMode = function(mode) {
+  const container = document.getElementById('live-flow-container');
+  const btnCanvas = document.getElementById('btn-live-canvas');
+  const btnFeed = document.getElementById('btn-live-feed');
+  if (container) {
+    container.classList.toggle('feed-mode', mode === 'feed');
+  }
+  if (btnCanvas && btnFeed) {
+    btnCanvas.classList.toggle('active', mode === 'canvas');
+    btnFeed.classList.toggle('active', mode === 'feed');
+  }
+  if (mode === 'canvas' && typeof fitLiveFlowView === 'function') {
+    setTimeout(fitLiveFlowView, 60);
   }
 };

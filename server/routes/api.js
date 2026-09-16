@@ -2761,4 +2761,55 @@ router.post('/tiktok/test-chain', async (req, res) => {
 
 router.autoRestoreUazapiInstances = autoRestoreUazapiInstances;
 router.syncUazapiInstanceData = syncUazapiInstanceData;
+
+// Endpoint para Aprovação Manual de Venda ($39 USD / R$ 49,90) pelo Live Chat
+router.post('/sales/manual-approve', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 8) {
+      return res.status(400).json({ error: 'Número de telefone inválido' });
+    }
+
+    const chats = db.getChats();
+    const chat = chats[cleanPhone] || { leadPhone: cleanPhone };
+    const accessCode = chat.codigo || 'vip';
+    const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
+    const autoDeliverMsg = `¡Pago recibido y validado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel ha sido desbloqueado.\n\nAccede ahora mismo a través de este enlace seguro:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`;
+
+    chat.state = 'FINALIZADO';
+    chat.orderStatus = 'PAGO';
+    chat.upsellStage = 'stage_finalizado';
+    db.saveChat(cleanPhone, chat);
+
+    db.confirmAttributionSale(cleanPhone, 39);
+
+    const instances = db.getInstances();
+    const inst = instances.find(i => i.status === 'connected') || instances[0];
+    if (inst) {
+      db.addChatMessage(cleanPhone, { from: 'bot', text: autoDeliverMsg, instanceId: inst.id }, 'FINALIZADO');
+      try {
+        const { sendOutgoingTextMessage } = require('../services/flowEngine');
+        if (typeof sendOutgoingTextMessage === 'function') {
+          sendOutgoingTextMessage(inst, cleanPhone, autoDeliverMsg, 500).catch(console.error);
+        }
+      } catch(e) {}
+    }
+
+    eventBus.emit('new_sale', {
+      amount: 39,
+      currency: 'USD',
+      phone: cleanPhone,
+      code: accessCode,
+      timestamp: new Date().toISOString()
+    });
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+
+    return res.json({ success: true, message: 'Acesso liberado e venda aprovada com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao aprovar venda manual:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

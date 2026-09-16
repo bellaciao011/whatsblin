@@ -652,6 +652,15 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.variables = { phone: cleanPhone, checkoutUrl: chatData.variables.checkoutUrl, valor_atual: '39' };
     lastBotReplyTimestamps.delete(cleanPhone);
     lastPhysicalSendTimes.delete(cleanPhone);
+
+    // Emite evento de novo lead para notificação sonora e push no celular
+    eventBus.emit('new_lead', {
+      phone: cleanPhone,
+      codigo: chatData.codigo || storedAttr?.codigo || '',
+      campaign: storedAttr?.campanha_nome || storedAttr?.utm_campaign || 'TikTok Ads',
+      text: rawMsg || 'Hola, quiero espiar un número',
+      timestamp: new Date().toISOString()
+    });
   }
 
   // Helper para obter o texto configurado no nó visual do fluxo ativo
@@ -682,6 +691,13 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.orderStatus = 'PAGO';
     db.saveChat(cleanPhone, { state: 'FINALIZADO', orderStatus: 'PAGO', upsellStage: 'stage_finalizado' });
     db.confirmAttributionSale(cleanPhone, 39);
+    eventBus.emit('new_sale', {
+      amount: 39,
+      currency: 'USD',
+      phone: cleanPhone,
+      code: accessCode,
+      timestamp: new Date().toISOString()
+    });
     eventBus.emit('chat_updated', { phone: cleanPhone });
     return;
   }
@@ -839,6 +855,15 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     state: 'AGUARDANDO_NUMERO',
     assignedFlowId: activeFlow.id,
     flowLanguage: 'es'
+  });
+
+  // Notifica o celular do usuário sobre a chegada de novo lead
+  eventBus.emit('new_lead', {
+    phone: cleanPhone,
+    codigo: chatData.codigo || storedAttr?.codigo || '',
+    campaign: storedAttr?.campanha_nome || storedAttr?.utm_campaign || 'WhatsApp Funnel',
+    text: rawMsg || 'Hola, quiero espiar un número',
+    timestamp: new Date().toISOString()
   });
 
   db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
