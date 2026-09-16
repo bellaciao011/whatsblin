@@ -45,7 +45,7 @@ function findInstance(req) {
 /**
  * POST /api/webhooks/uazapi (Endpoint oficial para receber webhooks da uazapi)
  */
-router.post('/uazapi', async (req, res) => {
+router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
   // Resposta rápida 200 para liberar o servidor uazapi
   res.status(200).json({ received: true });
 
@@ -229,12 +229,12 @@ router.post('/uazapi', async (req, res) => {
 
       // 3. Filtro de Mensagens Anteriores à Conexão do Chip
       const msgTimeMs = msg.messageTimestamp ? (msg.messageTimestamp > 1000000000000 ? msg.messageTimestamp : msg.messageTimestamp * 1000) : Date.now();
-      if (instance?.connectedAt && msgTimeMs <= instance.connectedAt) {
-        console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} <= connectedAt: ${instance.connectedAt})`);
+      if (instance?.connectedAt && msgTimeMs < (instance.connectedAt - 60000)) {
+        console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} < connectedAt - 60s: ${instance.connectedAt - 60000})`);
         continue;
       }
-      if (Date.now() - msgTimeMs > 120000) {
-        console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 45s) ignorada para não disparar automações atrasadas.`);
+      if (Date.now() - msgTimeMs > 600000) {
+        console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 10min) ignorada para não disparar automações atrasadas.`);
         continue;
       }
 
