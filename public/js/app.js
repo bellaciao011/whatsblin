@@ -360,6 +360,11 @@ function handleRoute() {
     item.classList.toggle('active', item.dataset.view === route);
   });
 
+  // Atualiza abas no Mobile Bottom Navigation Bar
+  document.querySelectorAll('.mobile-tab-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === route);
+  });
+
   // Limpa timer de polling de domínios ao sair da tela
   if (window.domainPollingTimer && route !== 'dominios') {
     clearInterval(window.domainPollingTimer);
@@ -515,8 +520,11 @@ async function updateBadges() {
       fetch('/api/instances').then(r => r.json()).catch(() => ([]))
     ]);
     state.chats = chatsRes;
+    const leadsCount = Object.keys(state.chats).length;
     const leadsBadge = document.getElementById('badge-leads');
-    if (leadsBadge) leadsBadge.textContent = Object.keys(state.chats).length;
+    if (leadsBadge) leadsBadge.textContent = leadsCount;
+    const mobileLeadsBadge = document.getElementById('mobile-badge-leads');
+    if (mobileLeadsBadge) mobileLeadsBadge.textContent = leadsCount;
 
     const chipsBadge = document.getElementById('badge-chips');
     if (chipsBadge && Array.isArray(instRes)) chipsBadge.textContent = instRes.length;
@@ -2263,7 +2271,7 @@ async function renderInbox(showLoading = true) {
     : '';
 
   const html = `
-    <div class="inbox-container">
+    <div class="inbox-container ${state.activeChatPhone ? 'chat-open' : ''}">
       <!-- Contact List -->
       <div class="inbox-sidebar">
         <div class="inbox-search">
@@ -2331,7 +2339,10 @@ async function renderInbox(showLoading = true) {
       <div class="inbox-view">
         ${activeChat ? `
           <div class="chat-header">
-            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <button class="mobile-chat-back-btn" onclick="closeMobileChat()" title="Voltar aos Contatos">
+                <span>←</span> <span>Voltar</span>
+              </button>
               <div class="chat-avatar" style="width: 48px; height: 48px;">
                 ${activeChat.leadPhotoUrl ? `<img src="${activeChat.leadPhotoUrl}" alt="" onerror="this.style.display='none';">` : (activeChat.leadName && !activeChat.leadName.startsWith('Lead ') ? activeChat.leadName.slice(0, 2).toUpperCase() : activeChat.leadPhone.slice(-2))}
                 <span class="avatar-online-dot"></span>
@@ -2508,6 +2519,25 @@ async function renderInbox(showLoading = true) {
 window.selectChat = function(phone) {
   state.activeChatPhone = phone;
   renderInbox(false);
+};
+
+window.closeMobileChat = function() {
+  state.activeChatPhone = null;
+  renderInbox(false);
+};
+
+window.openMobileDrawer = function() {
+  const drawer = document.getElementById('mobile-drawer');
+  const backdrop = document.getElementById('mobile-drawer-backdrop');
+  if (drawer) drawer.classList.add('open');
+  if (backdrop) backdrop.classList.add('open');
+};
+
+window.closeMobileDrawer = function() {
+  const drawer = document.getElementById('mobile-drawer');
+  const backdrop = document.getElementById('mobile-drawer-backdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
 };
 
 window.toggleFlowMenu = function(phone) {

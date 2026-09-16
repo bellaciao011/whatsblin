@@ -57,8 +57,8 @@ function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
   // Início de campanha/anúncio pelo lead nunca é bloqueado como duplicata
   const isStart = Boolean(
     (text && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(text)) ||
-    (text && /\b[A-Z0-9]{6}\b/i.test(text)) ||
-    (text && text.includes('(') && text.includes(')'))
+    (text && /\([A-Za-z0-9]{4,8}\)/.test(text)) ||
+    (text && /c[oó]digo\s*:?\s*[A-Za-z0-9]{4,8}/i.test(text))
   );
   if (isStart) return false;
 
@@ -657,8 +657,8 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // 0.2 RECONHECIMENTO DE ENTRADA DE ANÚNCIO / CAMPANHA
   const isCampaignStart = Boolean(
     (rawMsg && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(rawMsg)) ||
-    (rawMsg && /\b[A-Z0-9]{6}\b/i.test(rawMsg)) ||
-    (rawMsg && rawMsg.includes('(') && rawMsg.includes(')'))
+    (rawMsg && /\([A-Za-z0-9]{4,8}\)/.test(rawMsg)) ||
+    (rawMsg && /c[oó]digo\s*:?\s*[A-Za-z0-9]{4,8}/i.test(rawMsg))
   );
 
   if (isCampaignStart) {
@@ -824,44 +824,28 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   }
 
   // CASO B: LEAD JÁ RECEBEU A OFERTA (OFERTA_ENVIADA / DUVIDAS / NEGOCIACAO)
-  // O lead tem dúvidas sobre pagamento, segurança, preço, etc.
+  // O lead tem dúvidas sobre pagamento, segurança, preço, reembolso, denúncia, consultar outro número, etc.
   if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'DUVIDAS') {
-    if (hasRecentBotReply(cleanPhone, 8000)) {
-      console.log(`[FlowEngine] ⏳ Resposta recente já enviada para +${cleanPhone} há menos de 8s. Suprimindo disparo concorrente.`);
-      return;
-    }
-    console.log(`[FlowEngine] Analisando dúvida/objeção do lead com IA (Lang: ${flowLanguage})...`);
+    console.log(`[FlowEngine] 🤖 Quebra de objeção com GPT (Lang: ${flowLanguage}, Lead: +${cleanPhone}): "${rawMsg}"`);
     recordBotReply(cleanPhone);
-    const aiReply = await aiService.classifyAndReply(rawMsg, chatData.messages, stageInfo, flowLanguage);
+    const aiReply = await aiService.classifyAndReply(rawMsg, chatData.messages, stageInfo, flowLanguage, 'OFERTA_ENVIADA', chatData.variables?.alvo);
 
     db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id });
-    await sendOutgoingTextMessage(inst, cleanPhone, aiReply, 1800);
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply, 1500);
     eventBus.emit('chat_updated', { phone: cleanPhone });
     return;
   }
 
-  // CASO C: LEAD ESTÁ EM AGUARDANDO_NUMERO (Enviou dúvida ou texto aleatório em vez do número)
+  // CASO C: LEAD ESTÁ EM AGUARDANDO_NUMERO (Enviou dúvida, pergunta ou objeção antes de enviar o número)
   if (chatData.state === 'AGUARDANDO_NUMERO') {
-    const welcomeDecision = await aiService.classifyWelcomeReply(rawMsg, flowLanguage);
-    console.log(`[FlowEngine] Resposta pós-boas-vindas classificada como: ${welcomeDecision.type}`);
+    console.log(`[FlowEngine] 🤖 Lead em AGUARDANDO_NUMERO enviou pergunta/dúvida (Lead: +${cleanPhone}): "${rawMsg}". Consultando GPT em espanhol...`);
+    recordBotReply(cleanPhone);
+    const aiReply = await aiService.classifyAndReply(rawMsg, chatData.messages, stageInfo, flowLanguage, 'AGUARDANDO_NUMERO');
 
-    if (welcomeDecision.type === 'DUVIDA') {
-      // Nó de Dúvida pós Boas-Vindas (node-doubt-welcome)
-      const fallbackDoubt = "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono.";
-      const doubtText = getNodeText('node-doubt-welcome', fallbackDoubt);
-      db.addChatMessage(cleanPhone, { from: 'bot', text: doubtText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-      await sendOutgoingTextMessage(inst, cleanPhone, doubtText, 1500);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    } else {
-      // Nó Negativa / Aleatória / 'Salvei' (node-reinf-phone)
-      const fallbackReinf = "En cuanto envíes el número ya lo activo aquí 👍\n\nNecesito el WhatsApp de la persona:\nCódigo de país + número";
-      const reinfText = getNodeText('node-reinf-phone', fallbackReinf);
-      db.addChatMessage(cleanPhone, { from: 'bot', text: reinfText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
-      await sendOutgoingTextMessage(inst, cleanPhone, reinfText, 1500);
-      eventBus.emit('chat_updated', { phone: cleanPhone });
-      return;
-    }
+    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply, 1500);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+    return;
   }
 
   // CASO D: NOVO LEAD OU INÍCIO DE CAMPANHA (BOAS-VINDAS)

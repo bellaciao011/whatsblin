@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>WhatsApp Automation Hub — Funil com Prova Dinâmica & Multi-Chip</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -167,6 +167,25 @@
 
     <!-- Main Content -->
     <main class="main-viewport">
+      <!-- Mobile Header (Nativo PWA) -->
+      <header class="mobile-header">
+        <div class="mobile-header-left">
+          <div class="mobile-header-brand" onclick="window.location.hash='#overview'">
+            <div class="mobile-brand-bolt">⚡</div>
+            <span>WhatsHub</span>
+          </div>
+          <div class="mobile-chip-pill" onclick="window.location.hash='#instances'">
+            <span class="mobile-pulse-dot"></span>
+            <span id="mobile-chip-name">CELULAR ROXO</span>
+          </div>
+        </div>
+        <div class="mobile-header-actions">
+          <button class="mobile-icon-btn" onclick="toggleTheme()" title="Tema">☀️</button>
+          <button class="mobile-icon-btn" onclick="requestNotificationPermission()" title="Alertas">🔔</button>
+          <button class="mobile-icon-btn" onclick="openMobileDrawer()" title="Menu">☰</button>
+        </div>
+      </header>
+
       <header class="top-bar">
         <div class="top-title" id="top-title">Visão Geral</div>
         <div class="top-actions">
@@ -427,5 +446,73 @@
   <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
   <script src="/js/flowBuilder.js?v=20260914_uazapi_v3"></script>
   <script src="/js/app.js?v=20260914_uazapi_v3"></script>
+  <!-- Mobile Bottom Navigation Bar (Tab Bar Estilo App Nativo) -->
+  <nav class="mobile-bottom-nav">
+    <a href="#overview" class="mobile-tab-item active" data-tab="overview">
+      <span class="mobile-tab-icon">📊</span>
+      <span>Painel</span>
+    </a>
+    <a href="#fluxo-ao-vivo" class="mobile-tab-item" data-tab="fluxo-ao-vivo" style="color: #f87171;">
+      <span class="mobile-tab-icon">⚡</span>
+      <span>Ao Vivo</span>
+    </a>
+    <a href="#inbox" class="mobile-tab-item" data-tab="inbox">
+      <span class="mobile-tab-icon">💬</span>
+      <span>Chats</span>
+      <span class="mobile-nav-badge" id="mobile-badge-leads">0</span>
+    </a>
+    <a href="#instances" class="mobile-tab-item" data-tab="instances">
+      <span class="mobile-tab-icon">📱</span>
+      <span>Chips</span>
+    </a>
+    <a href="javascript:void(0)" class="mobile-tab-item" onclick="openMobileDrawer()">
+      <span class="mobile-tab-icon">☰</span>
+      <span>Mais</span>
+    </a>
+  </nav>
+
+  <!-- Mobile Drawer Backdrop & Panel -->
+  <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" onclick="closeMobileDrawer()"></div>
+  <aside class="mobile-drawer" id="mobile-drawer">
+    <div class="drawer-header">
+      <div class="mobile-header-brand">
+        <div class="mobile-brand-bolt">⚡</div>
+        <div>
+          <div style="font-size: 16px; font-weight: 800;">WhatsHub Pro</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Painel de Controle</div>
+        </div>
+      </div>
+      <button class="drawer-close-btn" onclick="closeMobileDrawer()">✕</button>
+    </div>
+
+    <div style="padding: 10px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+      <span class="mobile-pulse-dot"></span>
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #34d399;">WhatsApp Conectado</div>
+        <div style="font-size: 11px; color: #94a3b8;">Chip: CELULAR ROXO</div>
+      </div>
+    </div>
+
+    <ul class="drawer-list">
+      <li><a class="drawer-item" href="#overview" onclick="closeMobileDrawer()"><span>📊</span> <span>Dashboard Geral</span></a></li>
+      <li><a class="drawer-item" href="#fluxo-ao-vivo" onclick="closeMobileDrawer()" style="color: #f87171;"><span>⚡</span> <span>Fluxo ao Vivo</span></a></li>
+      <li><a class="drawer-item" href="#inbox" onclick="closeMobileDrawer()"><span>💬</span> <span>Chats ao Vivo</span></a></li>
+      <li><a class="drawer-item" href="#kanban" onclick="closeMobileDrawer()"><span>🗂️</span> <span>Kanban de Atendimento</span></a></li>
+      <li><a class="drawer-item" href="#contacts" onclick="closeMobileDrawer()"><span>👥</span> <span>Contatos & Leads</span></a></li>
+      <li><a class="drawer-item" href="#flows" onclick="closeMobileDrawer()"><span>🔗</span> <span>Fluxos de Automação</span></a></li>
+      <li><a class="drawer-item" href="#instances" onclick="closeMobileDrawer()"><span>📱</span> <span>Conexões (Chips)</span></a></li>
+      <li><a class="drawer-item" href="#pixels" onclick="closeMobileDrawer()"><span>🎯</span> <span>Pixels & Meta CAPI</span></a></li>
+      <li><a class="drawer-item" href="#tiktok" onclick="closeMobileDrawer()"><span>🎵</span> <span>TikTok Ads Attribution</span></a></li>
+      <li><a class="drawer-item" href="#dominios" onclick="closeMobileDrawer()"><span>🌐</span> <span>Domínios Customizados</span></a></li>
+      <li><a class="drawer-item" href="#settings" onclick="closeMobileDrawer()"><span>🤖</span> <span>Ajustes de IA & Funil</span></a></li>
+      <li><a class="drawer-item" href="#simulator" onclick="closeMobileDrawer()"><span>🧪</span> <span>Simulador de Lead</span></a></li>
+      <li style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <a class="drawer-item" href="javascript:void(0)" onclick="logout()" style="color: #f87171;">
+          <span>🔒</span> <span>Encerrar Sessão</span>
+        </a>
+      </li>
+    </ul>
+  </aside>
+
 </body>
 </html>
