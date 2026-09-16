@@ -5,7 +5,7 @@ const db = require('../storage/db');
 const TIKTOK_TRACK_URL = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
 
 /**
- * Normaliza o telefone para formato E.164 (somente dígitos)
+ * Normaliza o telefone para formato E.164 (somente dígitos com DDI)
  */
 function cleanPhoneNumber(phone) {
   if (!phone) return '';
@@ -17,15 +17,23 @@ function cleanPhoneNumber(phone) {
 }
 
 /**
- * Gera hash SHA-256 de uma string
+ * Gera hash SHA-256 de uma string em hexadecimal minúsculo
  */
 function sha256(val) {
   if (!val) return '';
-  return crypto.createHash('sha256').update(String(val).trim()).digest('hex');
+  return crypto.createHash('sha256').update(String(val).trim().toLowerCase()).digest('hex');
 }
 
 /**
  * Dispara evento de conversão server-side para o TikTok Events API v1.3
+ * Especificação Oficial:
+ * POST https://business-api.tiktok.com/open_api/v1.3/event/track/
+ * Headers: { 'Access-Token': '<token>', 'Content-Type': 'application/json' }
+ * Body: {
+ *   event_source: 'web',
+ *   event_source_id: '<PIXEL_ID>',
+ *   data: [ { event, event_time, event_id, user: { phone, external_id, ttclid, ttp }, properties: { ... } } ]
+ * }
  */
 async function sendTikTokEvent(options = {}) {
   const {
@@ -39,10 +47,13 @@ async function sendTikTokEvent(options = {}) {
     eventId = null
   } = options;
 
-  if (!pixelCode || !accessToken) {
+  const cleanPixelId = String(pixelCode || '').trim();
+  const cleanToken = String(accessToken || '').trim();
+
+  if (!cleanPixelId || !cleanToken) {
     console.warn('[TikTok Events API] Pixel Code ou Access Token ausente. Modo teste/simulação.');
     const log = db.addTikTokLog({
-      pixel_code: pixelCode || 'TEST_CODE',
+      pixel_code: cleanPixelId || 'TEST_CODE',
       event: eventName,
       phone: phone || '',
       ttclid: attribution?.ttclid || null,
@@ -60,44 +71,56 @@ async function sendTikTokEvent(options = {}) {
   const phoneHash = cleanPhone ? sha256(cleanPhone) : '';
   const finalEventId = eventId || `ev_${cleanPhone || 'lead'}_${Date.now()}`;
   const numValue = parseFloat(String(value).replace(',', '.')) || 49.90;
+  const eventTimeSeconds = Math.floor(Date.now() / 1000);
 
-  // Montagem do Contexto TikTok (Advanced Matching & Ad Attribution)
-  const context = {
-    ad: {
-      callback: attribution?.ttclid || undefined
-    },
-    user: {
-      phone_number: phoneHash || undefined,
-      external_id: phoneHash || undefined,
-      ttp: attribution?.ttp || undefined
-    },
-    page: {
-      url: attribution?.pressel_url || 'https://minhapressel.com'
-    }
-  };
+  // Usuário (Advanced Matching TikTok)
+  const userData = {};
+  if (phoneHash) {
+    userData.phone = phoneHash;
+    userData.external_id = phoneHash;
+  }
+  if (attribution?.ttclid) {
+    userData.ttclid = attribution.ttclid;
+  }
+  if (attribution?.ttp) {
+    userData.ttp = attribution.ttp;
+  }
 
-  const properties = {
-    value: numValue,
-    currency: currency || 'BRL',
-    content_type: 'product'
-  };
+  // Página da conversão
+  const pageData = {};
+  if (attribution?.pressel_url) {
+    pageData.url = attribution.pressel_url;
+  } else if (attribution?.host) {
+    pageData.url = `https://${attribution.host}/c/${attribution.campanha_id || 'camp'}`;
+  }
 
+  // Payload oficial TikTok Events API v1.3
   const payload = {
-    pixel_code: pixelCode,
-    event: eventName,
-    event_id: finalEventId,
-    timestamp: new Date().toISOString(),
-    context,
-    properties
+    event_source: 'web',
+    event_source_id: cleanPixelId,
+    data: [
+      {
+        event: eventName,
+        event_time: eventTimeSeconds,
+        event_id: finalEventId,
+        user: Object.keys(userData).length > 0 ? userData : undefined,
+        page: Object.keys(pageData).length > 0 ? pageData : undefined,
+        properties: {
+          value: numValue,
+          currency: currency || 'BRL',
+          content_type: 'product'
+        }
+      }
+    ]
   };
 
   // Simulação positiva para tokens de teste / sandbox
-  if (accessToken.startsWith('tt_act_demo_') || pixelCode.startsWith('TT_PIXEL_TEST_')) {
+  if (cleanToken.startsWith('tt_act_demo_') || cleanPixelId.startsWith('TT_PIXEL_TEST_')) {
     if (cleanPhone) {
       db.confirmAttributionSale(cleanPhone, numValue);
     }
     const log = db.addTikTokLog({
-      pixel_code: pixelCode,
+      pixel_code: cleanPixelId,
       event: eventName,
       phone: cleanPhone,
       phone_hash: phoneHash,
@@ -112,21 +135,21 @@ async function sendTikTokEvent(options = {}) {
     return { success: true, isDemo: true, logId: log.id, eventId: finalEventId };
   }
 
-  console.log(`[TikTok Events API] 🎯 Disparando "${eventName}" para pixel ${pixelCode} | Valor: ${numValue} ${currency} | ttclid: ${attribution?.ttclid || 'nenhum'}`);
+  console.log(`[TikTok Events API v1.3] 🎯 Disparando "${eventName}" para pixel ${cleanPixelId} | Valor: ${numValue} ${currency} | ttclid: ${attribution?.ttclid || 'nenhum'}`);
 
   try {
     const res = await axios.post(TIKTOK_TRACK_URL, payload, {
       headers: {
-        'Access-Token': accessToken,
+        'Access-Token': cleanToken,
         'Content-Type': 'application/json'
       },
-      timeout: 10000
+      timeout: 12000
     });
 
     const isSuccess = res.data && (res.data.code === 0 || res.status === 200);
 
     if (isSuccess && res.data.code === 0) {
-      console.log(`[TikTok Events API] ✓ Evento "${eventName}" aceito pela TikTok! Mensagem: ${res.data.message || 'OK'}`);
+      console.log(`[TikTok Events API v1.3] ✓ Evento "${eventName}" aceito com SUCESSO pela TikTok! Mensagem: ${res.data.message || 'OK'}`);
 
       // Se houver lead/atribuição vinculada, confirma a venda
       if (cleanPhone) {
@@ -134,7 +157,7 @@ async function sendTikTokEvent(options = {}) {
       }
 
       const log = db.addTikTokLog({
-        pixel_code: pixelCode,
+        pixel_code: cleanPixelId,
         event: eventName,
         phone: cleanPhone,
         phone_hash: phoneHash,
@@ -150,10 +173,10 @@ async function sendTikTokEvent(options = {}) {
       return { success: true, data: res.data, logId: log.id };
     } else {
       const errMsg = res.data?.message || `Código TikTok: ${res.data?.code}`;
-      console.warn(`[TikTok Events API] Resposta com aviso/erro da TikTok:`, errMsg);
+      console.warn(`[TikTok Events API v1.3] Resposta com aviso/erro da TikTok:`, errMsg);
 
       const log = db.addTikTokLog({
-        pixel_code: pixelCode,
+        pixel_code: cleanPixelId,
         event: eventName,
         phone: cleanPhone,
         phone_hash: phoneHash,
@@ -171,10 +194,10 @@ async function sendTikTokEvent(options = {}) {
     }
   } catch (err) {
     const errorDetail = err.response?.data?.message || err.response?.data?.error || err.message;
-    console.error(`[TikTok Events API Error] Falha ao disparar evento "${eventName}":`, errorDetail);
+    console.error(`[TikTok Events API v1.3 Error] Falha ao disparar evento "${eventName}":`, errorDetail);
 
     const log = db.addTikTokLog({
-      pixel_code: pixelCode,
+      pixel_code: cleanPixelId,
       event: eventName,
       phone: cleanPhone,
       phone_hash: phoneHash,

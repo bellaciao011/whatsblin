@@ -4427,7 +4427,8 @@ async function openCreateCampaignModal() {
   let activeDomains = [];
   try {
     const res = await fetch('/api/dominios').then(r => r.json());
-    activeDomains = (res.domains || []).filter(d => d.status === 'ativo' && d.ativo !== false);
+    // Exibe todos os domínios customizados registrados (ativos ou em propagação)
+    activeDomains = (res.domains || []).filter(d => d.ativo !== false);
   } catch (e) {}
 
   const modalHtml = `
@@ -4461,7 +4462,7 @@ async function openCreateCampaignModal() {
             <select class="form-select" id="camp-input-domain" onchange="updateCampSlugPrefix(this.value)" style="border-color: rgba(254, 44, 85, 0.4);">
               <option value="">Padrão do Sistema (${defaultHost})</option>
               ${activeDomains.map(d => `
-                <option value="${d.dominio}">🌐 ${d.dominio} (Ativo & SSL Verificado)</option>
+                <option value="${d.dominio}">🌐 ${d.dominio} ${d.status === 'ativo' ? '(Ativo)' : '(Conectado no Railway)'}</option>
               `).join('')}
             </select>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Selecione o domínio customizado com o qual este link será veiculado no anúncio.</div>
@@ -4477,9 +4478,25 @@ async function openCreateCampaignModal() {
           </div>
 
           <div class="form-group">
-            <label class="form-label">URL de Destino (A Pressel) *</label>
-            <input type="url" class="form-input" id="camp-input-presell" placeholder="https://minhapressel.com" value="https://minhapressel.com" required>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">O sistema redirecionará o lead para essa página adicionando <code>?codigo=XXXXXX</code></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin: 0;">Destino do Tráfego / Pressel</label>
+              <span style="font-size: 11px; color: #22c55e; font-weight: 700;">⚡ Pressel Própria Automática Ativa</span>
+            </div>
+            <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 10px; padding: 12px; margin-bottom: 8px;">
+              <div style="font-size: 12.5px; font-weight: 600; color: #4ade80; display: flex; align-items: center; gap: 6px;">
+                <span>✓</span> Pressel Própria Ultra-Rápida Integrada
+              </div>
+              <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">
+                O lead vê uma tela de carregamento de apenas 0.3s com o logo do WhatsApp, dispara os pixels para capturar <code>_ttp</code> e <code>_fbp</code>, e é redirecionado <b>diretamente para o seu WhatsApp</b> com o código no texto! Não precisa criar nenhuma página externa.
+              </div>
+            </div>
+            <details style="margin-top: 6px;">
+              <summary style="font-size: 11px; color: #a855f7; cursor: pointer; font-weight: 600;">+ Deseja usar uma pressel externa própria? (Opcional)</summary>
+              <div style="margin-top: 8px;">
+                <input type="url" class="form-input" id="camp-input-presell" placeholder="Ex: https://minhapressel.com (Opcional)">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Deixe em branco para usar a Pressel Própria Ultra-Rápida do sistema.</div>
+              </div>
+            </details>
           </div>
 
           <div class="form-group">
@@ -4518,7 +4535,7 @@ async function handleCreateCampaign(e) {
   const name = document.getElementById('camp-input-name').value.trim();
   const slug = document.getElementById('camp-input-slug').value.trim();
   const custom_domain = document.getElementById('camp-input-domain')?.value || '';
-  const presell_url = document.getElementById('camp-input-presell').value.trim();
+  const presell_url = (document.getElementById('camp-input-presell')?.value || '').trim();
   const whatsapp_number = document.getElementById('camp-input-whatsapp').value.trim();
   const message_template = document.getElementById('camp-input-template').value.trim();
 

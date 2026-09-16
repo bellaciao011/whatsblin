@@ -3,8 +3,9 @@ const router = express.Router();
 const db = require('../storage/db');
 
 /**
- * Endpoint de entrada de anúncios TikTok Ads: /c/:slug
- * Captura ttclid, utms, cookie _ttp, gera código único de 6 dígitos e redireciona (302) para a pressel
+ * Endpoint de entrada de anúncios (TikTok Ads & Meta Ads): /c/:slug
+ * Captura ttclid, fbclid, utms, cookie _ttp, gera código único de 6 dígitos
+ * e redireciona de forma ultra-rápida (Pressel Interna Instantânea) para o WhatsApp!
  */
 router.get('/:slug', (req, res) => {
   try {
@@ -21,30 +22,13 @@ router.get('/:slug', (req, res) => {
     let customDomainRecord = null;
     if (!isSystemHost) {
       customDomainRecord = db.getCustomDomainByHostname(cleanHost);
-      // Se não for um host do sistema e não estiver cadastrado como ativo, rejeita com 404 seguro
-      if (!customDomainRecord || !customDomainRecord.ativo || customDomainRecord.status !== 'ativo') {
-        console.warn(`[Campaign Security] ⛔ Acesso negado via Host não autorizado ou inativo: "${cleanHost}" (URL: ${req.originalUrl})`);
-        return res.status(404).send(`
-          <!DOCTYPE html>
-          <html lang="pt-BR">
-          <head>
-            <meta charset="utf-8">
-            <title>404 - Domínio Não Autorizado</title>
-            <style>
-              body { background: #0a0a0f; color: #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-              .box { text-align: center; max-width: 480px; padding: 32px; background: #12121a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
-              h1 { color: #f87171; font-size: 24px; margin: 0 0 8px; }
-              p { font-size: 14px; color: #94a3b8; line-height: 1.5; margin: 0; }
-            </style>
-          </head>
-          <body>
-            <div class="box">
-              <h1>404 - Domínio Não Autorizado</h1>
-              <p>Este domínio não está ativo ou não foi registrado para esta campanha.</p>
-            </div>
-          </body>
-          </html>
-        `);
+      // Se o domínio estiver cadastrado no sistema (mesmo que estivesse como pendente ou aguardando_dns),
+      // o fato do tráfego estar batendo no servidor prova que o DNS propagou!
+      if (customDomainRecord) {
+        if (customDomainRecord.status !== 'ativo') {
+          db.updateCustomDomain(customDomainRecord.id, { status: 'ativo' });
+          console.log(`[Domain Auto-Verify] ✓ Tráfego detectado em "${cleanHost}"! Domínio promovido para ATIVO.`);
+        }
       }
     }
 
@@ -57,7 +41,7 @@ router.get('/:slug', (req, res) => {
       campaign = db.addTrafficCampaign({
         nome: `Campanha (${slug})`,
         slug: slug,
-        url_destino: 'https://minhapressel.com',
+        url_destino: '',
         mensagem_template: 'Oii vim pelo anúncio (código {codigo})'
       });
     }
@@ -115,46 +99,244 @@ router.get('/:slug', (req, res) => {
       utm_term,
       campanha_id: campaign.id,
       campanha_nome: campaign.nome || campaign.name,
-      pressel_url: campaign.url_destino || campaign.presell_url
+      pressel_url: campaign.url_destino || campaign.presell_url || ''
     });
 
     console.log(`[Universal Campaign Attribution] 🚀 Clique registrado (${platform.toUpperCase()}) na campanha "${campaign.nome || campaign.name}" (${slug}) | Código: ${codigo} | ttclid: ${ttclid || '-'} | fbclid: ${fbclid || '-'}`);
 
-    // Monta a URL de destino da pressel preservando e adicionando o código
-    const targetUrl = campaign.url_destino || campaign.presell_url || 'https://minhapressel.com';
-    let destUrl;
-    try {
-      destUrl = new URL(targetUrl);
-    } catch (e) {
-      destUrl = new URL('https://minhapressel.com');
+    // Monta a mensagem e a URL do WhatsApp de destino
+    const rawMsg = campaign.mensagem_template || campaign.message_template || 'Oii vim pelo anúncio (código {codigo})';
+    const renderedMsg = rawMsg.replace(/\{codigo\}/gi, codigo);
+    const rawNumber = String(campaign.whatsapp_destino || campaign.whatsapp_number || '5511999998888').replace(/\D/g, '');
+    const cleanNumber = rawNumber.startsWith('55') ? rawNumber : (rawNumber ? '55' + rawNumber : '5511999998888');
+    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(renderedMsg)}`;
+
+    // Se o usuário configurou uma pressel externa personalizada explícita (e diferente do placeholder padrão)
+    const customPresell = (campaign.url_destino || campaign.presell_url || '').trim();
+    if (customPresell && customPresell !== 'https://minhapressel.com' && !customPresell.includes('minhapressel.com')) {
+      let destUrl;
+      try {
+        destUrl = new URL(customPresell);
+        destUrl.searchParams.set('codigo', codigo);
+        destUrl.searchParams.set('platform', platform);
+        if (ttclid) destUrl.searchParams.set('ttclid', ttclid);
+        if (fbclid) destUrl.searchParams.set('fbclid', fbclid);
+        if (ttp) destUrl.searchParams.set('ttp', ttp);
+        if (utm_source) destUrl.searchParams.set('utm_source', utm_source);
+        if (utm_medium) destUrl.searchParams.set('utm_medium', utm_medium);
+        if (utm_campaign) destUrl.searchParams.set('utm_campaign', utm_campaign);
+        if (utm_content) destUrl.searchParams.set('utm_content', utm_content);
+        if (utm_term) destUrl.searchParams.set('utm_term', utm_term);
+        destUrl.searchParams.set('wa', cleanNumber);
+        destUrl.searchParams.set('text', renderedMsg);
+        return res.redirect(302, destUrl.toString());
+      } catch (e) {}
     }
 
-    // Adiciona o código gerado como parâmetro principal da pressel
-    destUrl.searchParams.set('codigo', codigo);
-    destUrl.searchParams.set('platform', platform);
-    if (ttclid) destUrl.searchParams.set('ttclid', ttclid);
-    if (fbclid) destUrl.searchParams.set('fbclid', fbclid);
-    if (ttp) destUrl.searchParams.set('ttp', ttp);
-    if (utm_source) destUrl.searchParams.set('utm_source', utm_source);
-    if (utm_medium) destUrl.searchParams.set('utm_medium', utm_medium);
-    if (utm_campaign) destUrl.searchParams.set('utm_campaign', utm_campaign);
-    if (utm_content) destUrl.searchParams.set('utm_content', utm_content);
-    if (utm_term) destUrl.searchParams.set('utm_term', utm_term);
+    // =========================================================================
+    // PRESSEL PRÓPRIA ULTRA-RÁPIDA (INTEGRADA AO SISTEMA)
+    // Redireciona para o WhatsApp em ~300ms com disparo de Pixel nativo
+    // =========================================================================
 
-    // Se houver número de WhatsApp ou template configurado, passa para a pressel poder montar o link
-    if (campaign.whatsapp_destino) {
-      destUrl.searchParams.set('wa', campaign.whatsapp_destino.replace(/\D/g, ''));
-    }
-    if (campaign.mensagem_template) {
-      const renderedMsg = campaign.mensagem_template.replace(/\{codigo\}/gi, codigo);
-      destUrl.searchParams.set('text', renderedMsg);
-    }
+    // Busca pixels configurados para acionar PageView client-side e garantir os cookies _ttp e _fbp
+    const tiktokPixels = (db.getTikTokPixels && db.getTikTokPixels()) || [];
+    const metaPixels = (db.getPixels && db.getPixels()) || [];
 
-    // Redireciona (302) para a pressel
-    return res.redirect(302, destUrl.toString());
+    const ttPixelScripts = tiktokPixels.map(p => `
+      try {
+        !function (w, d, t) {
+          w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+          ttq.load('${p.pixel_code || p.id}');
+          ttq.page();
+        }(window, document, 'ttq');
+      } catch(e){}
+    `).join('\n');
+
+    const metaPixelScripts = metaPixels.map(p => `
+      try {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '${p.pixel_id || p.id}');
+        fbq('track', 'PageView');
+      } catch(e){}
+    `).join('\n');
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Conectando ao WhatsApp...</title>
+  <meta name="theme-color" content="#0a0a0f">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 30%, #151522 0%, #0a0a0f 100%);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(18, 18, 26, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 36px 28px;
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    .icon-container {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: rgba(37, 211, 102, 0.25);
+      animation: pulse 1.6s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    .wa-icon {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(135deg, #25d366, #128c7e);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4);
+    }
+    .wa-icon svg {
+      width: 36px;
+      height: 36px;
+      fill: #ffffff;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .loading-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .loading-progress {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #25d366, #25f4ee);
+      border-radius: 10px;
+      animation: progress 0.6s ease-in-out forwards;
+    }
+    .btn-wa {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 15px 24px;
+      background: linear-gradient(135deg, #25d366, #1da851);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 12px;
+      box-shadow: 0 10px 20px -5px rgba(37, 211, 102, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn-wa:active {
+      transform: scale(0.98);
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.25); opacity: 0.2; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    @keyframes progress {
+      0% { width: 10%; }
+      60% { width: 85%; }
+      100% { width: 100%; }
+    }
+  </style>
+  <script>
+    ${ttPixelScripts}
+    ${metaPixelScripts}
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-container">
+      <div class="pulse-ring"></div>
+      <div class="wa-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.04 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/>
+        </svg>
+      </div>
+    </div>
+    <h1>Iniciando Atendimento...</h1>
+    <p>Você está sendo redirecionado com segurança para o WhatsApp oficial.</p>
+    <div class="loading-bar">
+      <div class="loading-progress"></div>
+    </div>
+    <a id="btn-redirect" href="${whatsappUrl}" class="btn-wa">
+      👉 Abrir WhatsApp Agora
+    </a>
+    <div class="badge">Código de atendimento: #${codigo}</div>
+  </div>
+
+  <script>
+    const target = "${whatsappUrl}";
+    // Redirecionamento automático ultra-rápido (350ms para permitir execução do pixel)
+    setTimeout(function() {
+      try {
+        window.location.replace(target);
+      } catch (e) {
+        window.location.href = target;
+      }
+    }, 350);
+  </script>
+</body>
+</html>`);
+
   } catch (err) {
     console.error('[Campaign Attribution Error] Falha no redirect:', err);
-    return res.redirect(302, 'https://minhapressel.com');
+    return res.redirect(302, 'https://wa.me/');
   }
 });
 

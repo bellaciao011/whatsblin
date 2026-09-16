@@ -30,12 +30,49 @@ app.use((req, res, next) => {
   }
   next();
 });
-// - /generated: Fotos geradas baixadas pelo WhatsApp e Leona
-// - /assets: Templates e mídias estáticas do sistema
-// - /css: Estilos compartilhados para a tela de login
-// - /webhook: Endpoint oficial da Meta WhatsApp Cloud API
-// - /api/webhooks/uazapi: Endpoint oficial da uazapi Webhook
-// - /c: Endpoint de links curtos de campanha do TikTok Ads
+
+// =========================================================================
+// ISOLAMENTO TOTAL DE DOMÍNIOS DE CAMPANHA (TRACKING ONLY)
+// Garante que domínios customizados (ex: expresstrackin-g.com, wtb.expresstrackin-g.com)
+// NUNCA exibam a tela de login, o painel administrativo ou o SaaS do WhatsHub Pro!
+// =========================================================================
+app.use((req, res, next) => {
+  const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim();
+  const isSystemHost = rawHost === 'localhost' || 
+                       rawHost === '127.0.0.1' || 
+                       rawHost.endsWith('.railway.app') || 
+                       rawHost.endsWith('.up.railway.app');
+
+  // Se o tráfego vier pelo domínio oficial do Railway ou localhost, libera acesso ao dashboard e APIs
+  if (isSystemHost) {
+    return next();
+  }
+
+  // Se o tráfego vier por um domínio customizado de anúncio:
+  // 1. Se for rota de tracking de campanha (/c/*), permite o fluxo normal:
+  if (req.path.startsWith('/c/')) {
+    return next();
+  }
+
+  // 2. Se for arquivo estático essencial (favicon, imagens geradas):
+  if (req.path === '/favicon.ico' || req.path.startsWith('/assets/')) {
+    return next();
+  }
+
+  // 3. Para QUALQUER outra rota acessada no domínio de campanha (ex: "/", "/login", "/admin"):
+  // NUNCA exibe o painel! Redireciona imediatamente para a campanha ou WhatsApp:
+  const campaigns = db.getTrafficCampaigns();
+  const matchedCamp = campaigns.find(c => c.custom_domain === rawHost) || campaigns[0];
+
+  if (matchedCamp) {
+    return res.redirect(302, `/c/${matchedCamp.slug}`);
+  }
+
+  // Se não houver campanha, faz redirect limpo para WhatsApp
+  return res.redirect(302, 'https://wa.me/');
+});
+
+// Arquivos estáticos e Webhooks públicos
 app.use('/generated', express.static(path.join(__dirname, '../public/generated')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/css', express.static(path.join(__dirname, '../public/css')));
@@ -56,9 +93,6 @@ app.get(['/login', '/login.html'], (req, res) => {
 // 2. MIDDLEWARE DE PROTEÇÃO POR SENHA (BARREIRA DE SEGURANÇA)
 app.use((req, res, next) => {
   // Rotas que dispensam autenticação:
-  // - /c/* (Links de campanha TikTok Ads)
-  // - /api/auth/* (login e verificação)
-  // - /api/generate-proof (utilizada pela Leona síncrona para gerar as provas)
   if (
     req.path.startsWith('/c/') ||
     req.path.startsWith('/api/auth/') ||
@@ -139,7 +173,6 @@ app.listen(PORT, () => {
       if (connected) {
         console.log(`[Boot] ✓ Conexão WhatsApp preservada e ativa: ${connected.name} (${connected.numero_conectado || connected.id})`);
       }
-      // Inicia sincronizador contínuo em segundo plano (a cada 3.5s)
       startUazapiMessageSyncWorker(3500);
     }).catch(e => {
       console.warn('[Boot] Aviso ao restaurar conexão:', e.message);

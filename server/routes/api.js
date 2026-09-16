@@ -1957,19 +1957,22 @@ router.get('/traffic/campaigns', (req, res) => {
   res.json(mapped);
 });
 
-// Criar nova campanha
+// Criar nova campanha (Pressel própria ultra-rápida padrão ou externa opcional)
 router.post('/traffic/campaigns', (req, res) => {
   const { name, presell_url, whatsapp_number, message_template, slug, custom_domain } = req.body;
 
-  if (!name || !presell_url || !whatsapp_number) {
-    return res.status(400).json({ error: 'Nome, URL de destino (pressel) e WhatsApp são obrigatórios' });
+  if (!name || !whatsapp_number) {
+    return res.status(400).json({ error: 'Nome da campanha e WhatsApp de destino são obrigatórios' });
   }
 
   const campaign = db.addTrafficCampaign({
     name,
-    presell_url,
+    presell_url: presell_url ? String(presell_url).trim() : '',
+    url_destino: presell_url ? String(presell_url).trim() : '',
     whatsapp_number,
-    message_template,
+    whatsapp_destino: whatsapp_number,
+    message_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
+    mensagem_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
     slug,
     custom_domain: custom_domain ? String(custom_domain).trim().toLowerCase() : null
   });
