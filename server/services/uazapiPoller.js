@@ -348,27 +348,23 @@ async function syncUazapiInstancesNow() {
                 db.saveChats(cc);
               }
 
-              // Executa o processIncomingMessage passando msgId e timestamp originais
-              await processIncomingMessage(
-                inst.id,
-                cleanPhone,
-                text,
-                mediaUrl ? { url: mediaUrl, type: m.messageType || 'image' } : null,
-                msgId,
-                parseTimestamp(m.messageTimestamp)
-              );
+              // O Poller sincroniza a mensagem no banco para o Live Chat
+              // O Webhook é a AUTORIDADE ÚNICA que dispara o motor de fluxo (evitando 100% de duplicação)
+              const existingChat = db.getChat(cleanPhone);
+              const alreadyHasIt = existingChat?.messages?.some(x => x.id === msgId);
+              if (!alreadyHasIt) {
+                db.addChatMessage(cleanPhone, {
+                  id: msgId,
+                  timestamp: parseTimestamp(m.messageTimestamp),
+                  from: 'lead',
+                  text: text || (mediaUrl ? '[Mídia]' : ''),
+                  mediaUrl: mediaUrl,
+                  mediaType: m.messageType || null,
+                  instanceId: inst.id
+                });
+              }
 
               anyUpdate = true;
-
-              // Atualiza o watermark da conversa
-              const reloaded = db.getChat(cleanPhone);
-              if (reloaded) {
-                reloaded.lastProcessedTimestamp = Math.max(reloaded.lastProcessedTimestamp || 0, msgTimestampMs);
-                const currentChats = db.getChats();
-                currentChats[cleanPhone] = reloaded;
-                db.saveChats(currentChats);
-                chat = reloaded;
-              }
             } catch (procErr) {
               console.error(`[uazapi Poller Error] Falha ao processar mensagem de +${cleanPhone}:`, procErr);
             } finally {

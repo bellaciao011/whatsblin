@@ -561,7 +561,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   let chatData = chats[cleanPhone];
 
   // 1. Vinculação Estrita: localiza o fluxo configurado para o chat ativo ou para ESTE chip específico
-  const targetFlowId = inst.assignedFlowId || chatData?.assignedFlowId || 'fluxo-espiao-foto';
+  const targetFlowId = inst.assignedFlowId || chatData?.assignedFlowId || 'fluxo-espiao-es';
   const flows = db.getFlows();
   const activeFlow = flows.find(f => f.id === targetFlowId) || flows.find(f => f.status === 'ativo') || flows[0];
   const flowLanguage = 'es'; // RIGOROSAMENTE 100% ESPANHOL
@@ -739,7 +739,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
         const fallback100 = flowLanguage === 'en'
           ? "Payment of $49.90 received ✅\n\nNext payment to unlock everything: $100 👇\n\n{checkoutUrl100}\n\nPlease proceed and send me the receipt as soon as it's completed!"
-          : "Pagamento de R$ 49,90 recebido ✅\n\nPróximo pagamento para liberar tudo: R$ 100 👇\n\n{checkoutUrl100}\n\nPode seguir e me enviar o comprovante assim que finalizar!";
+          : "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado!";
         const upsellText = getNodeText('node-upsell-100', fallback100);
         const finalText = interpolateVariables(upsellText, chatData.variables);
 
@@ -937,7 +937,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         ? `¡Perfecto! Voy a iniciar la búsqueda para el número ${normalizedNewTarget} y ya te traigo la previa. Espera un momento mientras verificamos en el sistema... 🔍`
         : (flowLanguage === 'en'
           ? `Perfect! I'll start checking the number ${normalizedNewTarget} right away. Please wait a moment while we verify in the system... 🔍`
-          : `Perfeito! Vou iniciar a busca para o número ${normalizedNewTarget} e já te trago a prévia. Aguarde um momento enquanto verificamos no sistema... 🔍`);
+          : `¡Perfecto! Voy a iniciar la búsqueda para el número ${normalizedNewTarget} y ya te traigo la previa. Espera un momento mientras verificamos en el sistema... 🔍`);
 
       db.addChatMessage(cleanPhone, { from: 'bot', text: fallbackStartingNew, instanceId: inst.id }, 'ANALISANDO');
       await sendOutgoingTextMessage(inst, cleanPhone, fallbackStartingNew, 1800);
@@ -977,7 +977,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
         ? `¡Listo! Encontré las conversaciones y registros de este nuevo número también ✅\n\nPara desbloquear la desencriptación completa de todas las conversaciones, audios y ubicación en tiempo real, completa la activación en el enlace seguro:\n\n{checkoutUrl}\n\n¡En cuanto pagues, envíame el comprobante por aquí para habilitar tu acceso de inmediato!`
         : (flowLanguage === 'en'
           ? `Done! I found conversations and records for this new number as well ✅\n\nTo unlock full decryption of all chats, audios, and real-time location, complete activation on the secure link:\n\n{checkoutUrl}\n\nAs soon as you pay, send me the receipt here to unlock full access immediately!`
-          : `Pronto! Encontrei as conversas e registros desse novo número também ✅\n\nPara liberar a descriptografia completa de todas as conversas, áudios e localização em tempo real, conclua a ativação no link seguro abaixo:\n\n{checkoutUrl}\n\nAssim que pagar, me envia o comprovante por aqui para eu liberar seu acesso imediatamente!`);
+          : `¡Listo! Encontré las conversaciones y registros de este nuevo número también ✅\n\nPara desbloquear la desencriptación completa de todas las conversaciones, audios y ubicación en tiempo real, completa la activación en el enlace seguro:\n\n{checkoutUrl}\n\n¡En cuanto pagues, envíame el comprobante por aquí para habilitar tu acceso de inmediato!`);
 
       const offerText = interpolateVariables(fallbackOfferNew, chatData.variables);
       chatData.state = 'OFERTA_ENVIADA';
@@ -1045,7 +1045,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       ? "Espera un momento mientras verificamos en el sistema..."
       : (flowLanguage === 'en'
         ? "Please wait a moment while we check the system..."
-        : "Aguarde um momento enquanto verificamos no sistema");
+        : "Espera un momento mientras verificamos en el sistema...");
 
     const analyzingMsg = getNodeText('node-analyzing-msg', fallbackAnalyzing);
     db.addChatMessage(cleanPhone, { from: 'bot', text: analyzingMsg, instanceId: inst.id }, 'ANALISANDO');
@@ -1089,7 +1089,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       ? "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado."
       : (flowLanguage === 'en'
         ? "Payment link for $49.90 👇\n{checkoutUrl}\n\nPayment info: 🔒 100% Secure & Encrypted Checkout"
-        : "Link para pagamento via PIX R$49,90 👇\n{checkoutUrl}\n\nDados do pagamento: 🔒 Nome: KIRVANO PAGAMENTOS LTDA 🏦 Instituição: PICPAY");
+        : "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.");
 
     const offerText = getNodeText('node-offer-pix-49', fallbackOffer);
     const finalOffer = interpolateVariables(offerText, chatData.variables);
@@ -1103,7 +1103,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       ? "El pago con tarjeta se confirma automáticamente en pocos segundos. ¡Avísame por aquí en cuanto lo completes para confirmar tu acceso!"
       : (flowLanguage === 'en'
         ? "As soon as you pay, send me the receipt here to unlock full access!"
-        : "Assim que pagar, me envia o comprovante por aqui para liberar o acesso completo.");
+        : "El pago con tarjeta se confirma automáticamente en pocos segundos. ¡Avísame por aquí en cuanto lo completes para confirmar tu acceso!");
 
     const proofInstruction = getNodeText('node-msg-comprovante', fallbackProofInstruction);
     db.addChatMessage(cleanPhone, { from: 'bot', text: proofInstruction, instanceId: inst.id }, 'OFERTA_ENVIADA');
@@ -1127,7 +1127,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     ? "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
     : (flowLanguage === 'en'
       ? "Hello! Save my contact and send the person's phone number and I'll send you the proof right away."
-      : "Olá, Salve o meu contato e envie o número da pessoa que já vou mandar a prova");
+      : "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba.");
 
   const welcomeText = getNodeText('node-welcome', fallbackWelcome);
   chatData.state = 'AGUARDANDO_NUMERO';
@@ -1262,7 +1262,7 @@ async function triggerManualFlow(cleanPhone, options = {}) {
   }
 
   const flows = db.getFlows();
-  const targetFlowId = options.flowId || inst.assignedFlowId || 'fluxo-espiao-foto';
+  const targetFlowId = options.flowId || inst.assignedFlowId || 'fluxo-espiao-es';
   const activeFlow = flows.find(f => f.id === targetFlowId) || flows[0];
   const flowLanguage = activeFlow?.language || (activeFlow?.id?.includes('-es') ? 'es' : (activeFlow?.id?.includes('-en') ? 'en' : 'pt'));
   const funnel = db.getFunnel();

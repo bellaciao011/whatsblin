@@ -43,8 +43,8 @@ async function classifyWelcomeReply(userMessage, language = 'es') {
 
   const welcomeTexts = {
     pt: {
-      doubt: "Nosso sistema localiza mensagens, áudios apagados e registros nos servidores pelo número de telefone. É 100% sigiloso e a pessoa não fica sabendo.\n\nPara eu gerar a prévia e te mandar a prova, só me envie o número dela com DDD aqui.",
-      reinforce: funnel.reinforceNumberMessage || "Assim que enviar o número já ativo aqui 👍\n\nPreciso do WhatsApp da pessoa:\nDDD+9+número (ex: 11912345678)\n\nManda rápido."
+      doubt: "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono. Es 100% confidencial y la persona no se entera.\n\nPara que pueda generar la vista previa y enviarte la prueba, solo envíame su número aquí con el código de país.",
+      reinforce: "En cuanto envíes el número ya lo activo aquí 👍\n\nNecesito el WhatsApp de la persona:\nCódigo de país + número\n\nEnvíalo rápido."
     },
     es: {
       doubt: "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono. Es 100% confidencial y la persona no se entera.\n\nPara que pueda generar la vista previa y enviarte la prueba, solo envíame su número aquí con el código de país.",

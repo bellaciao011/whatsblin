@@ -211,7 +211,9 @@ router.post('/uazapi', async (req, res) => {
         continue;
       }
 
-      const msgId = msg.id || msg.messageid || msg.key?.id || msg.data?.id || (msg.key?.remoteJid && msg.messageTimestamp ? `${msg.key.remoteJid}_${msg.messageTimestamp}` : null) || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const rawId = msg.id || msg.messageid || msg.key?.id || msg.data?.id || (msg.key?.remoteJid && msg.messageTimestamp ? `${msg.key.remoteJid}_${msg.messageTimestamp}` : null) || null;
+      const cleanId = rawId && String(rawId).includes(':') ? String(rawId).split(':').pop() : rawId;
+      const msgId = cleanId || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       // 1. Deduplicação Global (evita colisão de webhook e poller para a mesma mensagem)
       if (isMessageAlreadyHandled(msgId, cleanPhone, textBody, Date.now())) {
@@ -231,7 +233,7 @@ router.post('/uazapi', async (req, res) => {
         console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} <= connectedAt: ${instance.connectedAt})`);
         continue;
       }
-      if (Date.now() - msgTimeMs > 20000) {
+      if (Date.now() - msgTimeMs > 120000) {
         console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 45s) ignorada para não disparar automações atrasadas.`);
         continue;
       }

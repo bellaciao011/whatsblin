@@ -8,7 +8,7 @@
     "name": "KIRVANO PAGAMENTOS LTDA",
     "bank": "PICPAY"
   },
-  "checkoutUrl": "https://pay.kirvano.com/checkout-49",
+  "checkoutUrl": "https://go.centerpag.com/PPU38CQG5EL",
   "upsellStages": {
     "stage_49": {
       "value": "49,90",

@@ -582,7 +582,7 @@ router.post('/instances', (req, res) => {
     phoneNumberId: phoneNumberId || '',
     wabaId: wabaId || '',
     accessToken: accessToken || '',
-    assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
+    assignedFlowId: assignedFlowId || 'fluxo-espiao-es',
     status: (accessToken && phoneNumberId) ? 'connected' : 'disconnected',
     totalSent: 0,
     totalReceived: 0,
@@ -594,7 +594,7 @@ router.post('/instances', (req, res) => {
     instances[existingIdx] = {
       ...instances[existingIdx],
       ...newInst,
-      assignedFlowId: assignedFlowId !== undefined ? assignedFlowId : (instances[existingIdx].assignedFlowId || 'fluxo-espiao-foto')
+      assignedFlowId: assignedFlowId !== undefined ? assignedFlowId : (instances[existingIdx].assignedFlowId || 'fluxo-espiao-es')
     };
   } else {
     instances.push(newInst);
@@ -823,7 +823,7 @@ router.post('/uazapi/init-connect', async (req, res) => {
       phoneNumber: (connectedUser && /\d{8,}/.test(connectedUser)) ? connectedUser : (cleanPhone || ''),
       numero_conectado: connectedUser || '',
       status: isFullyConnected ? 'connected' : 'connecting',
-      assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
+      assignedFlowId: assignedFlowId || 'fluxo-espiao-es',
       totalSent: 0,
       totalReceived: 0,
       criado_em: new Date().toISOString(),
@@ -1543,7 +1543,7 @@ router.post('/whatsapp/embedded-signup', async (req, res) => {
       phoneNumberId: targetPhoneId || '',
       wabaId: targetWabaId || '',
       accessToken: finalToken,
-      assignedFlowId: assignedFlowId || 'fluxo-espiao-foto',
+      assignedFlowId: assignedFlowId || 'fluxo-espiao-es',
       type: 'official',
       coexistence: Boolean(coexistence),
       status: 'connected',
@@ -1558,7 +1558,7 @@ router.post('/whatsapp/embedded-signup', async (req, res) => {
       instances[existingIdx] = {
         ...instances[existingIdx],
         ...newInstance,
-        assignedFlowId: assignedFlowId || instances[existingIdx].assignedFlowId || 'fluxo-espiao-foto'
+        assignedFlowId: assignedFlowId || instances[existingIdx].assignedFlowId || 'fluxo-espiao-es'
       };
     } else {
       instances.push(newInstance);

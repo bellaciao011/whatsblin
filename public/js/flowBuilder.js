@@ -99,7 +99,7 @@ const FlowBuilder = {
               ${flows.map(f => {
                 const langFlag = f.language === 'es' ? '🇪🇸' : (f.language === 'en' ? '🇺🇸' : '🇧🇷');
                 const langLabel = f.language === 'es' ? 'Español' : (f.language === 'en' ? 'English' : 'Português');
-                const boundChips = instances.filter(i => (i.assignedFlowId || 'fluxo-espiao-foto') === f.id);
+                const boundChips = instances.filter(i => (i.assignedFlowId || 'fluxo-espiao-es') === f.id);
                 return `
                 <tr onclick="FlowBuilder.openCanvas('${f.id}')" style="cursor: pointer;">
                   <td style="color: var(--text-muted); font-size: 18px;">⋮⋮</td>
@@ -169,7 +169,7 @@ const FlowBuilder = {
     this.canvasScale = 1;
 
     const langFlag = flow.language === 'es' ? '🇪🇸' : (flow.language === 'en' ? '🇺🇸' : '🇧🇷');
-    const boundChips = (instances || []).filter(i => (i.assignedFlowId || 'fluxo-espiao-foto') === flow.id);
+    const boundChips = (instances || []).filter(i => (i.assignedFlowId || 'fluxo-espiao-es') === flow.id);
 
     container.innerHTML = `
       <div class="canvas-root" id="canvas-root">

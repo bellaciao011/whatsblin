@@ -419,7 +419,7 @@ function handleRoute() {
   else if (route === 'kanban') renderKanban();
   else if (route === 'contacts') renderContacts();
   else if (route === 'flows') FlowBuilder.renderList(container);
-  else if (route === 'flow-canvas') FlowBuilder.renderCanvas(container, params.get('id') || 'fluxo-espiao-foto');
+  else if (route === 'flow-canvas') FlowBuilder.renderCanvas(container, params.get('id') || 'fluxo-espiao-es');
   else if (route === 'instances') renderInstances();
   else if (route === 'pixels') renderPixels();
   else if (route === 'tiktok') renderTikTokAttribution();
@@ -887,7 +887,7 @@ function initSalesChart(salesByDay) {
 let liveFlowAnimationFrame = null;
 let liveFlowPollingInterval = null;
 let liveParticles = [];
-let currentLiveFlowId = localStorage.getItem('wh_live_flow_id') || 'fluxo-espiao-foto';
+let currentLiveFlowId = localStorage.getItem('wh_live_flow_id') || 'fluxo-espiao-es';
 let liveZoomState = {
   scale: 1.0,
   panX: 40,
@@ -924,7 +924,7 @@ async function renderLiveFlow() {
       fetch('/api/traffic/live-flow').then(r => r.json()).catch(() => ({ activeNodes: {}, platformRates: {}, recentEvents: [] }))
     ]);
 
-    const activeFlow = flows.find(f => f.id === currentLiveFlowId) || flows.find(f => f.id === 'fluxo-espiao-foto') || flows[0];
+    const activeFlow = flows.find(f => f.id === currentLiveFlowId) || flows.find(f => f.id === 'fluxo-espiao-es') || flows[0];
     if (!activeFlow) {
       container.innerHTML = '<div class="card">Nenhum fluxo encontrado para visualização ao vivo.</div>';
       return;
@@ -2087,7 +2087,7 @@ async function renderInstances() {
                     </span>
                   </div>
                   <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
-                    <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-foto' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
+                    <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-es' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
                     <option value="fluxo-espiao-es" ${i.assignedFlowId === 'fluxo-espiao-es' ? 'selected' : ''}>🇪🇸 Funil Oficial (Español)</option>
                     <option value="fluxo-espiao-en" ${i.assignedFlowId === 'fluxo-espiao-en' ? 'selected' : ''}>🇺🇸 Funil Oficial (English)</option>
                   </select>
@@ -2361,7 +2361,7 @@ async function renderInbox(showLoading = true) {
             <!-- Disparo Manual de Fluxo e Automação -->
             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
               <select id="inbox-flow-select" class="form-input" style="padding: 6px 10px; font-size: 11.5px; height: 34px; max-width: 190px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); border-radius: 8px;" title="Selecione o fluxo para disparar">
-                ${(state.flows || []).map(f => `<option value="${f.id}" ${f.id === (activeChat.assignedFlowId || 'fluxo-espiao-foto') ? 'selected' : ''}>${f.name}</option>`).join('')}
+                ${(state.flows || []).map(f => `<option value="${f.id}" ${f.id === (activeChat.assignedFlowId || 'fluxo-espiao-es') ? 'selected' : ''}>${f.name}</option>`).join('')}
               </select>
 
               <button class="btn btn-primary" style="font-size: 11.5px; padding: 7px 12px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); display: flex; align-items: center; gap: 6px;" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')" title="Iniciar automação deste fluxo para o contato">
@@ -3290,7 +3290,7 @@ function handleRegisterWithMeta() {
   }
 
   const coexistence = document.getElementById('conn-coexistence')?.checked ?? true;
-  const flowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
+  const flowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-es';
   const appId = state.facebook?.appId || '1388636936143540';
   const configId = state.facebook?.configId || '2204676673432561';
 
@@ -3564,7 +3564,7 @@ async function handleSaveUazapi() {
   const connectType = document.querySelector('input[name="uazapi-connect-type"]:checked')?.value || 'qr';
   const instanceKey = document.getElementById('uazapi-key')?.value.trim() || '';
   const phone = connectType === 'phone' ? document.getElementById('uazapi-phone-input')?.value.trim() : '';
-  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
+  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-es';
 
   if (connectType === 'phone' && !phone) {
     showToast('Informe o número de telefone para pareamento com DDI e DDD', 'error');
@@ -3726,7 +3726,7 @@ async function saveNewChip(e) {
   const phoneNumberId = document.getElementById('chip-phone-id').value;
   const wabaId = document.getElementById('chip-waba-id').value;
   const accessToken = document.getElementById('chip-token').value;
-  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-foto';
+  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-es';
 
   await fetch('/api/instances', {
     method: 'POST',
