@@ -597,11 +597,10 @@ router.patch('/instances/:id/flow', (req, res) => {
     let updatedChats = false;
     for (const phone of Object.keys(chats)) {
       const c = chats[phone];
-      if (c.instanceId === inst.id || c.instanceId === inst.instance_id || !c.instanceId || c.instanceId === 'inst_1') {
-        c.assignedFlowId = inst.assignedFlowId;
-        c.flowLanguage = newLang;
-        updatedChats = true;
-      }
+      c.assignedFlowId = inst.assignedFlowId;
+      c.flowLanguage = newLang;
+      c.instanceId = inst.id;
+      updatedChats = true;
     }
     if (updatedChats) {
       db.saveChats(chats);
