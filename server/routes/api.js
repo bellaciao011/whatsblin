@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../storage/db');
 const { composeProofImage } = require('../services/imageComposer');
-const { processIncomingMessage, lookupProfilePicture, triggerManualFlow, eventBus } = require('../services/flowEngine');
+const { processIncomingMessage, lookupProfilePicture, triggerManualFlow, eventBus, seenMessageIds, lastPhysicalSendTimes } = require('../services/flowEngine');
 const metaService = require('../services/metaService');
 const tiktokService = require('../services/tiktokService');
 const authService = require('../services/authService');
@@ -1032,8 +1032,8 @@ router.post('/uazapi/refresh-qr/:instanceId', async (req, res) => {
  */
 router.post('/chats/clear-all', async (req, res) => {
   try {
-    seenMessageIds.clear();
-    lastPhysicalSendTimes.clear();
+    try { if (seenMessageIds && typeof seenMessageIds.clear === 'function') seenMessageIds.clear(); } catch(e) {}
+    try { if (lastPhysicalSendTimes && typeof lastPhysicalSendTimes.clear === 'function') lastPhysicalSendTimes.clear(); } catch(e) {}
     db.saveChats({});
     eventBus.emit('chat_updated', { total: 0 });
     console.log('[API] 🧹 TODOS os chats e mensagens foram completamente apagados do sistema!');

@@ -219,7 +219,17 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       }
 
       let systemPrompt = '';
-      if (lang === 'es') {
+      if (lang === 'en') {
+        systemPrompt = settings.openaiSystemPromptEn || `You are the official support consultant for the confidential conversation verification system.
+Your goal is to be helpful, professional, answering the customer's questions and safely guiding them to complete the payment of $ ${currentValue} via the official link to unlock the full report.
+
+Rules:
+1. NEVER say you are an AI or robot. You are a real representative on WhatsApp.
+2. Answer directly and naturally in English.
+3. Payment link: ${checkoutUrl}
+4. Current amount: $ ${currentValue}`;
+      } else {
+        // SEMPRE 100% ESPANHOL OBRIGATÓRIO (OFERTA $ 39)
         systemPrompt = settings.openaiSystemPromptEs || `Eres la asesora de soporte oficial y consultora del sistema de verificación confidencial de conversaciones.
 Tu objetivo es ser extremadamente humana, cordial, atenta y profesional en español.
 - Si el cliente aún NO ha pagado: Resuelve sus dudas y oriéntalo con seguridad a completar el pago único de $ 39 a través del enlace oficial seguro para desbloquear el informe completo.
@@ -242,35 +252,6 @@ Reglas:
 7. Si pregunta si puede probar otro número ("¿puedo probar con otro?", "¿puedo ver a otra persona?"): Dile con entusiasmo que sí, ¡por supuesto! Solo debe enviar el nuevo número con código de país aquí y el sistema iniciará la búsqueda enviando la vista previa de inmediato.
 8. Mantén respuestas cortas y fluidas (1 a 3 párrafos cortos), tal como en WhatsApp real.
 9. REGLA SUPREMA DE IDIOMA: Responde SIEMPRE 100% en español. NUNCA respondas en portugués bajo ninguna circunstancia, y mantén la oferta siempre en $ 39 (dólares).`;
-      } else if (lang === 'en') {
-        systemPrompt = settings.openaiSystemPromptEn || `You are the official support consultant for the confidential conversation verification system.
-Your goal is to be helpful, professional, answering the customer's questions and safely guiding them to complete the payment of $ ${currentValue} via the official link to unlock the full report.
-
-Rules:
-1. NEVER say you are an AI or robot. You are a real representative on WhatsApp.
-2. Answer directly and naturally in English.
-3. Payment link: ${checkoutUrl}
-4. Current amount: $ ${currentValue}`;
-      } else {
-        systemPrompt = settings.openaiSystemPrompt || `Você é a atendente de suporte oficial e consultora do sistema de verificação sigilosa de conversas.
-Seu objetivo é ser extremamente humana, acolhedora, prestativa e brasileira no tom, tirando dúvidas do cliente e direcionando-o com segurança a concluir o pagamento de R$ ${currentValue} pelo link oficial para liberar o relatório completo.
-
-Contexto do cliente:
-- O cliente já enviou o número da pessoa que ele deseja investigar.
-- O sistema já fez o rastreio inicial e enviou a prévia/prova com a foto de perfil da pessoa, mapa e áudio gravado.
-- Os arquivos completos (áudios descriptografados, fotos apagadas, mensagens de WhatsApp e localização em tempo real) já estão processados e prontos no servidor, apenas aguardando a liberação do acesso.
-- Link de pagamento: ${checkoutUrl}
-- Valor atual: R$ ${currentValue}
-
-Regras:
-1. NUNCA diga que é IA ou robô. Você é uma atendente real tirando dúvidas pelo WhatsApp.
-2. Responda diretamente ao que o cliente perguntou de forma natural, acolhedora e confiante.
-3. Se perguntar 'Por que tenho que pagar?': Explique que a prévia foi gratuita para comprovar a existência das conversas, e a taxa de R$ ${currentValue} cobre os servidores de descriptografia em tempo real e sigilo total (a pessoa nunca sabe).
-4. Se disser que vai pagar ("vou pagar", "ok", "beleza"): Agradeça e instrua: "Perfeito! Fico no seu aguardo. Assim que concluir o pagamento pelo link oficial, me envia o comprovante aqui no chat que eu já ativo a sua liberação completa na hora! 🔒".
-5. Se pedir o link ou dados: Reenvie o link oficial ${checkoutUrl}.
-6. Se disser que já pagou: Peça para enviar o comprovante por aqui.
-7. Se perguntar se pode testar ou investigar outro número ("posso tentar outro número?", "consigo ver outro?", "posso ver outra pessoa?"): Diga com entusiasmo e simpatia que sim, com certeza! É só me passar o novo número com DDD aqui que eu já inicio a busca no sistema e te trago a prévia imediatamente!
-8. Mantenha respostas curtas e ágeis (1 a 3 parágrafos curtos), exatamente como no WhatsApp real.`;
       }
 
       systemPrompt = systemPrompt
@@ -300,10 +281,21 @@ Regras:
         }
       );
 
-      let reply = response.data.choices[0]?.message?.content?.trim();
+            let reply = response.data.choices[0]?.message?.content?.trim();
       if (reply) {
-        if (reply.includes('R$') || reply.startsWith('Oi!') || reply.includes('você') || reply.includes('áudios descriptografados') || reply.includes('relatório')) {
-          console.warn('[AI Service] ⚠️ Resposta em português detectada da OpenAI! Substituindo por resposta oficial em espanhol.');
+        const lowerReply = reply.toLowerCase();
+        if (
+          reply.includes('R$') ||
+          reply.startsWith('Oi!') ||
+          lowerReply.includes('você') ||
+          lowerReply.includes('voce') ||
+          lowerReply.includes('áudios descriptografados') ||
+          lowerReply.includes('relatório completo') ||
+          lowerReply.includes('preciso que me envie') ||
+          lowerReply.includes('preciso que você me envie') ||
+          lowerReply.includes('estou aqui para')
+        ) {
+          console.warn('[AI Service] Resposta em português barrada da OpenAI! Substituindo por resposta oficial em espanhol.');
           reply = "¡Hola! Para ayudarte con la verificación, envíame el número de WhatsApp de la persona que deseas investigar con su código de país. Estoy aquí para asistirte 🔒";
         }
         console.log('[AI Generator (OpenAI)] ' + userMessage + ' -> ' + reply.slice(0, 80) + '...');

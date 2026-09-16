@@ -1410,6 +1410,7 @@ module.exports = {
   recordBotReply,
   isMessageAlreadyHandled,
   markMessageHandled,
+  lastPhysicalSendTimes,
   seenMessageIds,
   eventBus
 };
