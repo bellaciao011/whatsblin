@@ -555,7 +555,8 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
       if (isAlreadyPaid) {
         const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
-        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
+        const leadToken = `cw_sec_${String(accessCode).toLowerCase()}_2026`;
+        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}&cw_token=${leadToken}&view=lead`;
         const paidMsg = flowLanguage === 'es'
           ? `¡Tu pago ya está confirmado y activo en nuestro sistema! 🎉\n\nTu acceso completo e ilimitado al panel está disponible aquí:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`
           : `Seu pagamento já está aprovado e ativo! 🎉\n\nSeu acesso foi liberado com sucesso!`;
@@ -1183,7 +1184,9 @@ async function triggerManualFlow(cleanPhone, options = {}) {
         ? "I found recent conversations and a WhatsApp audio linked to this number.\n\nTo unlock full access to the dashboard and listen to the audio now, access the official link:\n{checkoutUrl}"
         : "Localizei conversas recentes e um áudio do WhatsApp vinculado a este número.\n\nPara liberar o acesso completo ao painel e ouvir o áudio agora, acesse o link oficial:\n{checkoutUrl}");
 
-    chatData.variables.checkoutUrl = funnel.upsellStages?.stage_49?.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
+    const manualStageInfo = getCurrentStageInfo(chatData.upsellStage || 'stage_49', funnel, flowLanguage, chatData.codigo || 'lead');
+    chatData.variables.checkoutUrl = manualStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
+    chatData.variables.valor_atual = manualStageInfo.value;
     const offerTemplate = getNodeText('node-offer-checkout', fallbackOffer);
     const offerMsg = interpolateVars(offerTemplate);
 

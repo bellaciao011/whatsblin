@@ -1867,8 +1867,10 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
         if (inst) {
           const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || trackingCode;
           const codeVal = trackingCode || chat?.codigo || attribution?.codigo || 'vip';
+          const leadToken = `cw_sec_${String(codeVal).toLowerCase()}_2026`;
+          const upsellUrl = `https://spysfunills.vercel.app/upsell1/?code=${codeVal}&cw_token=${leadToken}&view=lead`;
           const deliveryMsg = isEs
-            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 ${upsellUrl}\n\nSi tienes cualquier duda, escríbeme por aquí.`
             : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
           try {
