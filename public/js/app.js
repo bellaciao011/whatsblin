@@ -2087,9 +2087,7 @@ async function renderInstances() {
                     </span>
                   </div>
                   <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
-                    <option value="fluxo-espiao-foto" ${(i.assignedFlowId === 'fluxo-espiao-es' || !i.assignedFlowId) ? 'selected' : ''}>🇧🇷 Funil Oficial (Português)</option>
-                    <option value="fluxo-espiao-es" ${i.assignedFlowId === 'fluxo-espiao-es' ? 'selected' : ''}>🇪🇸 Funil Oficial (Español)</option>
-                    <option value="fluxo-espiao-en" ${i.assignedFlowId === 'fluxo-espiao-en' ? 'selected' : ''}>🇺🇸 Funil Oficial (English)</option>
+                    <option value="fluxo-espiao-es" selected>🇪🇸 Funil Oficial - Mavrol Empresarial (Español)</option>
                   </select>
                   <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
                     As conversas deste número acionam <strong>exclusivamente</strong> este fluxo para evitar qualquer mistura.

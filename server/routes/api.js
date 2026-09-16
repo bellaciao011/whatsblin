@@ -934,8 +934,21 @@ router.get('/uazapi/status/:instanceId', async (req, res) => {
       }
     }
 
-    const qrcode = extractQrCode(statusRes, null);
-    const paircode = extractPairCode(statusRes, null);
+    let qrcode = extractQrCode(statusRes, null);
+    let paircode = extractPairCode(statusRes, null);
+
+    // Se não está conectado e o QR expirou/está vazio, gera um novo imediatamente
+    if (!isFullyConnected && !qrcode) {
+      try {
+        const connRes = await uazapiService.connectInstance(inst.url_servidor, decryptedToken);
+        if (connRes) {
+          qrcode = extractQrCode(connRes, null);
+          paircode = extractPairCode(connRes, null);
+        }
+      } catch (connErr) {
+        console.warn('[uazapi Status] Tentativa de renovação de QR:', connErr.message);
+      }
+    }
 
     res.json({
       success: true,
