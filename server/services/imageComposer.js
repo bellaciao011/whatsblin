@@ -3,8 +3,14 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const TEMPLATE_WITH_PHOTO = path.join(__dirname, '../../assets/templates/template_com_foto.png');
-const TEMPLATE_NO_PHOTO_LOCK = path.join(__dirname, '../../assets/templates/template_sem_foto_cadeado.png');
+// Templates em Português
+const TEMPLATE_WITH_PHOTO_PT = path.join(__dirname, '../../assets/templates/template_com_foto.png');
+const TEMPLATE_NO_PHOTO_LOCK_PT = path.join(__dirname, '../../assets/templates/template_sem_foto_cadeado.png');
+
+// Templates oficiais em Espanhol (enviados pelo usuário)
+const TEMPLATE_WITH_PHOTO_ES = path.join(__dirname, '../../assets/templates/template_com_foto_es.png');
+const TEMPLATE_NO_PHOTO_LOCK_ES = path.join(__dirname, '../../assets/templates/template_sem_foto_cadeado_es.png');
+
 const FALLBACK_CROP = path.join(__dirname, '../../assets/templates/print_screenshot_crop.png');
 
 async function getAvatarBuffer(avatarUrl) {
@@ -12,7 +18,7 @@ async function getAvatarBuffer(avatarUrl) {
   try {
     const res = await axios.get(avatarUrl, {
       responseType: 'arraybuffer',
-      timeout: 6000,
+      timeout: 7000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       }
@@ -25,45 +31,71 @@ async function getAvatarBuffer(avatarUrl) {
 }
 
 /**
- * Compõe o print com lógica condicional:
- * - Se avatarUrl for null/não tiver foto: Retorna o template do cadeado amarelo (Print 2).
- * - Se avatarUrl for válida: Retorna o template com a foto redonda no áudio (Print 1).
+ * Compõe o print de prova personalizado com suporte a múltiplos idiomas:
+ * - Espanhol (es): Usa os prints em espanhol enviados com coordenadas perfeitamente alinhadas
+ * - Português (pt): Usa os prints em português
  * 
- * @param {string|null} avatarUrl - URL da foto do alvo ou null
- * @param {Object} coords - Coordenadas X, Y e raio
+ * Lógica condicional:
+ * - Se avatarUrl for null/sem foto: Retorna o template do cadeado criptografado (Template 2)
+ * - Se avatarUrl for válida: Estampa a foto redonda no áudio (Template 1)
+ * 
+ * @param {string|null} avatarUrl - URL da foto pública do alvo ou null
+ * @param {Object} coords - Coordenadas X, Y e raio (opcional)
+ * @param {string} language - 'es' ou 'pt'
  * @returns {Promise<Buffer>}
  */
-async function composeProofImage(avatarUrl, coords = { x: 135, y: 657, radius: 18 }) {
-  // CASO 1: Não tem foto de perfil pública (Privacidade só para contatos ou sem foto)
-  // Usa o segundo print que já tem os cadeados amarelos nativos nas mensagens de áudio
+async function composeProofImage(avatarUrl, coords = null, language = 'es') {
+  const isEs = (language || 'es').toLowerCase() === 'es';
+
+  // Seleciona os templates corretos por idioma
+  const tplWithPhoto = isEs
+    ? (fs.existsSync(TEMPLATE_WITH_PHOTO_ES) ? TEMPLATE_WITH_PHOTO_ES : TEMPLATE_WITH_PHOTO_PT)
+    : (fs.existsSync(TEMPLATE_WITH_PHOTO_PT) ? TEMPLATE_WITH_PHOTO_PT : TEMPLATE_WITH_PHOTO_ES);
+
+  const tplNoPhotoLock = isEs
+    ? (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_ES) ? TEMPLATE_NO_PHOTO_LOCK_ES : TEMPLATE_NO_PHOTO_LOCK_PT)
+    : (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_PT) ? TEMPLATE_NO_PHOTO_LOCK_PT : TEMPLATE_NO_PHOTO_LOCK_ES);
+
+  // Coordenadas calibradas perfeitamente para cada template
+  const defaultCoords = isEs
+    ? { x: 136, y: 659, radius: 22 }
+    : { x: 135, y: 657, radius: 18 };
+
+  const effectiveCoords = {
+    x: coords?.x || defaultCoords.x,
+    y: coords?.y || defaultCoords.y,
+    radius: coords?.radius || defaultCoords.radius
+  };
+
+  // CASO 1: Perfil sem foto pública (privacidade apenas para contatos ou sem foto)
+  // Retorna o template oficial com cadeados amarelos de criptografia
   if (!avatarUrl) {
-    console.log('[ImageComposer] Perfil sem foto pública -> Selecionando Template 2 (Cadeado Criptografado)');
-    if (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK)) {
-      return fs.readFileSync(TEMPLATE_NO_PHOTO_LOCK);
+    console.log(`[ImageComposer] Perfil sem foto pública -> Selecionando Template 2 Cadeado Criptografado (Idioma: ${isEs ? 'ES' : 'PT'})`);
+    if (fs.existsSync(tplNoPhotoLock)) {
+      return fs.readFileSync(tplNoPhotoLock);
     }
   }
 
-  // CASO 2: Perfil com foto disponível -> Estampa no Template 1 (Bolinha branca do áudio)
-  const tplPath = fs.existsSync(TEMPLATE_WITH_PHOTO) ? TEMPLATE_WITH_PHOTO : FALLBACK_CROP;
-  const tplMetadata = await sharp(tplPath).metadata();
-
-  const radius = Math.max(8, parseInt(coords.radius, 10) || 18);
-  const diam = radius * 2;
-  const centerX = parseInt(coords.x, 10) || 135;
-  const centerY = parseInt(coords.y, 10) || 657;
-
-  const left = Math.max(0, Math.min(tplMetadata.width - diam, centerX - radius));
-  const top = Math.max(0, Math.min(tplMetadata.height - diam, centerY - radius));
-
+  // CASO 2: Perfil com foto disponível -> Estampa a foto redonda dentro do círculo do áudio
   const rawAvatarBuffer = await getAvatarBuffer(avatarUrl);
 
   if (!rawAvatarBuffer) {
-    // Se falhou o download mesmo tendo URL, envia o print com cadeado para ficar perfeito
-    console.log('[ImageComposer] Falha no download do avatar -> Fallback para Template 2 (Cadeado)');
-    if (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK)) {
-      return fs.readFileSync(TEMPLATE_NO_PHOTO_LOCK);
+    console.log(`[ImageComposer] Falha no download da foto -> Fallback para Template 2 Cadeado (Idioma: ${isEs ? 'ES' : 'PT'})`);
+    if (fs.existsSync(tplNoPhotoLock)) {
+      return fs.readFileSync(tplNoPhotoLock);
     }
   }
+
+  const tplPath = fs.existsSync(tplWithPhoto) ? tplWithPhoto : FALLBACK_CROP;
+  const tplMetadata = await sharp(tplPath).metadata();
+
+  const radius = Math.max(8, parseInt(effectiveCoords.radius, 10) || defaultCoords.radius);
+  const diam = radius * 2;
+  const centerX = parseInt(effectiveCoords.x, 10) || defaultCoords.x;
+  const centerY = parseInt(effectiveCoords.y, 10) || defaultCoords.y;
+
+  const left = Math.max(0, Math.min(tplMetadata.width - diam, centerX - radius));
+  const top = Math.max(0, Math.min(tplMetadata.height - diam, centerY - radius));
 
   const circularMask = Buffer.from(
     '<svg width="' + diam + '" height="' + diam + '"><circle cx="' + radius + '" cy="' + radius + '" r="' + radius + '" fill="white"/></svg>'
@@ -86,12 +118,16 @@ async function composeProofImage(avatarUrl, coords = { x: 135, y: 657, radius: 1
     .png()
     .toBuffer();
 
-  console.log('[ImageComposer] Template 1 gerado com sucesso com a foto do alvo estampada!');
+  console.log(`[ImageComposer] Template 1 gerado com sucesso com a foto do alvo estampada! (Idioma: ${isEs ? 'ES' : 'PT'})`);
   return finalImage;
 }
 
 module.exports = {
   composeProofImage,
-  TEMPLATE_WITH_PHOTO,
-  TEMPLATE_NO_PHOTO_LOCK
+  TEMPLATE_WITH_PHOTO_PT,
+  TEMPLATE_NO_PHOTO_LOCK_PT,
+  TEMPLATE_WITH_PHOTO_ES,
+  TEMPLATE_NO_PHOTO_LOCK_ES,
+  TEMPLATE_WITH_PHOTO: TEMPLATE_WITH_PHOTO_ES,
+  TEMPLATE_NO_PHOTO_LOCK: TEMPLATE_NO_PHOTO_LOCK_ES
 };

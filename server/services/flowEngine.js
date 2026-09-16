@@ -844,7 +844,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
       chatData.targetPhotoUrl = photoUrl;
 
       // 3. Monta a nova imagem de prova personalizada para o novo alvo
-      const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates);
+      const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
       const proofsDir = path.join(__dirname, '../../public/generated');
       fs.mkdirSync(proofsDir, { recursive: true });
       const filename = `proof_${cleanPhone}_${Date.now()}.png`;
@@ -933,7 +933,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.variables.photoUrl = photoUrl;
 
     // Monta a foto personalizada (Template 1 com foto ou Template 2 com cadeado)
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates);
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_${cleanPhone}_${Date.now()}.png`;
@@ -1156,7 +1156,7 @@ async function triggerManualFlow(cleanPhone, options = {}) {
     const photoUrl = await lookupProfilePicture(targetPhone);
     chatData.variables.photoUrl = photoUrl;
 
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates);
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_${phone}_${Date.now()}.png`;
