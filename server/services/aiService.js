@@ -1,3 +1,23 @@
+
+function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
+  let url = (baseUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
+  const cleanCode = (leadCode || 'lead').toLowerCase().replace(/[^a-z0-9]/g, '') || 'lead';
+  const leadToken = `cw_sec_${cleanCode}_2026`;
+
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has('src')) u.searchParams.set('src', leadToken);
+    if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', leadToken);
+    if (!u.searchParams.has('utm_campaign')) u.searchParams.set('utm_campaign', leadToken);
+    if (!u.searchParams.has('cw_token')) u.searchParams.set('cw_token', leadToken);
+    if (!u.searchParams.has('view')) u.searchParams.set('view', 'lead');
+    return u.toString();
+  } catch (e) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}src=${leadToken}&utm_source=${leadToken}&utm_campaign=${leadToken}&cw_token=${leadToken}&view=lead`;
+  }
+}
+
 const axios = require('axios');
 const db = require('../storage/db');
 const cryptoService = require('./cryptoService');
@@ -121,7 +141,7 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
     else paidValue = '0';
   }
   const nextValue = currentStageInfo.nextValue || '100';
-  const checkoutUrl = (lang === 'es' ? (funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL') : (currentStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49'));
+  const checkoutUrl = (lang === 'es' ? buildSpanishCheckoutUrl(funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL', 'lead') : (currentStageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49'));
 
   const formatText = (template) => {
     if (!template) return '';
@@ -196,7 +216,9 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       let systemPrompt = '';
       if (lang === 'es') {
         systemPrompt = settings.openaiSystemPromptEs || `Eres la asesora de soporte oficial y consultora del sistema de verificación confidencial de conversaciones.
-Tu objetivo es ser extremadamente humana, cordial, atenta y profesional en español, resolviendo dudas del cliente y orientándolo con total seguridad a completar el pago único de $ 39 a través del enlace oficial para desbloquear el informe completo.
+Tu objetivo es ser extremadamente humana, cordial, atenta y profesional en español.
+- Si el cliente aún NO ha pagado: Resuelve sus dudas y oriéntalo con seguridad a completar el pago único de $ 39 a través del enlace oficial seguro para desbloquear el informe completo.
+- Si el cliente YA PAGÓ ($39 completado): NO le pidas más dinero ni menciones otros pagos. Responde amablemente a cualquier duda que tenga sobre el acceso, indícale que revise su correo o que su panel ya se encuentra activo para consultar las conversaciones.
 
 Contexto del cliente:
 - El cliente ya envió el número de la persona que desea investigar.

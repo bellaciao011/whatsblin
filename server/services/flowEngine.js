@@ -291,15 +291,41 @@ async function executeTikTokPixelNode(tiktokNode, chatData) {
 /**
  * Obtém os dados da etapa atual de pagamento/upsell com formatação de moeda correta
  */
-function getCurrentStageInfo(stageKey, funnel, language = 'pt') {
+
+/**
+ * Gera a URL de checkout da CenterPag com a UTM/Token de camuflagem
+ * para desbloquear a página real de Upsell 1 (https://spysfunills.vercel.app/upsell1/)
+ */
+function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
+  let url = (baseUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
+  const cleanCode = (leadCode || 'lead').toLowerCase().replace(/[^a-z0-9]/g, '') || 'lead';
+  const leadToken = `cw_sec_${cleanCode}_2026`;
+
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has('src')) u.searchParams.set('src', leadToken);
+    if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', leadToken);
+    if (!u.searchParams.has('utm_campaign')) u.searchParams.set('utm_campaign', leadToken);
+    if (!u.searchParams.has('cw_token')) u.searchParams.set('cw_token', leadToken);
+    if (!u.searchParams.has('view')) u.searchParams.set('view', 'lead');
+    return u.toString();
+  } catch (e) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}src=${leadToken}&utm_source=${leadToken}&utm_campaign=${leadToken}&cw_token=${leadToken}&view=lead`;
+  }
+}
+
+function getCurrentStageInfo(stageKey, funnel, language = 'pt', leadCode = 'lead') {
   const lang = (language || 'pt').toLowerCase();
 
-  // No funil em espanhol: oferta única front-end de $39 USD sem upsell no WhatsApp
+  // No funil em espanhol: oferta única front-end de $39 USD com camuflagem de Upsell (CenterPag)
   if (lang === 'es') {
+    const rawUrl = funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL';
+    const cloakedCheckout = buildSpanishCheckoutUrl(rawUrl, leadCode);
     return {
       stage: stageKey || 'stage_49',
       value: '39',
-      checkoutUrl: funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL',
+      checkoutUrl: cloakedCheckout,
       nextStage: null,
       nextValue: null,
       paidValue: stageKey === 'stage_finalizado' ? '39' : '0'
@@ -458,7 +484,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   chatData.variables.checkoutUrl400 = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
 
   const rawDigits = (messageText || '').replace(/\D/g, '');
-  const stageInfo = getCurrentStageInfo(chatData.upsellStage, funnel, flowLanguage);
+  const stageInfo = getCurrentStageInfo(chatData.upsellStage, funnel, flowLanguage, chatData.codigo || 'lead');
   
   chatData.variables.checkoutUrl = stageInfo.checkoutUrl || funnel.checkoutUrl || 'https://pay.kirvano.com/checkout-49';
   chatData.variables.valor_atual = stageInfo.value;
@@ -470,6 +496,19 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     const node = activeFlow?.nodes?.find(n => n.id === nodeId);
     return node?.data?.text || fallback;
   };
+
+  // =========================================================================
+  // CASO 0: LEAD JÁ FINALIZOU / JÁ PAGOU O FRONT (PÓS-VENDA & ATENDIMENTO A DÚVIDAS)
+  // No funil em espanhol não há upsell no chat: apenas esclarece dúvidas após o pagamento
+  // =========================================================================
+  if (chatData.state === 'FINALIZADO' || chatData.state === 'PAGO' || chatData.state === 'APROVADO') {
+    console.log(`[FlowEngine] Lead finalizado enviou mensagem (${cleanPhone}). Respondendo dúvidas com IA (Lang: ${flowLanguage})...`);
+    const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
+    db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id }, 'FINALIZADO');
+    await sendOutgoingTextMessage(inst, cleanPhone, aiReply);
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+    return;
+  }
 
   // =========================================================================
   // CASO 1: LEAD JÁ ESTÁ NA ETAPA DE OFERTA / UPSELL (REPOSTAS, OBJEÇÕES, COMPROVANTES)
