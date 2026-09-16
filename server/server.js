@@ -64,10 +64,10 @@ app.use((req, res, next) => {
   }
 
   // CASO 2: DOMÍNIOS DE ANÚNCIO (ex: wtb.expresstrackin-g.com, expresstrackin-g.com)
-  // Esses domínios são EXCLUSIVAMENTE de tracking e redirecionamento para o WhatsApp.
+  // Esses domínios são EXCLUSIVAMENTE de tracking, redirect de checkout e WhatsApp.
   // O painel do SaaS, tela de login e rotas de administração NÃO EXISTEM aqui!
-  if (req.path.startsWith('/c/')) {
-    return next(); // Executa o tracking e redireciona imediatamente para o WhatsApp
+  if (req.path.startsWith('/c/') || req.path.startsWith('/checkout') || req.path.startsWith('/chk')) {
+    return next(); // Executa o tracking ou o redirecionamento limpo para o checkout
   }
 
   // Assets necessários para renderização da pressel instantânea
@@ -93,6 +93,75 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/css', express.static(path.join(__dirname, '../public/css')));
 app.use('/webhook', webhookRoutes);
 app.use('/api/webhooks', uazapiWebhookRoutes);
+
+// =========================================================================
+// ROTA DE REDIRECIONAMENTO LIMPO DE CHECKOUT
+// Transforma links elegantes como https://wtb.expresstrackin-g.com/checkout?codigo=3W7K9P
+// no checkout completo da CenterPag com todas as UTMs, SRC, SCK e cw_token preenchidos.
+// =========================================================================
+app.get(['/checkout', '/checkout/:codigo', '/chk/:codigo'], (req, res) => {
+  try {
+    let rawCode = req.params.codigo || req.query.codigo || req.query.code || req.query.c || '';
+
+    // Se o parâmetro foi passado como chave pura (ex: ?3W7K9P ou ?codigo)
+    if (!rawCode) {
+      const keys = Object.keys(req.query);
+      for (const k of keys) {
+        if (/^[A-Za-z0-9]{4,12}$/.test(k)) {
+          rawCode = k;
+          break;
+        }
+      }
+    }
+
+    const cleanCode = (rawCode ? String(rawCode).trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '') || 'LEAD';
+    const leadToken = `cw_sec_${cleanCode.toLowerCase()}_2026`;
+
+    // 1. Busca URL base do checkout em espanhol configurado no funil
+    const funnel = (db.getFunnel ? db.getFunnel() : {}) || {};
+    const baseUrl = (funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
+
+    // 2. Monta a URL de destino na CenterPag com todas as UTMs e parâmetros necessários
+    const u = new URL(baseUrl);
+    u.searchParams.set('code', cleanCode);
+    u.searchParams.set('codigo', cleanCode);
+    u.searchParams.set('utm_source', cleanCode);
+    u.searchParams.set('utm_campaign', cleanCode);
+    u.searchParams.set('utm_content', cleanCode);
+    u.searchParams.set('utm_medium', 'cpc');
+    u.searchParams.set('src', cleanCode);
+    u.searchParams.set('sck', cleanCode);
+    u.searchParams.set('cw_token', leadToken);
+    u.searchParams.set('view', 'lead');
+
+    // 3. Tenta resgatar ttclid da atribuição vinculada a este código para alimentar o checkout
+    let ttclid = req.query.ttclid || req.query.tt_clid || null;
+    if (!ttclid && cleanCode !== 'LEAD') {
+      try {
+        const attributions = db.getTrafficAttributions();
+        const attr = attributions.find(a => (a.codigo || '').toUpperCase() === cleanCode);
+        if (attr?.ttclid) ttclid = attr.ttclid;
+      } catch (e) {}
+    }
+    if (ttclid) {
+      u.searchParams.set('ttclid', ttclid);
+    }
+
+    // 4. Preserva quaisquer outros parâmetros adicionais passados na query string
+    Object.keys(req.query).forEach(k => {
+      if (!['codigo', 'code', 'c', 'ttclid', 'tt_clid'].includes(k) && !u.searchParams.has(k)) {
+        u.searchParams.set(k, req.query[k]);
+      }
+    });
+
+    console.log(`[Checkout Redirect] ⚡ Redirecionando lead (${cleanCode}) ➔ CenterPag com UTMs completas`);
+    return res.redirect(302, u.toString());
+  } catch (err) {
+    console.error('[Checkout Redirect Error]:', err);
+    return res.redirect(302, 'https://go.centerpag.com/PPU38CQG5EL');
+  }
+});
+
 app.use('/c', campaignRoutes);
 
 // Rota da Tela de Login (se já estiver autenticado, vai direto para o dashboard)

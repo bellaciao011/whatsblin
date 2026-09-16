@@ -296,35 +296,23 @@ async function executeTikTokPixelNode(tiktokNode, chatData) {
  * Gera a URL de checkout da CenterPag com a UTM/Token de camuflagem
  * para desbloquear a página real de Upsell 1 (https://spysfunills.vercel.app/upsell1/)
  */
-function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
-  let url = (baseUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
-  const cleanCode = (leadCode || 'lead').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LEAD';
-  const leadToken = `cw_sec_${cleanCode.toLowerCase()}_2026`;
-
+function getCustomTrackingDomain() {
   try {
-    const u = new URL(url);
-    // 1. Código direto para a página de Upsell 1 (spysfunills.vercel.app/upsell1/?code=...)
-    u.searchParams.set('code', cleanCode);
-    u.searchParams.set('codigo', cleanCode);
+    const campaigns = db.getTrafficCampaigns();
+    const camp = campaigns.find(c => c.custom_domain && c.custom_domain.trim());
+    if (camp && camp.custom_domain) return camp.custom_domain.trim();
 
-    // 2. UTMs completas repassadas nos Webhooks da PerfectPay / CenterPag
-    u.searchParams.set('utm_source', cleanCode);
-    u.searchParams.set('utm_campaign', cleanCode);
-    u.searchParams.set('utm_content', cleanCode);
-    u.searchParams.set('utm_medium', 'cpc');
+    const domains = db.getCustomDomains();
+    const active = domains.find(d => (d.status === 'ativo' || d.ativo) && d.dominio);
+    if (active && active.dominio) return active.dominio.trim();
+  } catch (e) {}
+  return 'wtb.expresstrackin-g.com';
+}
 
-    // 3. SRC e SCK (parâmetro nativo de rastreio da PerfectPay, Hotmart e CenterPag)
-    u.searchParams.set('src', cleanCode);
-    u.searchParams.set('sck', cleanCode);
-
-    // 4. Token de camuflagem e visualização da oferta
-    u.searchParams.set('cw_token', leadToken);
-    u.searchParams.set('view', 'lead');
-    return u.toString();
-  } catch (e) {
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}code=${cleanCode}&codigo=${cleanCode}&utm_source=${cleanCode}&utm_campaign=${cleanCode}&utm_content=${cleanCode}&utm_medium=cpc&src=${cleanCode}&sck=${cleanCode}&cw_token=${leadToken}&view=lead`;
-  }
+function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
+  const cleanCode = (leadCode || 'lead').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LEAD';
+  const domain = getCustomTrackingDomain();
+  return `https://${domain}/checkout?codigo=${cleanCode}`;
 }
 
 function getCurrentStageInfo(stageKey, funnel, language = 'pt', leadCode = 'lead') {
