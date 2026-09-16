@@ -340,6 +340,28 @@ async function sendTextMessage(serverUrl, instanceToken, number, text) {
   if (!number) throw new Error('Número de destino não informado.');
   if (!text) throw new Error('Conteúdo da mensagem não informado.');
 
+  // BARREIRA DE FERRO: Bloqueio absoluto de qualquer texto em português na raiz de envio
+  const lowerText = String(text).toLowerCase();
+  if (
+    lowerText.startsWith('oi!') ||
+    lowerText.startsWith('olá') ||
+    lowerText.includes('você') ||
+    lowerText.includes('voce') ||
+    lowerText.includes('áudios descriptografados') ||
+    lowerText.includes('relatório completo') ||
+    lowerText.includes('busca inicial') ||
+    lowerText.includes('investigação desse número') ||
+    lowerText.includes('te ajudar a investigar') ||
+    lowerText.includes('te ajudar com a investigação') ||
+    lowerText.includes('r$ 49') ||
+    lowerText.includes('r$ 100') ||
+    lowerText.includes('r$ 200') ||
+    lowerText.includes('pix')
+  ) {
+    console.error(`[uazapiService] 🛑 BLOQUEIO CRÍTICO DE IDIOMA: Mensagem em português barrada antes de chamar a API da uazapi! Texto: "${text.slice(0, 80)}"`);
+    return { success: false, blocked: true, reason: 'portuguese_blocked' };
+  }
+
   const cleanNumber = String(number).replace(/\D/g, '');
   await throttleSend(1500);
 

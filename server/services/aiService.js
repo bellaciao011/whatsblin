@@ -36,6 +36,7 @@ function getOpenAiApiKey() {
  * Classifica a resposta do lead logo após a mensagem de Boas-Vindas
  */
 async function classifyWelcomeReply(userMessage, language = 'es') {
+  language = 'es';
   const lang = 'es';
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
@@ -126,6 +127,7 @@ async function classifyWelcomeReply(userMessage, language = 'es') {
  * Classifica a mensagem do lead em qualquer etapa do funil/upsell e retorna a resposta oficial exata
  */
 async function classifyAndReply(userMessage, conversationHistory = [], currentStageInfo = {}, language = 'es') {
+  language = 'es';
   const lang = 'es';
   const funnel = db.getFunnel();
   const settings = db.getSettings();

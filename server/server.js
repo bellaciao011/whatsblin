@@ -265,12 +265,12 @@ app.listen(PORT, () => {
       if (connected) {
         console.log(`[Boot] ✓ Conexão WhatsApp preservada e ativa: ${connected.name} (${connected.numero_conectado || connected.id})`);
       }
-      startUazapiMessageSyncWorker(3500);
+      // startUazapiMessageSyncWorker desativado para evitar concorrência com Webhook
     }).catch(e => {
       console.warn('[Boot] Aviso ao restaurar conexão:', e.message);
-      startUazapiMessageSyncWorker(3500);
+      // startUazapiMessageSyncWorker desativado para evitar concorrência com Webhook
     });
   } else {
-    startUazapiMessageSyncWorker(3500);
+    // startUazapiMessageSyncWorker desativado para evitar concorrência com Webhook
   }
 });
