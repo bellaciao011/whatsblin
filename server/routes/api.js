@@ -444,7 +444,7 @@ async function autoRestoreUazapiInstances(req = null) {
           phoneNumber: cleanOwner,
           numero_conectado: cleanOwner,
           status: rem.status || 'connected',
-          assignedFlowId: 'fluxo-espiao-foto',
+          assignedFlowId: (rem.name && /roxo|espanhol|es/i.test(rem.name)) ? 'fluxo-espiao-es' : 'fluxo-espiao-es',
           totalSent: 0,
           totalReceived: 0,
           criado_em: rem.created || new Date().toISOString(),
@@ -586,10 +586,33 @@ router.patch('/instances/:id/flow', (req, res) => {
   const inst = instances.find(i => i.id === req.params.id || i.instance_id === req.params.id || i.name === req.params.id);
   if (!inst) return res.status(404).json({ error: 'Instância / Chip não encontrado' });
   
-  inst.assignedFlowId = flowId || 'fluxo-espiao-foto';
+  inst.assignedFlowId = flowId || 'fluxo-espiao-es';
   db.saveInstances(instances);
   console.log(`[Instances] Chip "${inst.name}" (${inst.id}) vinculado com sucesso ao fluxo: ${inst.assignedFlowId}`);
+  
+  // Atualiza em tempo real todos os chats atribuídos a este chip para o novo fluxo e idioma
+  try {
+    const chats = db.getChats();
+    const newLang = (inst.assignedFlowId || '').includes('-es') ? 'es' : ((inst.assignedFlowId || '').includes('-en') ? 'en' : 'pt');
+    let updatedChats = false;
+    for (const phone of Object.keys(chats)) {
+      const c = chats[phone];
+      if (c.instanceId === inst.id || c.instanceId === inst.instance_id || !c.instanceId || c.instanceId === 'inst_1') {
+        c.assignedFlowId = inst.assignedFlowId;
+        c.flowLanguage = newLang;
+        updatedChats = true;
+      }
+    }
+    if (updatedChats) {
+      db.saveChats(chats);
+      console.log(`[Instances] Sincronizados chats para idioma "${newLang}" e fluxo "${inst.assignedFlowId}"`);
+    }
+  } catch (syncErr) {
+    console.warn('[Instances] Aviso ao sincronizar chats do chip:', syncErr.message);
+  }
+
   eventBus.emit('instances_updated', { instanceId: inst.id, assignedFlowId: inst.assignedFlowId });
+  eventBus.emit('chat_updated', { instanceId: inst.id });
   res.json({ success: true, instance: inst });
 });
 

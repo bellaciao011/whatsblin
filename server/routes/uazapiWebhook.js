@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../storage/db');
 const cryptoService = require('../services/cryptoService');
-const { processIncomingMessage, eventBus } = require('../services/flowEngine');
+const { processIncomingMessage, eventBus, isLeadLocked, isMessageAlreadyHandled, markMessageHandled, seenMessageIds } = require('../services/flowEngine');
 const { resolvePhoneFromLid, registerLidMapping } = require('../services/uazapiService');
 
 /**
@@ -204,11 +204,17 @@ router.post('/uazapi', async (req, res) => {
         continue;
       }
 
-      const msgId = msg.id || msg.messageid || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const msgId = msg.id || msg.messageid || msg.key?.id || msg.data?.id || (msg.key?.remoteJid && msg.messageTimestamp ? `${msg.key.remoteJid}_${msg.messageTimestamp}` : null) || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-      // Deduplicação: ignora se já existe no banco
-      const existingChat = db.getChat(cleanPhone);
-      if (existingChat?.messages?.some(m => m.id === msgId)) {
+      // 1. Deduplicação Global (evita colisão de webhook e poller para a mesma mensagem)
+      if (isMessageAlreadyHandled(msgId, cleanPhone, textBody, Date.now())) {
+        console.log(`[uazapi Webhook] 🛡️ Mensagem duplicada/já tratada ignorada para +${cleanPhone} (ID: ${msgId})`);
+        continue;
+      }
+
+      // 2. Trava de Concorrência ativa
+      if (isLeadLocked(cleanPhone)) {
+        console.log(`[uazapi Webhook] ⚠️ Lead +${cleanPhone} já em processamento ativo, ignorando webhook concorrente.`);
         continue;
       }
 
@@ -239,6 +245,12 @@ router.post('/uazapi', async (req, res) => {
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
+        // Atualiza imediatamente o watermark local para o poller não re-capturar
+        const chatBefore = db.getChat(cleanPhone);
+        if (chatBefore) {
+          chatBefore.lastProcessedTimestamp = Date.now();
+          db.saveChat(cleanPhone, chatBefore);
+        }
         await processIncomingMessage(instance.id, cleanPhone, textBody, mediaAttachment, msgId, null, senderName, senderPhoto);
       } else {
         console.warn('[uazapi Webhook] Nenhuma instância ativa configurada para processar esta mensagem.');

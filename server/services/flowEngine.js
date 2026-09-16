@@ -12,6 +12,77 @@ const fs = require('fs');
 
 const eventBus = new EventEmitter();
 
+// Trava global de concorrência por lead para impedir execuções simultâneas paralelas
+const activeLeadLocks = new Map();
+// Histórico de timestamps do último envio do bot por lead para debounce rigoroso
+const lastBotReplyTimestamps = new Map();
+// Cache compartilhado em memória de IDs de mensagens já processadas
+const seenMessageIds = new Set();
+
+function isLeadLocked(cleanPhone) {
+  const lockTime = activeLeadLocks.get(cleanPhone);
+  if (!lockTime) return false;
+  if (Date.now() - lockTime > 25000) {
+    activeLeadLocks.delete(cleanPhone);
+    return false;
+  }
+  return true;
+}
+
+function acquireLeadLock(cleanPhone) {
+  if (isLeadLocked(cleanPhone)) return false;
+  activeLeadLocks.set(cleanPhone, Date.now());
+  return true;
+}
+
+function releaseLeadLock(cleanPhone) {
+  activeLeadLocks.delete(cleanPhone);
+}
+
+function hasRecentBotReply(cleanPhone, cooldownMs = 12000) {
+  const lastTime = lastBotReplyTimestamps.get(cleanPhone);
+  if (!lastTime) return false;
+  return (Date.now() - lastTime) < cooldownMs;
+}
+
+function recordBotReply(cleanPhone) {
+  lastBotReplyTimestamps.set(cleanPhone, Date.now());
+}
+
+function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
+  if (msgId && seenMessageIds.has(msgId)) return true;
+
+  try {
+    const chat = db.getChat(cleanPhone);
+    if (chat && Array.isArray(chat.messages)) {
+      const cleanT = (text || '').trim();
+      const exists = chat.messages.some(m => {
+        if (msgId && m.id === msgId) return true;
+        if (cleanT && (m.text || '').trim() === cleanT) {
+          const t = new Date(m.timestamp).getTime();
+          if (Math.abs(t - (timestampMs || Date.now())) < 20000) return true;
+        }
+        return false;
+      });
+      if (exists) {
+        if (msgId) seenMessageIds.add(msgId);
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+function markMessageHandled(msgId) {
+  if (msgId) seenMessageIds.add(msgId);
+  if (seenMessageIds.size > 10000) {
+    const it = seenMessageIds.values();
+    for (let i = 0; i < 2000; i++) seenMessageIds.delete(it.next().value);
+  }
+}
+
+
 /**
  * Simula status de presença 'composing' (digitando) nativo no WhatsApp e no Live Chat
  */
@@ -1238,5 +1309,13 @@ module.exports = {
   simulateTyping,
   getStageTag,
   extractNewTargetPhone,
+  isLeadLocked,
+  acquireLeadLock,
+  releaseLeadLock,
+  hasRecentBotReply,
+  recordBotReply,
+  isMessageAlreadyHandled,
+  markMessageHandled,
+  seenMessageIds,
   eventBus
 };

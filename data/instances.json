@@ -1,7 +1,7 @@
 [
   {
     "id": "uaz_re9e832d34a43e1",
-    "name": "01",
+    "name": "CELULAR ROXO",
     "tipo": "uazapi",
     "url_servidor": "https://whatsblin.uazapi.com",
     "instance_id": "re9e832d34a43e1",
@@ -9,7 +9,7 @@
     "phoneNumber": "557193768941",
     "numero_conectado": "557193768941",
     "status": "connected",
-    "assignedFlowId": "fluxo-espiao-foto",
+    "assignedFlowId": "fluxo-espiao-es",
     "totalSent": 0,
     "totalReceived": 0,
     "criado_em": "2026-09-14 16:24:54.865Z",

@@ -1,13 +1,12 @@
 const db = require('../storage/db');
 const cryptoService = require('./cryptoService');
 const uazapiService = require('./uazapiService');
-const { processIncomingMessage, eventBus } = require('./flowEngine');
+const { processIncomingMessage, eventBus, isLeadLocked, isMessageAlreadyHandled, markMessageHandled, seenMessageIds } = require('./flowEngine');
 
 let isPolling = false;
 let pollTimer = null;
 
-// Cache global em memória de IDs já processados para deduplicação absoluta
-const seenMessageIds = new Set();
+// Usa cache global compartilhado seenMessageIds de flowEngine
 // Trava de concorrência por lead para evitar disparos paralelos
 const activeLeadProcessing = new Set();
 
@@ -289,25 +288,37 @@ async function syncUazapiInstancesNow() {
             const hasExistingMessages = Array.isArray(chat.messages) && chat.messages.length > 0;
             const isHistoricalMessage = hasExistingMessages && (msgTimestampMs <= (chat.lastProcessedTimestamp || 0));
 
-            // Se for mensagem de histórico antigo já processada, salva apenas para visualização no painel
-            if (isHistoricalMessage) {
+            // FILTRO CRÍTICO ANTI-LOOP: Mensagens antigas (> 2 minutos) nunca devem disparar fluxo ou IA!
+            const msgAgeMs = Date.now() - msgTimestampMs;
+            const isTooOld = msgAgeMs > 120000; // 2 minutos
+
+            if (isHistoricalMessage || isTooOld) {
               seenMessageIds.add(msgId);
-              db.addChatMessage(cleanPhone, {
-                id: msgId,
-                timestamp: parseTimestamp(m.messageTimestamp),
-                from: 'lead',
-                text: text || (mediaUrl ? '[Mídia]' : ''),
-                mediaUrl: mediaUrl,
-                mediaType: m.messageType || null,
-                instanceId: inst.id
-              });
-              anyUpdate = true;
+              const isAlreadyInHistory = chat.messages && chat.messages.some(existing => existing.id === msgId);
+              if (!isAlreadyInHistory) {
+                db.addChatMessage(cleanPhone, {
+                  id: msgId,
+                  timestamp: parseTimestamp(m.messageTimestamp),
+                  from: 'lead',
+                  text: text || (mediaUrl ? '[Mídia]' : ''),
+                  mediaUrl: mediaUrl,
+                  mediaType: m.messageType || null,
+                  instanceId: inst.id
+                });
+                anyUpdate = true;
+              }
+              chat.lastProcessedTimestamp = Math.max(chat.lastProcessedTimestamp || 0, msgTimestampMs);
               continue;
             }
 
-            // 4. Trava de concorrência por lead
-            if (activeLeadProcessing.has(cleanPhone)) {
-              console.log(`[uazapi Poller] Lead +${cleanPhone} em processamento ativo, aguardando próximo ciclo.`);
+            // 4. Trava de concorrência global por lead (compartilhada com Webhook e FlowEngine)
+            if (activeLeadProcessing.has(cleanPhone) || isLeadLocked(cleanPhone)) {
+              console.log(`[uazapi Poller] Lead +${cleanPhone} em processamento ativo no motor de fluxo, pulando ciclo.`);
+              continue;
+            }
+
+            if (isMessageAlreadyHandled(msgId, cleanPhone, text, msgTimestampMs)) {
+              console.log(`[uazapi Poller] 🛡️ Mensagem já processada anteriormente ignorada: ${msgId}`);
               continue;
             }
 
