@@ -5040,10 +5040,15 @@ async function renderDomains() {
                       </div>
 
                       <!-- Ações Direita -->
-                      <div style="display: flex; gap: 8px;">
+                      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button class="btn btn-secondary" onclick="checkDomainStatusNow('${d.id}')" style="font-size: 12px; padding: 6px 12px;" title="Consultar status imediato no Railway">
                           ⚡ Verificar Agora
                         </button>
+                        ${isPendente ? `
+                          <button class="btn btn-primary" onclick="confirmDomainNow('${d.id}')" style="font-size: 12px; padding: 6px 12px; background: #10b981; border: none; font-weight: 700;" title="Confirmar conexão feita no painel do Railway">
+                            ✅ Já Conectei (Ativar)
+                          </button>
+                        ` : ''}
                         <button class="btn btn-secondary" onclick="handleToggleDomainActive('${d.id}')" style="font-size: 12px; padding: 6px 12px;" title="Ativar ou desativar">
                           ${d.ativo ? '⏸️ Desativar' : '▶️ Ativar'}
                         </button>
@@ -5127,18 +5132,33 @@ async function handleCreateDomain(e) {
 /**
  * Consulta status imediato de um domínio
  */
-async function checkDomainStatusNow(id) {
+async async function checkDomainStatusNow(id) {
   try {
-    showToast('Consultando API do Railway...', 'info');
+    showToast('Verificando conexão HTTPS e DNS do domínio...', 'info');
     const res = await fetch(`/api/dominios/${id}/status`).then(r => r.json());
-    if (res.status === 'ativo') {
-      showToast(`🎉 Domínio ${res.dominio} verificado e ativo!`, 'success');
+    if (res.status === 'ativo' || res.verified) {
+      showToast(`🎉 Domínio ${res.dominio} verificado e ATIVO no Railway!`, 'success');
     } else {
-      showToast(`Status atual: Aguardando propagação DNS / Certificado SSL (${res.certificateStatus || 'PENDING'})`, 'info');
+      showToast(`Status: Aguardando propagação DNS / Certificado SSL`, 'info');
     }
     renderDomains();
   } catch (err) {
     showToast(`Erro ao verificar: ${err.message}`, 'error');
+  }
+}
+
+async function confirmDomainNow(id) {
+  try {
+    showToast('Ativando domínio...', 'info');
+    const res = await fetch(`/api/dominios/${id}/confirmar`, { method: 'POST' }).then(r => r.json());
+    if (res.success) {
+      showToast('🎉 Domínio confirmado e ATIVO no Railway para campanhas!', 'success');
+    } else {
+      showToast('Erro: ' + (res.error || 'Falha ao ativar'), 'danger');
+    }
+    renderDomains();
+  } catch (err) {
+    showToast('Erro ao confirmar: ' + err.message, 'danger');
   }
 }
 

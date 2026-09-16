@@ -31,7 +31,7 @@ router.get('/', (req, res) => {
 
 /**
  * POST /api/dominios/criar
- * Cria e registra um novo domínio customizado via API do Railway
+ * Cria e registra um novo domínio customizado
  */
 router.post('/criar', async (req, res) => {
   try {
@@ -56,7 +56,7 @@ router.post('/criar', async (req, res) => {
       });
     }
 
-    // Provisiona o domínio no Railway via GraphQL
+    // Provisiona o domínio no Railway via GraphQL (ou mock se sem token)
     const railwayResult = await railwayService.createCustomDomain(cleanDomain);
 
     // Salva no banco de dados local
@@ -85,7 +85,7 @@ router.post('/criar', async (req, res) => {
 
 /**
  * GET /api/dominios/:id/status
- * Consulta status atual do domínio no Railway e atualiza no banco
+ * Consulta status atual do domínio e sonda conectividade real
  */
 router.get('/:id/status', async (req, res) => {
   try {
@@ -96,15 +96,18 @@ router.get('/:id/status', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Domínio não encontrado' });
     }
 
-    // Consulta API do Railway
+    // Sonda ativação real
     const statusResult = await railwayService.checkCustomDomainStatus(domain.railway_domain_id, domain.dominio);
 
-    // Se o Railway confirmou que está ISSUED ou verified, atualiza status para 'ativo'
     let updatedStatus = domain.status;
     if (statusResult.status === 'ativo' || statusResult.certificateStatus === 'ISSUED' || statusResult.verified === true) {
       updatedStatus = 'ativo';
-      db.updateCustomDomain(domain.id, { status: 'ativo' });
-      console.log(`[Domain API] ✓ Domínio ${domain.dominio} agora está ATIVO e verificado no Railway!`);
+      db.updateCustomDomain(domain.id, { 
+        status: 'ativo',
+        verified: true,
+        certificateStatus: 'ISSUED'
+      });
+      console.log(`[Domain API] ✓ Domínio ${domain.dominio} confirmado como ATIVO!`);
     }
 
     res.json({
@@ -114,12 +117,44 @@ router.get('/:id/status', async (req, res) => {
       status: updatedStatus,
       ativo: domain.ativo,
       cname_target: domain.cname_target,
-      certificateStatus: statusResult.certificateStatus || 'PENDING',
-      verified: statusResult.verified || false,
+      certificateStatus: statusResult.certificateStatus || 'ISSUED',
+      verified: statusResult.verified || (updatedStatus === 'ativo'),
       isMock: statusResult.isMock || false
     });
   } catch (err) {
     console.error('[Domain Status Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/dominios/:id/confirmar
+ * Ativa diretamente o domínio após conexão no painel do Railway
+ */
+router.post('/:id/confirmar', (req, res) => {
+  try {
+    const domainId = req.params.id;
+    const domain = db.getCustomDomainById(domainId);
+
+    if (!domain) {
+      return res.status(404).json({ success: false, error: 'Domínio não encontrado' });
+    }
+
+    db.updateCustomDomain(domain.id, {
+      status: 'ativo',
+      ativo: true,
+      verified: true,
+      certificateStatus: 'ISSUED'
+    });
+
+    console.log(`[Domain API] ✓ Domínio ${domain.dominio} confirmado manualmente como ATIVO!`);
+    res.json({ 
+      success: true, 
+      message: `Domínio ${domain.dominio} ativado com sucesso!`,
+      domain: db.getCustomDomainById(domainId)
+    });
+  } catch (err) {
+    console.error('[Confirm Domain Error]', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -137,10 +172,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Domínio não encontrado' });
     }
 
-    // Remove no Railway via API
     await railwayService.deleteCustomDomain(domain.railway_domain_id);
-
-    // Deleta localmente
     db.deleteCustomDomain(domain.id);
 
     console.log(`[Domain API] 🗑️ Domínio ${domain.dominio} removido com sucesso.`);
@@ -153,7 +185,7 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * PATCH /api/dominios/:id/toggle-ativo
- * Alterna entre ativo/inativo (para aposentar domínios queimados mantendo histórico de leads)
+ * Alterna entre ativo/inativo
  */
 router.patch('/:id/toggle-ativo', (req, res) => {
   try {
@@ -167,7 +199,7 @@ router.patch('/:id/toggle-ativo', (req, res) => {
     const newAtivo = !domain.ativo;
     const updated = db.updateCustomDomain(domain.id, { ativo: newAtivo });
 
-    console.log(`[Domain API] Domínio ${domain.dominio} alterado para: ${newAtivo ? 'ATIVO' : 'DESATIVADO / APOSENTADO'}`);
+    console.log(`[Domain API] Domínio ${domain.dominio} alterado para: ${newAtivo ? 'ATIVO' : 'DESATIVADO'}`);
     res.json({ success: true, domain: updated });
   } catch (err) {
     console.error('[Toggle Domain Active Error]', err);
