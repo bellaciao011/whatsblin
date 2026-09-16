@@ -54,6 +54,14 @@ function recordBotReply(cleanPhone) {
 }
 
 function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
+  // Início de campanha/anúncio pelo lead nunca é bloqueado como duplicata
+  const isStart = Boolean(
+    (text && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(text)) ||
+    (text && /\b[A-Z0-9]{6}\b/i.test(text)) ||
+    (text && text.includes('(') && text.includes(')'))
+  );
+  if (isStart) return false;
+
   if (msgId && seenMessageIds.has(msgId)) return true;
 
   try {
@@ -627,6 +635,8 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.orderStatus = null;
     chatData.variables = { phone: cleanPhone };
     chatData.messages = []; // Limpa 100% da memória de mensagens deste lead
+    lastBotReplyTimestamps.delete(cleanPhone);
+    lastPhysicalSendTimes.delete(cleanPhone);
   }
 
   // Helper para obter o texto configurado no nó visual do fluxo ativo
@@ -1119,7 +1129,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // =========================================================================
   // CASO 3: PRIMEIRO CONTATO DO LEAD (BOAS-VINDAS)
   // =========================================================================
-  if (hasRecentBotReply(cleanPhone, 10000)) {
+  if (!isCampaignStart && hasRecentBotReply(cleanPhone, 10000)) {
     console.log(`[FlowEngine] ⏳ CASO 3: Boas-vindas recente já enviada para +${cleanPhone}. Suprimindo duplicata.`);
     return;
   }

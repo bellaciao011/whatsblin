@@ -294,16 +294,13 @@ async function syncUazapiInstancesNow() {
             anyUpdate = true;
           } else {
             // Mensagem de entrada do LEAD:
-            const hasExistingMessages = Array.isArray(chat.messages) && chat.messages.length > 0;
-            const isHistoricalMessage = hasExistingMessages && (msgTimestampMs <= (chat.lastProcessedTimestamp || 0));
-
-            // FILTRO ABSOLUTO DE CONEXÃO: Mensagens anteriores à conexão do chip ou antigas (> 30s) NUNCA disparam fluxo!
+            // FILTRO DE SEGURANÇA: Apenas ignora mensagens comprovadamente anteriores à conexão do chip
             const connTimestamp = inst.connectedAt || 0;
-            const isBeforeConnection = connTimestamp > 0 && msgTimestampMs <= connTimestamp;
+            const isBeforeConnection = connTimestamp > 0 && msgTimestampMs < (connTimestamp - 60000);
             const msgAgeMs = Date.now() - msgTimestampMs;
-            const isTooOld = msgAgeMs > 20000; // 20 segundos máximo
+            const isTooOld = msgAgeMs > 600000; // 10 minutos máximo
 
-            if (isHistoricalMessage || isTooOld || isBeforeConnection) {
+            if (isBeforeConnection || isTooOld) {
               seenMessageIds.add(msgId);
               const isAlreadyInHistory = chat.messages && chat.messages.some(existing => existing.id === msgId);
               if (!isAlreadyInHistory) {
