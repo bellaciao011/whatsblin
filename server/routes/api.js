@@ -34,7 +34,8 @@ router.post('/auth/login', (req, res) => {
   const token = authService.generateToken(username);
   
   // Define o cookie auth_token HttpOnly seguro por 7 dias
-  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
+  const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}${isHttps ? '; Secure' : ''}`);
 
   res.json({
     success: true,
@@ -45,7 +46,7 @@ router.post('/auth/login', (req, res) => {
 
 router.get('/auth/check', (req, res) => {
   const cookies = authService.parseCookies(req);
-  const token = cookies.auth_token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
+  const token = cookies.auth_token || req.query?.token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
   const session = authService.verifyToken(token);
 
   if (session) {

@@ -2,8 +2,28 @@
 // Interceptor global para redirecionar se a sessão expirar (401)
 const originalFetch = window.fetch;
 window.fetch = async function(...args) {
-  const res = await originalFetch(...args);
+  let [resource, config] = args;
+  const token = localStorage.getItem('hub_token');
+  if (token) {
+    if (typeof resource === 'string' || (typeof URL !== 'undefined' && resource instanceof URL)) {
+      config = config ? { ...config } : {};
+      config.headers = new Headers(config.headers || {});
+      if (!config.headers.has('Authorization')) {
+        config.headers.set('Authorization', 'Bearer ' + token);
+      }
+    } else if (resource && typeof resource === 'object' && resource.headers && typeof resource.headers.set === 'function') {
+      try {
+        if (!resource.headers.has('Authorization')) {
+          resource.headers.set('Authorization', 'Bearer ' + token);
+        }
+      } catch (e) {}
+    }
+  }
+
+  const res = await originalFetch(resource, config);
   if (res.status === 401 && !window.location.pathname.includes('login')) {
+    localStorage.removeItem('hub_token');
+    localStorage.removeItem('hub_auth_user');
     window.location.href = '/login';
   }
   return res;
@@ -255,7 +275,9 @@ function initRealtimeEvents() {
     state.eventSource = null;
   }
   try {
-    state.eventSource = new EventSource('/api/events');
+    const token = localStorage.getItem('hub_token');
+    const sseUrl = token ? '/api/events?token=' + encodeURIComponent(token) : '/api/events';
+    state.eventSource = new EventSource(sseUrl);
 
     state.eventSource.onmessage = (e) => {
       try {
@@ -4352,7 +4374,7 @@ async function renderTikTokAttribution() {
                   </div>
 
                   <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
-                    <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="handleTestTikTokPixel('${p.pixel_code}', '${p.access_token}')">⚡ Testar Envio (CompletePayment)</button>
+                    <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="testTikTokPixelManual('${p.pixel_code}', '${p.access_token}', '${p.test_event_code || ''}')">⚡ Testar Envio (CompletePayment)</button>
                   </div>
                 </div>
               `).join('') : `
@@ -4701,6 +4723,12 @@ function openCreateTikTokPixelModal() {
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Token seguro e de longa duração gerado no TikTok Ads Manager.</div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">Test Event Code (Test ID) <span style="font-size: 11px; color: #25f4ee; font-weight: normal;">(Opcional - para testes em tempo real)</span></label>
+            <input type="text" class="form-input" id="pix-tt-test-code" placeholder="Ex: TEST12345 (obtido na aba Test Events do TikTok)" style="font-family: monospace; border-color: rgba(37, 244, 238, 0.4);">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Insira o código gerado no TikTok Events Manager se estiver rodando testes em tempo real.</div>
+          </div>
+
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('pixel-tt-modal').remove()">Cancelar</button>
             <button type="submit" class="btn btn-primary" style="background: #fe2c55; border: none; font-weight: 700; padding: 8px 22px;">Salvar Pixel</button>
@@ -4718,12 +4746,13 @@ async function handleCreateTikTokPixel(e) {
   const name = document.getElementById('pix-tt-name').value.trim();
   const pixel_code = document.getElementById('pix-tt-code').value.trim();
   const access_token = document.getElementById('pix-tt-token').value.trim();
+  const test_event_code = (document.getElementById('pix-tt-test-code')?.value || '').trim();
 
   try {
     const res = await fetch('/api/tiktok/pixels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, pixel_code, access_token })
+      body: JSON.stringify({ name, pixel_code, access_token, test_event_code })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);

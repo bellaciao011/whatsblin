@@ -390,7 +390,10 @@
     // Se já estiver logado, redireciona direto para o painel
     (async function checkExistingSession() {
       try {
-        const res = await fetch('/api/auth/check');
+        const token = localStorage.getItem('hub_token');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const checkUrl = token ? '/api/auth/check?token=' + encodeURIComponent(token) : '/api/auth/check';
+        const res = await fetch(checkUrl, { headers });
         const data = await res.json();
         if (data.authenticated) {
           window.location.href = '/';

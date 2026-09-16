@@ -125,7 +125,7 @@ app.use((req, res, next) => {
 
   // Extrai token do cookie auth_token ou do header Authorization Bearer
   const cookies = authService.parseCookies(req);
-  const token = cookies.auth_token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
+  const token = cookies.auth_token || req.query?.token || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
   const session = authService.verifyToken(token);
 
   if (session) {

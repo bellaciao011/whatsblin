@@ -1,17 +1,54 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '../../data');
+const DEFAULT_DATA_DIR = path.join(__dirname, '../../data');
+
+// Suporte automático a volumes persistentes no Railway (/app/data, /data ou variável de ambiente)
+function resolveDataDir() {
+  if (process.env.DATA_DIR && fs.existsSync(process.env.DATA_DIR)) return process.env.DATA_DIR;
+  if (process.env.RAILWAY_VOLUME_MOUNT_PATH && fs.existsSync(process.env.RAILWAY_VOLUME_MOUNT_PATH)) return process.env.RAILWAY_VOLUME_MOUNT_PATH;
+  if (fs.existsSync('/app/data')) return '/app/data';
+  if (fs.existsSync('/data') && fs.statSync('/data').isDirectory()) return '/data';
+  return DEFAULT_DATA_DIR;
+}
+
+const DATA_DIR = resolveDataDir();
+try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+console.log('[Storage DB] Diretório de dados ativo:', DATA_DIR);
 
 function readJson(filename, defaultValue) {
   try {
     const fullPath = path.join(DATA_DIR, filename);
+    const fallbackPath = path.join(DEFAULT_DATA_DIR, filename);
+
+    // Se o arquivo não existir no DATA_DIR persistente, tenta copiar do DEFAULT_DATA_DIR ou criar
     if (!fs.existsSync(fullPath)) {
+      if (DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(fallbackPath)) {
+        try {
+          fs.copyFileSync(fallbackPath, fullPath);
+          const copied = fs.readFileSync(fullPath, 'utf8');
+          return JSON.parse(copied);
+        } catch (copyErr) {}
+      }
       fs.writeFileSync(fullPath, JSON.stringify(defaultValue, null, 2), 'utf8');
       return defaultValue;
     }
+
     const data = fs.readFileSync(fullPath, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+
+    // Se for array vazio e tivermos dados semeados no DEFAULT_DATA_DIR (ex: dominios_customizados), mescla os dados
+    if (Array.isArray(parsed) && parsed.length === 0 && DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(fallbackPath)) {
+      try {
+        const seeded = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+        if (Array.isArray(seeded) && seeded.length > 0) {
+          fs.writeFileSync(fullPath, JSON.stringify(seeded, null, 2), 'utf8');
+          return seeded;
+        }
+      } catch (e) {}
+    }
+
+    return parsed;
   } catch (err) {
     console.error(`Erro lendo ${filename}:`, err.message);
     return defaultValue;
