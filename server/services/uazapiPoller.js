@@ -111,6 +111,13 @@ async function syncUazapiInstancesNow() {
               console.warn(`[uazapi Poller] ⚠️ Instância ${inst.name || inst.id} desconectada no celular/uazapi! Atualizando para 'disconnected'...`);
               inst.status = 'disconnected';
               db.saveInstance(inst);
+              eventBus.emit('chip_disconnected', {
+                instanceId: inst.id,
+                name: inst.name,
+                phone: inst.numero_conectado || inst.phoneNumber,
+                timestamp: new Date().toISOString()
+              });
+              eventBus.emit('connection_status', { instanceId: inst.id, status: 'disconnected' });
               eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
             }
           }
@@ -119,6 +126,13 @@ async function syncUazapiInstancesNow() {
             console.log(`[uazapi Poller] Instância ${inst.name || inst.id} não autorizada ou expirada (401). Marcando como desconectada.`);
             inst.status = 'disconnected';
             db.saveInstance(inst);
+            eventBus.emit('chip_disconnected', {
+              instanceId: inst.id,
+              name: inst.name,
+              phone: inst.numero_conectado || inst.phoneNumber,
+              timestamp: new Date().toISOString()
+            });
+            eventBus.emit('connection_status', { instanceId: inst.id, status: 'disconnected' });
             eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
           }
         }
@@ -154,6 +168,13 @@ async function syncUazapiInstancesNow() {
           console.warn(`[uazapi Poller] ⚠️ Instância ${inst.name || inst.id} token 401 ao buscar chats. Marcando como desconectada.`);
           inst.status = 'disconnected';
           db.saveInstance(inst);
+          eventBus.emit('chip_disconnected', {
+            instanceId: inst.id,
+            name: inst.name,
+            phone: inst.numero_conectado || inst.phoneNumber,
+            timestamp: new Date().toISOString()
+          });
+          eventBus.emit('connection_status', { instanceId: inst.id, status: 'disconnected' });
           eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
           try {
             const apiRoutes = require('../routes/api');

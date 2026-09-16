@@ -87,6 +87,12 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
           instance.status = 'disconnected';
           db.saveInstance(instance);
           console.warn(`[uazapi Webhook] ⚠️ Instância ${instance.name} marcada como DESCONECTADA`);
+          eventBus.emit('chip_disconnected', {
+            instanceId: instance.id,
+            name: instance.name,
+            phone: instance.numero_conectado || instance.phoneNumber,
+            timestamp: new Date().toISOString()
+          });
         }
         eventBus.emit('connection_status', { instanceId: instance.id, status: instance.status });
         eventBus.emit('instances_updated', { instanceId: instance.id, status: instance.status });

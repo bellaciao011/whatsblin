@@ -209,6 +209,41 @@ function showPushNotification(title, body) {
   }
 }
 window.requestNotificationPermission = requestNotificationPermission;
+
+// Som de Alerta de Desconexão: Beep grave e urgente (Web Audio API)
+function playWarningSound() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(340, now);
+    gain1.gain.setValueAtTime(0.4, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.22);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(260, now + 0.25);
+    gain2.gain.setValueAtTime(0.45, now + 0.25);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.25);
+    osc2.stop(now + 0.55);
+  } catch (e) {
+    console.warn('[Audio Warning]', e);
+  }
+}
+window.playWarningSound = playWarningSound;
+
 window.playLeadSound = playLeadSound;
 window.playSaleSound = playSaleSound;
 
@@ -499,10 +534,20 @@ function initRealtimeEvents() {
           playWarningSound();
           const chipData = payload.data || {};
           const chipName = chipData.name || 'WhatsApp';
-          const phoneStr = chipData.phone ? ' (+ ' + chipData.phone + ')' : '';
-          showPushNotification('⚠️ Número Desconectado!', 'A conexão "' + chipName + '"' + phoneStr + ' foi desconectada do WhatsApp!');
-          showToast('⚠️ Atenção: A conexão "' + chipName + '" foi desconectada!', 'error');
+          const phoneStr = chipData.phone ? ' (+' + chipData.phone + ')' : '';
+          showPushNotification('⚠️ NÚMERO DESCONECTADO!', `O chip "${chipName}"${phoneStr} foi desconectado do WhatsApp! Toque aqui para abrir e reconectar o QR Code.`);
+          showToast(`⚠️ ATENÇÃO: O chip "${chipName}" foi desconectado!`, 'error');
           updateBadges();
+          
+          // Altera o pill no cabeçalho mobile para vermelho e aviso urgente
+          const pill = document.querySelector('.mobile-chip-pill');
+          const pillText = document.getElementById('mobile-chip-name');
+          if (pill && pillText) {
+            pill.style.background = 'rgba(239, 68, 68, 0.2)';
+            pill.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+            pill.style.color = '#f87171';
+            pillText.textContent = 'DESCONECTADO';
+          }
           if (state.currentView === 'instances') renderInstances();
         }
       } catch (err) {
