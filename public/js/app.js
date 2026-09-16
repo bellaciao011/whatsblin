@@ -5144,7 +5144,7 @@ async function handleCreateDomain(e) {
 /**
  * Consulta status imediato de um domínio
  */
-async async function checkDomainStatusNow(id) {
+async function checkDomainStatusNow(id) {
   try {
     showToast('Verificando conexão HTTPS e DNS do domínio...', 'info');
     const res = await fetch(`/api/dominios/${id}/status`).then(r => r.json());
