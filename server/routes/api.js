@@ -72,6 +72,21 @@ router.post('/auth/change-credentials', (req, res) => {
 /**
  * Estatísticas Gerais (Visão Geral)
  */
+
+router.get('/debug/info', (req, res) => {
+  res.json({
+    pid: process.pid,
+    uptime: process.uptime(),
+    nodeEnv: process.env.NODE_ENV,
+    railwayService: process.env.RAILWAY_SERVICE_NAME,
+    railwayDeployId: process.env.RAILWAY_DEPLOYMENT_ID,
+    railwayGitCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
+    instances: db.getInstances(),
+    flowsCount: db.getFlows().length,
+    activeFlows: db.getFlows().map(f => ({ id: f.id, lang: f.language, status: f.status }))
+  });
+});
+
 router.get('/stats', (req, res) => {
   const instances = db.getInstances();
   const chats = db.getChats();
