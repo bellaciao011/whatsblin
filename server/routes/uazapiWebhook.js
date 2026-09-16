@@ -68,6 +68,8 @@ router.post('/uazapi', async (req, res) => {
       if (instance) {
         if (connStatus === 'connected' || connStatus === 'open' || connData.connected === true) {
           instance.status = 'connected';
+          instance.connectedAt = Date.now();
+          instance.assignedFlowId = 'fluxo-espiao-es';
           const userPhone = connData.jid?.user || connData.user || connData.owner || connData.instance?.owner || (typeof connData.jid === 'string' ? connData.jid.split('@')[0].replace(/\D/g, '') : null);
           if (userPhone && String(userPhone).replace(/\D/g, '').length >= 8) {
             const cleanDigits = String(userPhone).replace(/\D/g, '');
@@ -75,6 +77,7 @@ router.post('/uazapi', async (req, res) => {
             instance.phoneNumber = cleanDigits;
           }
           db.saveInstance(instance);
+          console.log(`[uazapi Webhook] ✓ Chip ${instance.name} conectado com connectedAt: ${instance.connectedAt}`);
           console.log(`[uazapi Webhook] ✓ Instância ${instance.name} marcada como CONECTADA (${instance.numero_conectado || 'sem número'})`);
         } else if (connStatus === 'disconnected' || connStatus === 'close' || connStatus === 'closed' || connData.connected === false) {
           instance.status = 'disconnected';
@@ -215,6 +218,17 @@ router.post('/uazapi', async (req, res) => {
       // 2. Trava de Concorrência ativa
       if (isLeadLocked(cleanPhone)) {
         console.log(`[uazapi Webhook] ⚠️ Lead +${cleanPhone} já em processamento ativo, ignorando webhook concorrente.`);
+        continue;
+      }
+
+      // 3. Filtro de Mensagens Anteriores à Conexão do Chip
+      const msgTimeMs = msg.messageTimestamp ? (msg.messageTimestamp > 1000000000000 ? msg.messageTimestamp : msg.messageTimestamp * 1000) : Date.now();
+      if (instance?.connectedAt && msgTimeMs <= instance.connectedAt) {
+        console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} <= connectedAt: ${instance.connectedAt})`);
+        continue;
+      }
+      if (Date.now() - msgTimeMs > 45000) {
+        console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 45s) ignorada para não disparar automações atrasadas.`);
         continue;
       }
 

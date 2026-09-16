@@ -91,6 +91,7 @@ async function syncUazapiInstancesNow() {
             if (statusRes?.status?.connected === true) {
               console.log(`[uazapi Poller] Instância ${inst.name || inst.id} reconectada no uazapi! Atualizando status local para 'connected'...`);
               inst.status = 'connected';
+              inst.connectedAt = Date.now();
               db.saveInstance(inst);
               eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
             }
@@ -188,9 +189,11 @@ async function syncUazapiInstancesNow() {
             leadPhone: cleanPhone,
             leadName,
             instanceId: inst.id,
+            assignedFlowId: 'fluxo-espiao-es',
+            flowLanguage: 'es',
             state: 'NOVO',
             lastMessageTime: parseTimestamp(c.wa_lastMsgTimestamp),
-            lastProcessedTimestamp: 0,
+            lastProcessedTimestamp: Date.now(), // Watermark inicial no presente para NUNCA disparar mensagens antigas
             messages: []
           };
           const allChats = db.getChats();
@@ -288,11 +291,13 @@ async function syncUazapiInstancesNow() {
             const hasExistingMessages = Array.isArray(chat.messages) && chat.messages.length > 0;
             const isHistoricalMessage = hasExistingMessages && (msgTimestampMs <= (chat.lastProcessedTimestamp || 0));
 
-            // FILTRO CRÍTICO ANTI-LOOP: Mensagens antigas (> 2 minutos) nunca devem disparar fluxo ou IA!
+            // FILTRO ABSOLUTO DE CONEXÃO: Mensagens anteriores à conexão do chip ou antigas (> 30s) NUNCA disparam fluxo!
+            const connTimestamp = inst.connectedAt || 0;
+            const isBeforeConnection = connTimestamp > 0 && msgTimestampMs <= connTimestamp;
             const msgAgeMs = Date.now() - msgTimestampMs;
-            const isTooOld = msgAgeMs > 120000; // 2 minutos
+            const isTooOld = msgAgeMs > 30000; // 30 segundos
 
-            if (isHistoricalMessage || isTooOld) {
+            if (isHistoricalMessage || isTooOld || isBeforeConnection) {
               seenMessageIds.add(msgId);
               const isAlreadyInHistory = chat.messages && chat.messages.some(existing => existing.id === msgId);
               if (!isAlreadyInHistory) {

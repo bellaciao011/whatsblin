@@ -444,7 +444,8 @@ async function autoRestoreUazapiInstances(req = null) {
           phoneNumber: cleanOwner,
           numero_conectado: cleanOwner,
           status: rem.status || 'connected',
-          assignedFlowId: (rem.name && /roxo|espanhol|es/i.test(rem.name)) ? 'fluxo-espiao-es' : 'fluxo-espiao-es',
+          connectedAt: Date.now(),
+          assignedFlowId: 'fluxo-espiao-es',
           totalSent: 0,
           totalReceived: 0,
           criado_em: rem.created || new Date().toISOString(),
@@ -469,8 +470,13 @@ async function autoRestoreUazapiInstances(req = null) {
         const remStatus = rem.status || 'disconnected';
         if (existing.status !== remStatus) {
           existing.status = remStatus;
+          if (remStatus === 'connected') {
+            existing.connectedAt = Date.now();
+            console.log(`[Auto-Restore] ✓ Chip ${existing.name} conectou! connectedAt definido para ${existing.connectedAt}`);
+          }
           changed = true;
         }
+        existing.assignedFlowId = 'fluxo-espiao-es';
         if (cleanOwner && existing.numero_conectado !== cleanOwner) {
           existing.phoneNumber = cleanOwner;
           existing.numero_conectado = cleanOwner;
