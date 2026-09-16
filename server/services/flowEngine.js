@@ -583,6 +583,27 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   chatData.variables.valor_pago = stageInfo.paidValue;
   chatData.variables.proximo_valor = stageInfo.nextValue;
 
+  // 0.2 RECONHECIMENTO DE NOVO FUNIL / ENTRADA DE ANÚNCIO (CAMPANHA):
+  // Se o lead enviar mensagem inicial da pressel/anúncio (ex: "Hola, quiero espiar un número. (CÓDIGO...)"),
+  // reinicia imediatamente o ciclo do funil para NOVO, independente do histórico anterior.
+  const isCampaignStart = Boolean(
+    (messageText && /(?:quieros*espiar|queros*espiar|iniciars*investigaci[oó]n|iniciars*rastreo|come[çc]ars*investiga)/i.test(messageText)) ||
+    (messageText && messageText.match(/\(([A-Z0-9]{6})\)/i))
+  );
+
+  if (isCampaignStart) {
+    console.log(`[FlowEngine] 🚀 Lead +${cleanPhone} iniciou/reiniciou funil via anúncio/código! Resetando estado para NOVO.`);
+    chatData.state = 'NOVO';
+    chatData.upsellStage = 'stage_49';
+    chatData.currentNodeId = null;
+    chatData.orderStatus = null;
+    chatData.variables = { phone: cleanPhone };
+    // Limpa histórico antigo de mensagens para não contaminar o contexto da IA
+    if (Array.isArray(chatData.messages) && chatData.messages.length > 5) {
+      chatData.messages = chatData.messages.slice(-2);
+    }
+  }
+
   // Helper para obter o texto configurado no nó visual do fluxo ativo
   const getNodeText = (nodeId, fallback) => {
     const node = activeFlow?.nodes?.find(n => n.id === nodeId);
@@ -944,7 +965,25 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     }
 
     // 1.2 Lead enviou mensagem de texto: aciona o classificador inteligente no idioma do fluxo
+    if (hasRecentBotReply(cleanPhone, 12000)) {
+      console.log(`[FlowEngine] ⏳ Resposta recente já enviada para +${cleanPhone} há menos de 12s. Suprimindo disparo duplicado de IA.`);
+      return;
+    }
+
+    const cleanMsg = (messageText || '').trim();
+    if (!cleanMsg || cleanMsg === '[Mídia]' || cleanMsg === '[Imagem enviada]') {
+      console.log(`[FlowEngine] ℹ️ Lead enviou mídia sem texto. Resposta padrão cordial (Lang: ${flowLanguage})`);
+      const defaultMediaReply = flowLanguage === 'es'
+        ? "¡Recibí tu imagen! 📸 Si es tu comprobante de activación de $ 39, lo revisamos para validar tu acceso completo. Si tienes alguna duda, dime y te ayudo con gusto."
+        : "Recebi sua imagem! 📸 Se for o comprovante de pagamento, já estamos verificando para liberar seu acesso completo. Se tiver dúvidas, é só falar!";
+      db.addChatMessage(cleanPhone, { from: 'bot', text: defaultMediaReply, instanceId: inst.id });
+      await sendOutgoingTextMessage(inst, cleanPhone, defaultMediaReply);
+      eventBus.emit('chat_updated', { phone: cleanPhone });
+      return;
+    }
+
     console.log(`[FlowEngine] Analisando objeção do lead com IA (Lang: ${flowLanguage})...`);
+    recordBotReply(cleanPhone);
     const aiReply = await aiService.classifyAndReply(messageText, chatData.messages, stageInfo, flowLanguage);
 
     db.addChatMessage(cleanPhone, { from: 'bot', text: aiReply, instanceId: inst.id });

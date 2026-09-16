@@ -1079,18 +1079,34 @@ router.post('/chats/:phone/trigger-flow', async (req, res) => {
 /**
  * Reseta o estado de um lead para NOVO
  */
-router.post('/chats/:phone/reset-state', async (req, res) => {
+router.post(['/chats/:phone/reset-state', '/chats/:phone/clear-history'], async (req, res) => {
   try {
-    const phone = req.params.phone;
+    const phone = String(req.params.phone).replace(/\D/g, '');
     const chats = db.getChats();
-    if (chats[phone]) {
-      chats[phone].state = 'NOVO';
-      chats[phone].upsellStage = 'stage_49';
-      chats[phone].currentNodeId = null;
-      db.saveChats(chats);
-      eventBus.emit('chat_updated', { phone });
-    }
-    res.json({ success: true });
+    const inst = db.getInstances().find(i => i.status === 'connected') || db.getInstances()[0];
+    const flowId = inst?.assignedFlowId || 'fluxo-espiao-es';
+    const lang = flowId.includes('-es') ? 'es' : (flowId.includes('-en') ? 'en' : 'pt');
+
+    // Reseta completamente o estado, variáveis e LIMPA toda a memória de mensagens antigas
+    chats[phone] = {
+      leadPhone: phone,
+      leadName: `Lead +${phone}`,
+      instanceId: inst?.id || 'inst_1',
+      assignedFlowId: flowId,
+      flowLanguage: lang,
+      state: 'NOVO',
+      currentNodeId: null,
+      upsellStage: 'stage_49',
+      orderStatus: null,
+      variables: { phone },
+      lastMessageTime: new Date().toISOString(),
+      lastProcessedTimestamp: Date.now(),
+      messages: [] // MEMÓRIA 100% LIMPA
+    };
+    db.saveChats(chats);
+    eventBus.emit('chat_updated', { phone });
+    console.log(`[API] 🧹 Memória e histórico do lead +${phone} apagados com sucesso! Estado resetado para NOVO (${lang})`);
+    res.json({ success: true, message: `Histórico e memória de +${phone} limpos com sucesso!` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

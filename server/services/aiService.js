@@ -208,10 +208,15 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
   // 1. Se houver API key da OpenAI configurada, gera resposta humana, conversacional e persuasiva
   if (apiKey) {
     try {
-      const recentHistory = (conversationHistory || []).slice(-6).map(m => ({
+      let recentHistory = (conversationHistory || []).slice(-6).map(m => ({
         role: (m.from === 'agent' || m.from === 'bot') ? 'assistant' : 'user',
         content: m.text || (m.mediaUrl ? '[Imagem enviada]' : '')
       })).filter(m => m.content && m.content !== '[Imagem enviada]');
+
+      // Se o funil atual for em espanhol, expurga mensagens antigas em português do contexto da IA
+      if (lang === 'es') {
+        recentHistory = recentHistory.filter(m => !/(?:voc[eê]|n[aã]o|ol[aá]|obrigad|ajudar|rastrear|libera[cç]|relat[oó]rio)/i.test(m.content));
+      }
 
       let systemPrompt = '';
       if (lang === 'es') {
@@ -235,7 +240,8 @@ Reglas:
 5. Si pide el enlace o datos: Reenvía el enlace oficial ${checkoutUrl}.
 6. Si dice que ya pagó: Pídele que envíe el comprobante por aquí para verificar y desbloquear el acceso.
 7. Si pregunta si puede probar otro número ("¿puedo probar con otro?", "¿puedo ver a otra persona?"): Dile con entusiasmo que sí, ¡por supuesto! Solo debe enviar el nuevo número con código de país aquí y el sistema iniciará la búsqueda enviando la vista previa de inmediato.
-8. Mantén respuestas cortas y fluidas (1 a 3 párrafos cortos), tal como en WhatsApp real.`;
+8. Mantén respuestas cortas y fluidas (1 a 3 párrafos cortos), tal como en WhatsApp real.
+9. REGLA SUPREMA DE IDIOMA: Responde SIEMPRE 100% en español. NUNCA respondas en portugués bajo ninguna circunstancia, y mantén la oferta siempre en $ 39 (dólares).`;
       } else if (lang === 'en') {
         systemPrompt = settings.openaiSystemPromptEn || `You are the official support consultant for the confidential conversation verification system.
 Your goal is to be helpful, professional, answering the customer's questions and safely guiding them to complete the payment of $ ${currentValue} via the official link to unlock the full report.
