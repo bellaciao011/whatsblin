@@ -1630,10 +1630,90 @@ async function deleteTikTokPixelConfig(id) {
 }
 
 async function testTikTokPixelManual(code, token) {
-  const phone = prompt('Digite um telefone para teste no TikTok:', '11999998888');
-  if (!phone) return;
+  document.getElementById('tiktok-test-modal')?.remove();
 
-  showToast('Enviando evento para a TikTok Events API v1.3...', 'info');
+  const modalHtml = `
+    <div class="node-modal-backdrop" id="tiktok-test-modal">
+      <div class="card" style="width: 500px; max-width: 95%; background: #111827; border: 1px solid rgba(254, 44, 85, 0.5); border-radius: 16px; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.85);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #fe2c55, #25f4ee); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+              🎵
+            </div>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: #fff;">Testar TikTok Events API v1.3</h3>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Validação em tempo real com suporte a Test Event Code</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="document.getElementById('tiktok-test-modal').remove()" style="border: none; background: transparent; font-size: 18px;">✕</button>
+        </div>
+
+        <form onsubmit="handleExecuteTikTokTest(event, '${code}', '${token}')">
+          <div class="form-group">
+            <label class="form-label">Pixel ID (event_source_id)</label>
+            <input type="text" class="form-input" value="${code}" disabled style="background: rgba(0,0,0,0.3); font-family: monospace; color: #fe2c55;">
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="form-label" style="margin: 0;">Código de Evento de Teste (Test Event Code / Test ID)</label>
+              <span style="font-size: 11px; color: #25f4ee; font-weight: 600;">Recomendado</span>
+            </div>
+            <input type="text" class="form-input" id="tt-modal-test-code" placeholder="Ex: TEST12345 (da aba Test Events do TikTok)" style="border-color: rgba(37, 244, 238, 0.4); font-family: monospace;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Copie o código que aparece na aba <b>"Test Events"</b> do seu Pixel no Gerenciador de Eventos da TikTok para ver o evento bater em tempo real lá!
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Evento</label>
+              <select class="form-select" id="tt-modal-event">
+                <option value="CompletePayment" selected>CompletePayment</option>
+                <option value="InitiateCheckout">InitiateCheckout</option>
+                <option value="Contact">Contact</option>
+                <option value="SubmitForm">SubmitForm</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor (R$)</label>
+              <input type="number" step="0.01" class="form-input" id="tt-modal-val" value="49.90">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Telefone de Teste (DDI + DDD + Número)</label>
+            <input type="text" class="form-input" id="tt-modal-phone" value="5521983948347" placeholder="Ex: 5521983948347" required>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('tiktok-test-modal').remove()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="tt-btn-exec-test" style="background: linear-gradient(135deg, #fe2c55, #e11d48); border: none; font-weight: 700; padding: 8px 20px;">
+              🚀 Disparar Teste
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleExecuteTikTokTest(e, code, token) {
+  e.preventDefault();
+  const test_event_code = (document.getElementById('tt-modal-test-code')?.value || '').trim();
+  const event_name = document.getElementById('tt-modal-event')?.value || 'CompletePayment';
+  const value = document.getElementById('tt-modal-val')?.value || 49.90;
+  const phone = (document.getElementById('tt-modal-phone')?.value || '5521983948347').trim();
+  const btn = document.getElementById('tt-btn-exec-test');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+  }
+
+  showToast('Disparando para a TikTok Events API v1.3...', 'info');
 
   try {
     const res = await fetch('/api/tiktok/test', {
@@ -1642,21 +1722,23 @@ async function testTikTokPixelManual(code, token) {
       body: JSON.stringify({
         pixel_code: code,
         access_token: token,
-        event_name: 'CompletePayment',
+        event_name,
         phone,
-        value: 49.90
+        value,
+        test_event_code
       })
     }).then(r => r.json());
 
+    document.getElementById('tiktok-test-modal')?.remove();
+
     if (res.success) {
-      showToast('✓ Evento CompletePayment aceito pela TikTok Events API!', 'success');
-      renderPixels();
+      showToast('✓ Evento ' + event_name + ' aceito com SUCESSO pela TikTok!', 'success');
     } else {
-      showToast('Erro do TikTok: ' + (res.error || 'Falha no disparo'), 'danger');
-      renderPixels();
+      showToast('Retorno TikTok: ' + (res.error || 'Falha no disparo'), 'danger');
     }
+    if (typeof renderPixels === 'function') renderPixels();
   } catch (err) {
-    showToast('Erro ao testar TikTok: ' + err.message, 'danger');
+    showToast('Erro de comunicação: ' + err.message, 'danger');
   }
 }
 

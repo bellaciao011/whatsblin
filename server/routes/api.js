@@ -2248,15 +2248,17 @@ router.get('/tiktok/logs', (req, res) => {
 // Disparo de teste para o TikTok Pixel
 router.post('/tiktok/test', async (req, res) => {
   try {
-    const { pixel_code, access_token, event_name, phone, value } = req.body;
+    const { pixel_code, access_token, event_name, phone, value, test_event_code } = req.body;
     let code = pixel_code;
     let token = access_token;
+    let testCode = test_event_code;
 
     if (!code || !token) {
       const pixels = db.getTikTokPixels();
       if (pixels.length > 0) {
         code = code || pixels[0].pixel_code;
         token = token || pixels[0].access_token;
+        testCode = testCode || pixels[0].test_event_code;
       }
     }
 
@@ -2280,7 +2282,8 @@ router.post('/tiktok/test', async (req, res) => {
       },
       value: testValue,
       currency: 'BRL',
-      eventId: `tt_test_manual_${Date.now()}`
+      eventId: `tt_test_manual_${Date.now()}`,
+      testEventCode: testCode
     });
 
     res.json(result);

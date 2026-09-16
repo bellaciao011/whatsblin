@@ -32,6 +32,7 @@ function sha256(val) {
  * Body: {
  *   event_source: 'web',
  *   event_source_id: '<PIXEL_ID>',
+ *   test_event_code: '<TEST_CODE_OPCIONAL>',
  *   data: [ { event, event_time, event_id, user: { phone, external_id, ttclid, ttp }, properties: { ... } } ]
  * }
  */
@@ -44,7 +45,8 @@ async function sendTikTokEvent(options = {}) {
     attribution = null,
     value = 49.90,
     currency = 'BRL',
-    eventId = null
+    eventId = null,
+    testEventCode = null
   } = options;
 
   const cleanPixelId = String(pixelCode || '').trim();
@@ -94,10 +96,11 @@ async function sendTikTokEvent(options = {}) {
     pageData.url = `https://${attribution.host}/c/${attribution.campanha_id || 'camp'}`;
   }
 
-  // Payload oficial TikTok Events API v1.3
+  // Payload oficial TikTok Events API v1.3 com suporte a test_event_code
   const payload = {
     event_source: 'web',
     event_source_id: cleanPixelId,
+    test_event_code: testEventCode ? String(testEventCode).trim() : undefined,
     data: [
       {
         event: eventName,
@@ -135,7 +138,7 @@ async function sendTikTokEvent(options = {}) {
     return { success: true, isDemo: true, logId: log.id, eventId: finalEventId };
   }
 
-  console.log(`[TikTok Events API v1.3] 🎯 Disparando "${eventName}" para pixel ${cleanPixelId} | Valor: ${numValue} ${currency} | ttclid: ${attribution?.ttclid || 'nenhum'}`);
+  console.log(`[TikTok Events API v1.3] 🎯 Disparando "${eventName}" para pixel ${cleanPixelId} | Test Code: ${testEventCode || 'nenhum'} | Valor: ${numValue} ${currency}`);
 
   try {
     const res = await axios.post(TIKTOK_TRACK_URL, payload, {
