@@ -583,12 +583,13 @@ router.post('/instances', (req, res) => {
 router.patch('/instances/:id/flow', (req, res) => {
   const { flowId } = req.body;
   const instances = db.getInstances();
-  const inst = instances.find(i => i.id === req.params.id);
+  const inst = instances.find(i => i.id === req.params.id || i.instance_id === req.params.id || i.name === req.params.id);
   if (!inst) return res.status(404).json({ error: 'Instância / Chip não encontrado' });
   
   inst.assignedFlowId = flowId || 'fluxo-espiao-foto';
   db.saveInstances(instances);
-  console.log(`[Instances] Chip ${inst.name} (${inst.id}) vinculado com sucesso ao fluxo: ${inst.assignedFlowId}`);
+  console.log(`[Instances] Chip "${inst.name}" (${inst.id}) vinculado com sucesso ao fluxo: ${inst.assignedFlowId}`);
+  eventBus.emit('instances_updated', { instanceId: inst.id, assignedFlowId: inst.assignedFlowId });
   res.json({ success: true, instance: inst });
 });
 
@@ -1311,6 +1312,25 @@ router.post('/simulator/send', async (req, res) => {
 /**
  * Server-Sent Events (SSE) para atualização em tempo real do Live Chat
  */
+
+// Rota para testar a notificação de desconexão de chip no celular
+router.post('/instances/test-disconnect', (req, res) => {
+  const { name } = req.body || {};
+  const instances = db.getInstances();
+  const chip = instances[0] || { name: name || 'Celular Roxo', phoneNumber: '557193768941' };
+  const chipName = name || chip.name || 'Celular Roxo';
+
+  eventBus.emit('chip_disconnected', {
+    id: chip.id || 'test_inst',
+    name: chipName,
+    phone: chip.phoneNumber || chip.numero_conectado || '557193768941',
+    timestamp: new Date().toISOString()
+  });
+
+  console.log(`[Alert Test] ⚠️ Simulação de desconexão disparada para "${chipName}"`);
+  res.json({ success: true, message: `Alerta de desconexão enviado para "${chipName}"` });
+});
+
 router.get('/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1349,8 +1369,13 @@ router.get('/events', (req, res) => {
   eventBus.on('instances_updated', onInstancesUpdated);
   eventBus.on('connection_status', onConnectionStatus);
   eventBus.on('chat_typing', onChatTyping);
+  const onChipDisconnected = (data) => {
+    res.write(`data: ${JSON.stringify({ type: 'chip_disconnected', data })}\n\n`);
+  };
+
   eventBus.on('new_lead', onNewLead);
   eventBus.on('new_sale', onNewSale);
+  eventBus.on('chip_disconnected', onChipDisconnected);
 
   // Keep-alive a cada 25 segundos para evitar timeout de proxies (Railway)
   const pingInterval = setInterval(() => {
@@ -1366,6 +1391,7 @@ router.get('/events', (req, res) => {
     eventBus.removeListener('chat_typing', onChatTyping);
     eventBus.removeListener('new_lead', onNewLead);
     eventBus.removeListener('new_sale', onNewSale);
+    eventBus.removeListener('chip_disconnected', onChipDisconnected);
   });
 });
 

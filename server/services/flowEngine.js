@@ -463,7 +463,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   let chatData = chats[cleanPhone];
 
   // 1. Vinculação Estrita: localiza o fluxo configurado para o chat ativo ou para ESTE chip específico
-  const targetFlowId = chatData?.assignedFlowId || inst.assignedFlowId || 'fluxo-espiao-foto';
+  const targetFlowId = inst.assignedFlowId || chatData?.assignedFlowId || 'fluxo-espiao-foto';
   const flows = db.getFlows();
   const activeFlow = flows.find(f => f.id === targetFlowId) || flows.find(f => f.status === 'ativo') || flows[0];
   const flowLanguage = activeFlow?.language || (activeFlow?.id?.includes('-es') ? 'es' : (activeFlow?.id?.includes('-en') ? 'en' : 'pt'));

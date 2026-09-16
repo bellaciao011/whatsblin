@@ -482,6 +482,15 @@ function initRealtimeEvents() {
           updateBadges();
           if (state.currentView === 'inbox') renderInbox(false);
           if (state.currentView === 'tiktok') renderTikTokAttribution();
+        } else if (payload.type === 'chip_disconnected') {
+          playWarningSound();
+          const chipData = payload.data || {};
+          const chipName = chipData.name || 'WhatsApp';
+          const phoneStr = chipData.phone ? ' (+ ' + chipData.phone + ')' : '';
+          showPushNotification('⚠️ Número Desconectado!', 'A conexão "' + chipName + '"' + phoneStr + ' foi desconectada do WhatsApp!');
+          showToast('⚠️ Atenção: A conexão "' + chipName + '" foi desconectada!', 'error');
+          updateBadges();
+          if (state.currentView === 'instances') renderInstances();
         }
       } catch (err) {
         console.error(err);
