@@ -298,20 +298,32 @@ async function executeTikTokPixelNode(tiktokNode, chatData) {
  */
 function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
   let url = (baseUrl || 'https://go.centerpag.com/PPU38CQG5EL').trim();
-  const cleanCode = (leadCode || 'lead').toLowerCase().replace(/[^a-z0-9]/g, '') || 'lead';
-  const leadToken = `cw_sec_${cleanCode}_2026`;
+  const cleanCode = (leadCode || 'lead').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LEAD';
+  const leadToken = `cw_sec_${cleanCode.toLowerCase()}_2026`;
 
   try {
     const u = new URL(url);
-    if (!u.searchParams.has('src')) u.searchParams.set('src', leadToken);
-    if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', leadToken);
-    if (!u.searchParams.has('utm_campaign')) u.searchParams.set('utm_campaign', leadToken);
-    if (!u.searchParams.has('cw_token')) u.searchParams.set('cw_token', leadToken);
-    if (!u.searchParams.has('view')) u.searchParams.set('view', 'lead');
+    // 1. Código direto para a página de Upsell 1 (spysfunills.vercel.app/upsell1/?code=...)
+    u.searchParams.set('code', cleanCode);
+    u.searchParams.set('codigo', cleanCode);
+
+    // 2. UTMs completas repassadas nos Webhooks da PerfectPay / CenterPag
+    u.searchParams.set('utm_source', cleanCode);
+    u.searchParams.set('utm_campaign', cleanCode);
+    u.searchParams.set('utm_content', cleanCode);
+    u.searchParams.set('utm_medium', 'cpc');
+
+    // 3. SRC e SCK (parâmetro nativo de rastreio da PerfectPay, Hotmart e CenterPag)
+    u.searchParams.set('src', cleanCode);
+    u.searchParams.set('sck', cleanCode);
+
+    // 4. Token de camuflagem e visualização da oferta
+    u.searchParams.set('cw_token', leadToken);
+    u.searchParams.set('view', 'lead');
     return u.toString();
   } catch (e) {
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}src=${leadToken}&utm_source=${leadToken}&utm_campaign=${leadToken}&cw_token=${leadToken}&view=lead`;
+    return `${url}${sep}code=${cleanCode}&codigo=${cleanCode}&utm_source=${cleanCode}&utm_campaign=${cleanCode}&utm_content=${cleanCode}&utm_medium=cpc&src=${cleanCode}&sck=${cleanCode}&cw_token=${leadToken}&view=lead`;
   }
 }
 
@@ -340,6 +352,22 @@ function getCurrentStageInfo(stageKey, funnel, language = 'pt', leadCode = 'lead
     checkoutUrl: 'https://pay.kirvano.com/checkout-49',
     nextStage: 'stage_100'
   };
+
+  // Se houver código de lead, anexa UTMs e code no checkout brasileiro também
+  if (leadCode && leadCode !== 'lead' && leadCode !== 'LEAD' && current.checkoutUrl) {
+    try {
+      const u = new URL(current.checkoutUrl);
+      const codeUpper = String(leadCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (codeUpper) {
+        u.searchParams.set('code', codeUpper);
+        u.searchParams.set('codigo', codeUpper);
+        u.searchParams.set('utm_source', codeUpper);
+        u.searchParams.set('src', codeUpper);
+        u.searchParams.set('sck', codeUpper);
+        current.checkoutUrl = u.toString();
+      }
+    } catch(e) {}
+  }
 
   const next = stages[current.nextStage] || { value: '100' };
 

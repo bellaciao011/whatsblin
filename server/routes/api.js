@@ -1678,13 +1678,20 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
     const body = req.body || {};
     console.log(`[Webhook ${gatewayName}] Notificação recebida:`, JSON.stringify(body));
 
-    // 1. Extrai telefone do cliente em diferentes formatos
+    // 1. Extrai telefone do cliente em diferentes formatos (PerfectPay, CenterPag, Kirvano, Kiwify)
     const rawPhone = 
-      body.phone ||
+      body.customer?.phone_number ||
+      body.customer?.phone_formated ||
       body.customer?.phone ||
       body.customer?.mobile ||
+      body.customer?.cellphone ||
+      body.customer?.telephone ||
+      body.phone ||
+      body.phone_number ||
       body.buyer?.phone ||
       body.client?.phone ||
+      body.data?.customer?.phone_number ||
+      body.data?.customer?.phone_formated ||
       body.data?.customer?.phone ||
       body.data?.phone ||
       body.transaction?.customer?.phone ||
@@ -1703,24 +1710,50 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       body.transaction?.customer?.email ||
       null;
 
-    // 3. Extrai rastreamento e código único de atribuição da URL / SRC
-    const rawSrc = 
-      body.src ||
-      body.utm_source ||
-      body.tracking_code ||
-      body.custom_id ||
-      body.metadata?.src ||
-      body.metadata?.utm_source ||
-      body.data?.src ||
-      body.data?.utm_source ||
-      body.data?.tracking_code ||
-      body.transaction?.src ||
-      body.transaction?.tracking_code ||
-      req.query?.src ||
-      '';
+    // 3. Extrai rastreamento e código único de atribuição da URL / UTM / SRC / SCK / CODE
+    // PerfectPay envia: sck, src, utm_source, utm_campaign, code, codigo, metadata
+    const candidates = [
+      body.code,
+      body.codigo,
+      body.sck,
+      body.src,
+      body.utm_source,
+      body.utm_campaign,
+      body.utm_content,
+      body.custom_id,
+      body.tracking_code,
+      body.metadata,
+      body.metadata?.code,
+      body.metadata?.src,
+      body.metadata?.utm_source,
+      body.data?.code,
+      body.data?.codigo,
+      body.data?.sck,
+      body.data?.src,
+      body.data?.utm_source,
+      body.data?.utm_campaign,
+      body.data?.utm_content,
+      body.data?.custom_id,
+      body.transaction?.code,
+      body.transaction?.codigo,
+      body.transaction?.sck,
+      body.transaction?.src,
+      body.transaction?.utm_source,
+      req.query?.code,
+      req.query?.codigo,
+      req.query?.sck,
+      req.query?.src,
+      req.query?.utm_source
+    ].filter(Boolean).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v));
 
-    const codeMatch = String(rawSrc).match(/cw_sec_([A-Z0-9]{6})_2026/i) || String(rawSrc).match(/([A-Z0-9]{6})/i);
-    const trackingCode = codeMatch ? codeMatch[1].toUpperCase() : null;
+    let trackingCode = null;
+    for (const val of candidates) {
+      const match = val.match(/cw_sec_([A-Z0-9]{6})_2026/i) || val.match(/([A-Z0-9]{6})/i);
+      if (match && match[1]) {
+        trackingCode = match[1].toUpperCase();
+        break;
+      }
+    }
 
     // Se o telefone não veio formatado no checkout mas temos o código de rastreamento:
     let attribution = null;
@@ -1736,8 +1769,10 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       attribution = db.getTrafficAttributionByPhone(cleanPhone);
     }
 
-    // 4. Extrai valor monetário
+    // 4. Extrai valor monetário (suporta PerfectPay sale_amount ou sale_amount_cents)
     const rawAmount = 
+      body.sale_amount ||
+      (body.sale_amount_cents ? body.sale_amount_cents / 100 : null) ||
       body.amount ||
       body.price ||
       body.value ||
@@ -1751,9 +1786,12 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
     const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 39.00;
     const currency = body.currency || body.data?.currency || (amount <= 40 ? 'USD' : 'BRL');
 
-    // 5. Extrai status e evento de aprovação
-    const status = (body.status || body.event || body.order_status || body.data?.status || 'approved').toLowerCase();
-    const isApproved = status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success');
+    // 5. Extrai status e evento de aprovação (suporta PerfectPay sale_status_enum: 2 = Aprovado)
+    const rawStatusEnum = body.sale_status_enum || body.data?.sale_status_enum;
+    const status = (body.status || body.event || body.order_status || body.sale_status || body.status_name || body.data?.status || 'approved').toLowerCase();
+    
+    const isPerfectPayApproved = String(rawStatusEnum) === '2' || String(body.status_name || '').toLowerCase().includes('aprovad');
+    const isApproved = isPerfectPayApproved || status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success') || status.includes('complete');
 
     // Registra a venda no banco
     const sale = db.addSale({
@@ -1762,7 +1800,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       currency: currency,
       status: isApproved ? 'aprovado' : status,
       platform: body.platform || gatewayName,
-      orderId: body.order_id || body.id || body.data?.id || `ord_${Date.now()}`,
+      orderId: body.order_id || body.id || body.code || body.data?.id || `ord_${Date.now()}`,
       productName: body.product_name || body.product?.name || body.data?.product_name || 'Acesso Painel Monitoramento'
     });
 
@@ -1799,10 +1837,10 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
         const instances = db.getInstances();
         const inst = instances.find(i => i.status === 'connected') || instances[0];
         if (inst) {
-          const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || String(rawSrc).includes('es');
+          const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || trackingCode;
           const codeVal = trackingCode || chat?.codigo || attribution?.codigo || 'vip';
           const deliveryMsg = isEs
-            ? `¡Tu pago de $39 USD fue aprobado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
             : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
           try {
@@ -1853,7 +1891,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
     }
 
     eventBus.emit('new_sale', sale);
-    return res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id, matchedPhone: cleanPhone || null });
+    return res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id, matchedPhone: cleanPhone || null, matchedCode: trackingCode || null });
   } catch (err) {
     console.error(`[Webhook ${gatewayName} Error]`, err);
     return res.status(500).json({ success: false, error: err.message });
@@ -1862,12 +1900,17 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
 
 // Endpoint oficial universal de pagamentos (Kirvano, CenterPag, Kiwify, etc.)
 router.post('/webhooks/payment', async (req, res) => {
-  return handlePaymentWebhook(req, res, 'CenterPag / Kirvano');
+  return handlePaymentWebhook(req, res, 'Universal');
 });
 
 // Endpoint dedicado específico para CenterPag
 router.post('/webhooks/centerpag', async (req, res) => {
   return handlePaymentWebhook(req, res, 'CenterPag');
+});
+
+// Endpoint dedicado específico para PerfectPay
+router.post('/webhooks/perfectpay', async (req, res) => {
+  return handlePaymentWebhook(req, res, 'PerfectPay');
 });
 
 // Endpoint para aprovação manual em 1 clique pelo Chat ao Vivo
@@ -1903,7 +1946,7 @@ router.post('/sales/manual-approve', async (req, res) => {
     const inst = instances.find(i => i.status === 'connected') || instances[0];
     if (inst) {
       const deliveryMsg = isEs
-        ? `¡Tu pago de $39 USD fue confirmado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${code}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+        ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${code}\n\nSi tienes cualquier duda, escríbeme por aquí.`
         : `Pagamento de R$ ${finalAmount.toFixed(2)} aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
       db.addChatMessage(cleanPhone, { from: 'bot', text: deliveryMsg, instanceId: inst.id }, 'FINALIZADO');
