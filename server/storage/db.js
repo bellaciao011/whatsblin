@@ -243,19 +243,31 @@ module.exports = {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
+    let customDomain = data.custom_domain ? String(data.custom_domain).trim().toLowerCase() : null;
+    if (!customDomain) {
+      try {
+        const doms = readJson('dominios_customizados.json', []);
+        const activeDom = doms.find(d => d.ativo !== false && d.status === 'ativo');
+        if (activeDom) customDomain = activeDom.dominio;
+      } catch (e) {}
+    }
+
+    const cleanPresell = (data.presell_url && data.presell_url !== 'https://minhapressel.com') ? String(data.presell_url).trim() : '';
+
     const newCamp = {
       id: data.id || 'camp_' + Date.now(),
       nome: data.nome || data.name || 'Nova Campanha TikTok',
       name: data.name || data.nome || 'Nova Campanha TikTok',
       slug: cleanSlug || 'campanha-' + Date.now(),
-      url_destino: data.url_destino || data.presell_url || 'https://minhapressel.com',
-      presell_url: data.presell_url || data.url_destino || 'https://minhapressel.com',
+      custom_domain: customDomain,
+      url_destino: cleanPresell,
+      presell_url: cleanPresell,
       whatsapp_destino: data.whatsapp_destino || data.whatsapp_number || '',
       whatsapp_number: data.whatsapp_number || data.whatsapp_destino || '',
       mensagem_template: data.mensagem_template || data.message_template || 'Oii vim pelo TikTok (código {codigo})',
       message_template: data.message_template || data.mensagem_template || 'Oii vim pelo TikTok (código {codigo})',
       total_cliques: data.total_cliques || 0,
-      criado_em: new Date().toISOString()
+      criado_em: data.criado_em || new Date().toISOString()
     };
 
     const idx = campaigns.findIndex(c => c.id === newCamp.id || c.slug === newCamp.slug);

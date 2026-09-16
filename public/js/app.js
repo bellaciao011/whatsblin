@@ -4299,6 +4299,7 @@ async function renderTikTokAttribution() {
                       <td>
                         <strong style="color: #fff; font-size: 14px;">${c.name}</strong>
                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ID: ${c.id}</div>
+                        ${c.custom_domain ? `<div style="margin-top: 4px;"><span style="font-size: 10.5px; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace;">🌐 ${c.custom_domain}</span></div>` : ''}
                       </td>
                       <td>
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -4307,10 +4308,17 @@ async function renderTikTokAttribution() {
                         </div>
                       </td>
                       <td>
-                        <div style="font-size: 12px; color: #60a5fa; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                          <a href="${c.presell_url}" target="_blank" style="color: #60a5fa; text-decoration: none;">${c.presell_url}</a>
-                        </div>
-                        <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Redireciona com ?codigo=XXXXXX</div>
+                        ${c.presell_url && c.presell_url !== 'https://minhapressel.com' ? `
+                          <div style="font-size: 12px; color: #60a5fa; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <a href="${c.presell_url}" target="_blank" style="color: #60a5fa; text-decoration: none;">${c.presell_url}</a>
+                          </div>
+                          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Pressel Externa (?codigo=)</div>
+                        ` : `
+                          <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #34d399; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 6px; font-weight: 600;">
+                            <span>⚡</span> Pressel Própria Ultra-Rápida
+                          </div>
+                          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Redireciona direto p/ WhatsApp (0.3s)</div>
+                        `}
                       </td>
                       <td>
                         <span style="font-weight: 600; color: #10b981; font-size: 13px;">+${c.whatsapp_number}</span>
@@ -4587,7 +4595,7 @@ async function openCreateCampaignModal() {
           <div class="form-group">
             <label class="form-label">Slug da URL Curta (Opcional)</label>
             <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding-left: 10px;">
-              <span id="camp-slug-prefix" style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${proto}//${defaultHost}/c/</span>
+              <span id="camp-slug-prefix" style="font-size: 12px; color: #a855f7; font-family: monospace; font-weight: 700;">${activeDomains.length > 0 ? 'https://' + activeDomains[0].dominio : proto + '//' + defaultHost}/c/</span>
               <input type="text" class="form-input" id="camp-input-slug" placeholder="espiao-vsl-01" style="border: none; background: transparent; font-family: monospace;">
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Deixe vazio para gerar automaticamente com base no nome.</div>

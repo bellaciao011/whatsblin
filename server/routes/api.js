@@ -1941,16 +1941,23 @@ router.post('/integrations/test', async (req, res) => {
 // Listar campanhas de tráfego
 router.get('/traffic/campaigns', (req, res) => {
   const campaigns = db.getTrafficCampaigns();
+  const domains = db.getCustomDomains().filter(d => d.ativo !== false && d.status === 'ativo');
+  const defaultCustomDomain = domains.length > 0 ? domains[0].dominio : null;
+
   const host = req.get('host') || 'localhost:3000';
   const protocol = req.protocol || 'http';
 
   const mapped = campaigns.map(c => {
-    const domainToUse = c.custom_domain || host;
-    const protoToUse = c.custom_domain ? 'https' : protocol;
+    const domainToUse = c.custom_domain || defaultCustomDomain || host;
+    const protoToUse = (c.custom_domain || defaultCustomDomain) ? 'https' : protocol;
+    const presell = (c.presell_url && c.presell_url !== 'https://minhapressel.com') ? c.presell_url : '';
     return {
       ...c,
+      custom_domain: domainToUse,
+      presell_url: presell,
+      url_destino: presell,
       shortUrl: `${protoToUse}://${domainToUse}/c/${c.slug}`,
-      targetPresellWithCodeSample: `${c.presell_url}${c.presell_url.includes('?') ? '&' : '?'}codigo=AB79KP`,
+      targetPresellWithCodeSample: presell ? `${presell}${presell.includes('?') ? '&' : '?'}codigo=AB79KP` : '',
       whatsappSample: `https://wa.me/${(c.whatsapp_number || '').replace(/\D/g, '')}?text=${encodeURIComponent((c.message_template || '').replace('{codigo}', 'AB79KP'))}`
     };
   });
@@ -1966,30 +1973,53 @@ router.post('/traffic/campaigns', (req, res) => {
     return res.status(400).json({ error: 'Nome da campanha e WhatsApp de destino são obrigatórios' });
   }
 
+  const domains = db.getCustomDomains().filter(d => d.ativo !== false && d.status === 'ativo');
+  const selectedDomain = custom_domain || (domains.length > 0 ? domains[0].dominio : null);
+  const cleanPresell = (presell_url && presell_url !== 'https://minhapressel.com') ? String(presell_url).trim() : '';
+
   const campaign = db.addTrafficCampaign({
     name,
-    presell_url: presell_url ? String(presell_url).trim() : '',
-    url_destino: presell_url ? String(presell_url).trim() : '',
+    presell_url: cleanPresell,
+    url_destino: cleanPresell,
     whatsapp_number,
     whatsapp_destino: whatsapp_number,
     message_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
     mensagem_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
     slug,
-    custom_domain: custom_domain ? String(custom_domain).trim().toLowerCase() : null
+    custom_domain: selectedDomain
   });
 
   const host = req.get('host') || 'localhost:3000';
   const protocol = req.protocol || 'http';
-  const domainToUse = campaign.custom_domain || host;
-  const protoToUse = campaign.custom_domain ? 'https' : protocol;
+  const domainToUse = campaign.custom_domain || selectedDomain || host;
+  const protoToUse = (campaign.custom_domain || selectedDomain) ? 'https' : protocol;
 
   res.json({
     success: true,
     campaign: {
       ...campaign,
+      custom_domain: domainToUse,
       shortUrl: `${protoToUse}://${domainToUse}/c/${campaign.slug}`
     }
   });
+});
+
+// Atualizar campanha existente
+router.patch('/traffic/campaigns/:id', (req, res) => {
+  const campaigns = db.getTrafficCampaigns();
+  const idx = campaigns.findIndex(c => c.id === req.params.id);
+  if (idx < 0) return res.status(404).json({ error: 'Campanha não encontrada' });
+
+  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain } = req.body;
+  if (name) campaigns[idx].name = campaigns[idx].nome = name;
+  if (slug) campaigns[idx].slug = slug;
+  if (custom_domain !== undefined) campaigns[idx].custom_domain = custom_domain;
+  if (presell_url !== undefined) campaigns[idx].presell_url = campaigns[idx].url_destino = presell_url;
+  if (whatsapp_number) campaigns[idx].whatsapp_number = campaigns[idx].whatsapp_destino = whatsapp_number;
+  if (message_template) campaigns[idx].message_template = campaigns[idx].mensagem_template = message_template;
+
+  db.saveTrafficCampaigns(campaigns);
+  res.json({ success: true, campaign: campaigns[idx] });
 });
 
 // Excluir campanha

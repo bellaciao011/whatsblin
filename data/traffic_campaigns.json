@@ -1,17 +1,17 @@
 [
   {
-    "id": "camp_tiktok_principal",
-    "nome": "Campanha TikTok Ads - wtb",
-    "name": "Campanha TikTok Ads - wtb",
-    "slug": "tiktok",
+    "id": "camp_1789532512883",
+    "nome": "CAMPANHA 1",
+    "name": "CAMPANHA 1",
+    "slug": "campanha",
     "custom_domain": "wtb.expresstrackin-g.com",
     "url_destino": "",
     "presell_url": "",
-    "whatsapp_destino": "",
-    "whatsapp_number": "",
-    "mensagem_template": "Oii vim pelo TikTok (código {codigo})",
-    "message_template": "Oii vim pelo TikTok (código {codigo})",
+    "whatsapp_destino": "5571993768941",
+    "whatsapp_number": "5571993768941",
+    "mensagem_template": "Hola, quiero espiar un número. ({codigo} No borres este código.)",
+    "message_template": "Hola, quiero espiar un número. ({codigo} No borres este código.)",
     "total_cliques": 0,
-    "criado_em": "2026-09-15T21:10:00.000Z"
+    "criado_em": "2026-09-16T04:21:52.884Z"
   }
 ]
