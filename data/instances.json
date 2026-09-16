@@ -1,20 +1,15 @@
 [
   {
-    "id": "uaz_re9e832d34a43e1",
+    "id": "uaz_r58fb9541ea17a0",
     "name": "CELULAR ROXO",
     "tipo": "uazapi",
     "url_servidor": "https://whatsblin.uazapi.com",
-    "instance_id": "re9e832d34a43e1",
-    "instance_token": "c42d3e8b85f6f03f30048cea:b6daa2916bd3b2d36c1399b1ad83714a:21628a1ca4629884113e6b86c1ee328613c122d15ffd4df99ce7fa24d7ca03790f534f26",
-    "phoneNumber": "557193768941",
-    "numero_conectado": "557193768941",
-    "status": "connected",
+    "instance_id": "r58fb9541ea17a0",
+    "instance_token": "6cd4bb566d580d738a7d3f0f:d5a376e9243dec472777e99fd0740e53:5b213fd26e31d87eb168a5b40250b07abfb56cb8b4095979990c92be841a8be903a53019",
+    "status": "disconnected",
     "assignedFlowId": "fluxo-espiao-es",
     "totalSent": 0,
     "totalReceived": 0,
-    "criado_em": "2026-09-14 16:24:54.865Z",
-    "createdAt": "2026-09-14 16:24:54.865Z",
-    "lastSyncedAt": "2026-09-14T17:02:44.977Z",
-    "connectedAt": 1789540853197
+    "createdAt": "2026-09-16T07:53:26.040Z"
   }
 ]
