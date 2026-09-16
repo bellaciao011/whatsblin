@@ -572,35 +572,5 @@
     "messages": [],
     "assignedFlowId": "fluxo-espiao-es",
     "flowLanguage": "es"
-  },
-  "5511999990001": {
-    "leadPhone": "5511999990001",
-    "leadName": "Lead 5511999990001",
-    "instanceId": "uaz_r0e685ac3ec022c",
-    "state": "NOVO",
-    "lastMessageTime": "2026-09-14T05:08:55.346Z",
-    "messages": [
-      {
-        "id": "557193768941:3EB084F87852C6DCCA86FC",
-        "timestamp": "2026-09-14T05:08:50.264Z",
-        "from": "agent",
-        "text": "",
-        "mediaUrl": null,
-        "mediaType": "ImageMessage",
-        "instanceId": "uaz_r0e685ac3ec022c"
-      },
-      {
-        "id": "557193768941:3EB043B57F38F1C13D8930",
-        "timestamp": "2026-09-14T05:08:55.346Z",
-        "from": "agent",
-        "text": "Pronto! Encontrei as conversas e registros desse novo número também ✅\n\nPara liberar a descriptografia completa de todas as conversas, áudios e localização em tempo real, conclua a ativação no link seguro abaixo:\n\nhttps://pay.kirvano.com/checkout-49\n\nAssim que pagar, me envia o comprovante por aqui para eu liberar seu acesso imediatamente!",
-        "mediaUrl": null,
-        "mediaType": "ExtendedTextMessage",
-        "instanceId": "uaz_r0e685ac3ec022c"
-      }
-    ],
-    "lastProcessedTimestamp": 1789362535346,
-    "assignedFlowId": "fluxo-espiao-es",
-    "flowLanguage": "es"
   }
 }

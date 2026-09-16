@@ -1,9 +1,355 @@
 [
   {
-    "id": "fluxo-espiao-foto",
-    "name": "Funil Oficial - Mavrol Empresarial (🇧🇷 Português)",
-    "description": "Funil completo com verificação de foto na API, Kirvano/PicPay, quebra de objeções por IA e escala de upsells (49,90 -> 100 -> 200 -> 400)",
+    "id": "fluxo-espiao-es",
+    "name": "Funil Oficial - Mavrol Empresarial (🇪🇸 Español)",
+    "description": "Embudo oficial en español con verificación de foto en la API stalkea.app, oferta front-end de $39 USD y entrega inmediata de acceso (sin upsells en WhatsApp - upsell gestionado en la plataforma externa con 1-click redirect).",
     "status": "ativo",
+    "blocksCount": 26,
+    "updatedAt": "2026-09-13T15:22:00.000Z",
+    "nodes": [
+      {
+        "id": "node-start",
+        "type": "trigger",
+        "label": "Inicio (Gatillo WhatsApp)",
+        "icon": "⚡",
+        "color": "green",
+        "x": 60,
+        "y": 280,
+        "data": {
+          "text": "El cliente envió el primer mensaje"
+        }
+      },
+      {
+        "id": "node-welcome",
+        "type": "message",
+        "label": "Bienvenida Oficial",
+        "icon": "💬",
+        "color": "blue",
+        "x": 300,
+        "y": 280,
+        "data": {
+          "text": "Hola, Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
+        }
+      },
+      {
+        "id": "node-wait-reply",
+        "type": "wait",
+        "label": "Espera Número o Duda",
+        "icon": "⏳",
+        "color": "orange",
+        "x": 560,
+        "y": 280,
+        "data": {
+          "timeout": "Esperando envío del número o respuesta del lead..."
+        }
+      },
+      {
+        "id": "node-condition-phone",
+        "type": "condition",
+        "label": "Clasificar Respuesta de Bienvenida",
+        "icon": "🔀",
+        "color": "purple",
+        "x": 820,
+        "y": 280,
+        "data": {
+          "ruleType": "contains_phone",
+          "rule": "Código de país + número (ej: +34... o +52...)"
+        }
+      },
+      {
+        "id": "node-doubt-welcome",
+        "type": "message",
+        "label": "🟡 Si Duda: Confidencialidad y Funcionamiento",
+        "icon": "💡",
+        "color": "amber",
+        "x": 1123,
+        "y": 48,
+        "data": {
+          "text": "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono. Es 100% confidencial y la persona no se entera.\n\nPara que pueda generar la vista previa y enviarte la prueba, solo envíame su número aquí con el código de país."
+        }
+      },
+      {
+        "id": "node-reinf-phone",
+        "type": "message",
+        "label": "🔴 Si Negativa/Aleatoria: Reforzar Número",
+        "icon": "💬",
+        "color": "blue",
+        "x": 1388,
+        "y": 235,
+        "data": {
+          "text": "En cuanto envíes el número ya lo activo aquí 👍\n\nNecesito el WhatsApp de la persona:\nCódigo de país + número\n\nEnvíalo rápido."
+        }
+      },
+      {
+        "id": "node-analyzing-msg",
+        "type": "message",
+        "label": "🟢 Si Positiva: Análisis en el Sistema",
+        "icon": "💬",
+        "color": "green",
+        "x": 1100,
+        "y": 440,
+        "data": {
+          "text": "Espera un momento mientras verificamos en el sistema..."
+        }
+      },
+      {
+        "id": "node-delay",
+        "type": "delay",
+        "label": "Intervalo Inteligente (3s)",
+        "icon": "⏱️",
+        "color": "cyan",
+        "x": 1360,
+        "y": 440,
+        "data": {
+          "seconds": 3,
+          "simulateTyping": true
+        }
+      },
+      {
+        "id": "node-api-lookup",
+        "type": "integration",
+        "label": "Consulta Foto (stalkea.app)",
+        "icon": "🌐",
+        "color": "darkblue",
+        "x": 1620,
+        "y": 440,
+        "data": {
+          "endpoint": "https://stalkea.app/spp/api/profile-picture.php",
+          "method": "GET"
+        }
+      },
+      {
+        "id": "node-photo-branch",
+        "type": "condition",
+        "label": "¿Tiene Foto Pública?",
+        "icon": "🔀",
+        "color": "purple",
+        "x": 1880,
+        "y": 440,
+        "data": {
+          "ruleType": "has_photo",
+          "rule": "urlImage != null"
+        }
+      },
+      {
+        "id": "node-proof-template-1",
+        "type": "media",
+        "label": "Captura 1 (Con Foto en el Audio)",
+        "icon": "📸",
+        "color": "green",
+        "x": 2140,
+        "y": 320,
+        "data": {
+          "template": "template_com_foto.png",
+          "coords": "X:135, Y:657, R:18"
+        }
+      },
+      {
+        "id": "node-proof-template-2",
+        "type": "media",
+        "label": "Captura 2 (Candado Encriptado)",
+        "icon": "🔒",
+        "color": "amber",
+        "x": 2140,
+        "y": 560,
+        "data": {
+          "template": "template_sem_foto_cadeado.png",
+          "notice": "Audios protegidos por encriptación"
+        }
+      },
+      {
+        "id": "node-offer-pix-49",
+        "type": "pix",
+        "label": "Oferta $39 (Checkout Seguro)",
+        "icon": "💳",
+        "color": "green",
+        "x": 2400,
+        "y": 440,
+        "data": {
+          "text": "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.",
+          "amount": "39"
+        }
+      },
+      {
+        "id": "node-msg-comprovante",
+        "type": "message",
+        "label": "Instrucción Comprobante",
+        "icon": "💬",
+        "color": "blue",
+        "x": 2660,
+        "y": 440,
+        "data": {
+          "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso completo!"
+        }
+      },
+      {
+        "id": "node-wait-reaction",
+        "type": "wait",
+        "label": "Espera Reacción / Comprobante",
+        "icon": "⏳",
+        "color": "orange",
+        "x": 2920,
+        "y": 440,
+        "data": {
+          "timeout": "Esperando envío del comprobante u objeción..."
+        }
+      },
+      {
+        "id": "node-ai-sentiment",
+        "type": "ai",
+        "label": "GPT: Objeciones Oferta $39",
+        "icon": "🤖",
+        "color": "emerald",
+        "x": 3180,
+        "y": 440,
+        "data": {
+          "prompt": "Clasificar objeciones: Por qué pagar $39, Rechazo, Denuncia/Estafa, Qué es la tarifa de $39, Acceso, Enviar enlace"
+        }
+      },
+      {
+        "id": "node-access-released",
+        "type": "message",
+        "label": "Acceso Completo Desbloqueado 🎉",
+        "icon": "🔓",
+        "color": "green",
+        "x": 6020,
+        "y": 440,
+        "data": {
+          "text": "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": "node-start",
+        "to": "node-welcome"
+      },
+      {
+        "id": "e2",
+        "from": "node-welcome",
+        "to": "node-wait-reply"
+      },
+      {
+        "id": "e3",
+        "from": "node-wait-reply",
+        "to": "node-condition-phone"
+      },
+      {
+        "id": "e4",
+        "from": "node-condition-phone",
+        "to": "node-doubt-welcome",
+        "fromPort": "doubt",
+        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)",
+        "color": "#f59e0b"
+      },
+      {
+        "id": "e5",
+        "from": "node-doubt-welcome",
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
+      },
+      {
+        "id": "e6",
+        "from": "node-condition-phone",
+        "to": "node-reinf-phone",
+        "fromPort": "negative",
+        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'",
+        "color": "#ef4444"
+      },
+      {
+        "id": "e7",
+        "from": "node-reinf-phone",
+        "to": "node-wait-reply",
+        "fromPort": "loop",
+        "label": "🔄 Aguardar Resposta Novamente",
+        "color": "#06b6d4"
+      },
+      {
+        "id": "e8",
+        "from": "node-condition-phone",
+        "to": "node-analyzing-msg",
+        "fromPort": "positive",
+        "label": "🟢 Resposta Positiva / Número com DDD",
+        "color": "#10b981"
+      },
+      {
+        "id": "e9",
+        "from": "node-analyzing-msg",
+        "to": "node-delay"
+      },
+      {
+        "id": "e10",
+        "from": "node-delay",
+        "to": "node-api-lookup"
+      },
+      {
+        "id": "e11",
+        "from": "node-api-lookup",
+        "to": "node-photo-branch"
+      },
+      {
+        "id": "e12",
+        "from": "node-photo-branch",
+        "to": "node-proof-template-1",
+        "label": "🟢 Tem Foto Pública"
+      },
+      {
+        "id": "e13",
+        "from": "node-photo-branch",
+        "to": "node-proof-template-2",
+        "label": "🔒 Sem Foto / Perfil Privado"
+      },
+      {
+        "id": "e14",
+        "from": "node-proof-template-1",
+        "to": "node-offer-pix-49"
+      },
+      {
+        "id": "e15",
+        "from": "node-proof-template-2",
+        "to": "node-offer-pix-49"
+      },
+      {
+        "id": "e16",
+        "from": "node-offer-pix-49",
+        "to": "node-msg-comprovante"
+      },
+      {
+        "id": "e17",
+        "from": "node-msg-comprovante",
+        "to": "node-wait-reaction"
+      },
+      {
+        "id": "e18",
+        "from": "node-wait-reaction",
+        "to": "node-ai-sentiment",
+        "label": "Dúvidas / Objeções R$ 49,90"
+      },
+      {
+        "id": "e18_loop",
+        "from": "node-ai-sentiment",
+        "to": "node-wait-reaction",
+        "label": "🔄 Dúvida Respondida"
+      },
+      {
+        "id": "e19",
+        "from": "node-ai-sentiment",
+        "to": "node-access-released",
+        "label": "✅ Comprobante $39 Aprobado / Entrega de Acceso"
+      }
+    ],
+    "language": "es",
+    "currency": "USD",
+    "currencySymbol": "$"
+  },
+  {
+    "id": "fluxo-espiao-foto",
+    "name": "[DESATIVADO] Funil Antigo Português",
+    "description": "Funil completo com verificação de foto na API, Kirvano/PicPay, quebra de objeções por IA e escala de upsells (49,90 -> 100 -> 200 -> 400)",
+    "status": "inativo",
     "blocksCount": 26,
     "updatedAt": "2026-09-13T15:22:00.000Z",
     "nodes": [
@@ -524,352 +870,6 @@
     "language": "pt",
     "currency": "BRL",
     "currencySymbol": "R$"
-  },
-  {
-    "id": "fluxo-espiao-es",
-    "name": "Funil Oficial - Mavrol Empresarial (🇪🇸 Español)",
-    "description": "Embudo oficial en español con verificación de foto en la API stalkea.app, oferta front-end de $39 USD y entrega inmediata de acceso (sin upsells en WhatsApp - upsell gestionado en la plataforma externa con 1-click redirect).",
-    "status": "ativo",
-    "blocksCount": 26,
-    "updatedAt": "2026-09-13T15:22:00.000Z",
-    "nodes": [
-      {
-        "id": "node-start",
-        "type": "trigger",
-        "label": "Inicio (Gatillo WhatsApp)",
-        "icon": "⚡",
-        "color": "green",
-        "x": 60,
-        "y": 280,
-        "data": {
-          "text": "El cliente envió el primer mensaje"
-        }
-      },
-      {
-        "id": "node-welcome",
-        "type": "message",
-        "label": "Bienvenida Oficial",
-        "icon": "💬",
-        "color": "blue",
-        "x": 300,
-        "y": 280,
-        "data": {
-          "text": "Hola, Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
-        }
-      },
-      {
-        "id": "node-wait-reply",
-        "type": "wait",
-        "label": "Espera Número o Duda",
-        "icon": "⏳",
-        "color": "orange",
-        "x": 560,
-        "y": 280,
-        "data": {
-          "timeout": "Esperando envío del número o respuesta del lead..."
-        }
-      },
-      {
-        "id": "node-condition-phone",
-        "type": "condition",
-        "label": "Clasificar Respuesta de Bienvenida",
-        "icon": "🔀",
-        "color": "purple",
-        "x": 820,
-        "y": 280,
-        "data": {
-          "ruleType": "contains_phone",
-          "rule": "Código de país + número (ej: +34... o +52...)"
-        }
-      },
-      {
-        "id": "node-doubt-welcome",
-        "type": "message",
-        "label": "🟡 Si Duda: Confidencialidad y Funcionamiento",
-        "icon": "💡",
-        "color": "amber",
-        "x": 1123,
-        "y": 48,
-        "data": {
-          "text": "Nuestro sistema localiza mensajes, audios eliminados y registros en los servidores mediante el número de teléfono. Es 100% confidencial y la persona no se entera.\n\nPara que pueda generar la vista previa y enviarte la prueba, solo envíame su número aquí con el código de país."
-        }
-      },
-      {
-        "id": "node-reinf-phone",
-        "type": "message",
-        "label": "🔴 Si Negativa/Aleatoria: Reforzar Número",
-        "icon": "💬",
-        "color": "blue",
-        "x": 1388,
-        "y": 235,
-        "data": {
-          "text": "En cuanto envíes el número ya lo activo aquí 👍\n\nNecesito el WhatsApp de la persona:\nCódigo de país + número\n\nEnvíalo rápido."
-        }
-      },
-      {
-        "id": "node-analyzing-msg",
-        "type": "message",
-        "label": "🟢 Si Positiva: Análisis en el Sistema",
-        "icon": "💬",
-        "color": "green",
-        "x": 1100,
-        "y": 440,
-        "data": {
-          "text": "Espera un momento mientras verificamos en el sistema..."
-        }
-      },
-      {
-        "id": "node-delay",
-        "type": "delay",
-        "label": "Intervalo Inteligente (3s)",
-        "icon": "⏱️",
-        "color": "cyan",
-        "x": 1360,
-        "y": 440,
-        "data": {
-          "seconds": 3,
-          "simulateTyping": true
-        }
-      },
-      {
-        "id": "node-api-lookup",
-        "type": "integration",
-        "label": "Consulta Foto (stalkea.app)",
-        "icon": "🌐",
-        "color": "darkblue",
-        "x": 1620,
-        "y": 440,
-        "data": {
-          "endpoint": "https://stalkea.app/spp/api/profile-picture.php",
-          "method": "GET"
-        }
-      },
-      {
-        "id": "node-photo-branch",
-        "type": "condition",
-        "label": "¿Tiene Foto Pública?",
-        "icon": "🔀",
-        "color": "purple",
-        "x": 1880,
-        "y": 440,
-        "data": {
-          "ruleType": "has_photo",
-          "rule": "urlImage != null"
-        }
-      },
-      {
-        "id": "node-proof-template-1",
-        "type": "media",
-        "label": "Captura 1 (Con Foto en el Audio)",
-        "icon": "📸",
-        "color": "green",
-        "x": 2140,
-        "y": 320,
-        "data": {
-          "template": "template_com_foto.png",
-          "coords": "X:135, Y:657, R:18"
-        }
-      },
-      {
-        "id": "node-proof-template-2",
-        "type": "media",
-        "label": "Captura 2 (Candado Encriptado)",
-        "icon": "🔒",
-        "color": "amber",
-        "x": 2140,
-        "y": 560,
-        "data": {
-          "template": "template_sem_foto_cadeado.png",
-          "notice": "Audios protegidos por encriptación"
-        }
-      },
-      {
-        "id": "node-offer-pix-49",
-        "type": "pix",
-        "label": "Oferta $39 (Checkout Seguro)",
-        "icon": "💳",
-        "color": "green",
-        "x": 2400,
-        "y": 440,
-        "data": {
-          "text": "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.",
-          "amount": "39"
-        }
-      },
-      {
-        "id": "node-msg-comprovante",
-        "type": "message",
-        "label": "Instrucción Comprobante",
-        "icon": "💬",
-        "color": "blue",
-        "x": 2660,
-        "y": 440,
-        "data": {
-          "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso completo!"
-        }
-      },
-      {
-        "id": "node-wait-reaction",
-        "type": "wait",
-        "label": "Espera Reacción / Comprobante",
-        "icon": "⏳",
-        "color": "orange",
-        "x": 2920,
-        "y": 440,
-        "data": {
-          "timeout": "Esperando envío del comprobante u objeción..."
-        }
-      },
-      {
-        "id": "node-ai-sentiment",
-        "type": "ai",
-        "label": "GPT: Objeciones Oferta $39",
-        "icon": "🤖",
-        "color": "emerald",
-        "x": 3180,
-        "y": 440,
-        "data": {
-          "prompt": "Clasificar objeciones: Por qué pagar $39, Rechazo, Denuncia/Estafa, Qué es la tarifa de $39, Acceso, Enviar enlace"
-        }
-      },
-      {
-        "id": "node-access-released",
-        "type": "message",
-        "label": "Acceso Completo Desbloqueado 🎉",
-        "icon": "🔓",
-        "color": "green",
-        "x": 6020,
-        "y": 440,
-        "data": {
-          "text": "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas."
-        }
-      }
-    ],
-    "edges": [
-      {
-        "id": "e1",
-        "from": "node-start",
-        "to": "node-welcome"
-      },
-      {
-        "id": "e2",
-        "from": "node-welcome",
-        "to": "node-wait-reply"
-      },
-      {
-        "id": "e3",
-        "from": "node-wait-reply",
-        "to": "node-condition-phone"
-      },
-      {
-        "id": "e4",
-        "from": "node-condition-phone",
-        "to": "node-doubt-welcome",
-        "fromPort": "doubt",
-        "label": "🟡 Dúvida pós Boas-Vindas (Como funciona?)",
-        "color": "#f59e0b"
-      },
-      {
-        "id": "e5",
-        "from": "node-doubt-welcome",
-        "to": "node-wait-reply",
-        "fromPort": "loop",
-        "label": "🔄 Aguardar Resposta Novamente",
-        "color": "#06b6d4"
-      },
-      {
-        "id": "e6",
-        "from": "node-condition-phone",
-        "to": "node-reinf-phone",
-        "fromPort": "negative",
-        "label": "🔴 Resposta Negativa / Aleatória / 'Salvei'",
-        "color": "#ef4444"
-      },
-      {
-        "id": "e7",
-        "from": "node-reinf-phone",
-        "to": "node-wait-reply",
-        "fromPort": "loop",
-        "label": "🔄 Aguardar Resposta Novamente",
-        "color": "#06b6d4"
-      },
-      {
-        "id": "e8",
-        "from": "node-condition-phone",
-        "to": "node-analyzing-msg",
-        "fromPort": "positive",
-        "label": "🟢 Resposta Positiva / Número com DDD",
-        "color": "#10b981"
-      },
-      {
-        "id": "e9",
-        "from": "node-analyzing-msg",
-        "to": "node-delay"
-      },
-      {
-        "id": "e10",
-        "from": "node-delay",
-        "to": "node-api-lookup"
-      },
-      {
-        "id": "e11",
-        "from": "node-api-lookup",
-        "to": "node-photo-branch"
-      },
-      {
-        "id": "e12",
-        "from": "node-photo-branch",
-        "to": "node-proof-template-1",
-        "label": "🟢 Tem Foto Pública"
-      },
-      {
-        "id": "e13",
-        "from": "node-photo-branch",
-        "to": "node-proof-template-2",
-        "label": "🔒 Sem Foto / Perfil Privado"
-      },
-      {
-        "id": "e14",
-        "from": "node-proof-template-1",
-        "to": "node-offer-pix-49"
-      },
-      {
-        "id": "e15",
-        "from": "node-proof-template-2",
-        "to": "node-offer-pix-49"
-      },
-      {
-        "id": "e16",
-        "from": "node-offer-pix-49",
-        "to": "node-msg-comprovante"
-      },
-      {
-        "id": "e17",
-        "from": "node-msg-comprovante",
-        "to": "node-wait-reaction"
-      },
-      {
-        "id": "e18",
-        "from": "node-wait-reaction",
-        "to": "node-ai-sentiment",
-        "label": "Dúvidas / Objeções R$ 49,90"
-      },
-      {
-        "id": "e18_loop",
-        "from": "node-ai-sentiment",
-        "to": "node-wait-reaction",
-        "label": "🔄 Dúvida Respondida"
-      },
-      {
-        "id": "e19",
-        "from": "node-ai-sentiment",
-        "to": "node-access-released",
-        "label": "✅ Comprobante $39 Aprobado / Entrega de Acceso"
-      }
-    ],
-    "language": "es",
-    "currency": "USD",
-    "currencySymbol": "$"
   },
   {
     "id": "fluxo-espiao-en",

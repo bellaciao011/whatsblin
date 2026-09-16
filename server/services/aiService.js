@@ -39,7 +39,7 @@ async function classifyWelcomeReply(userMessage, language = 'pt') {
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
   const funnel = db.getFunnel();
-  const lang = (language || 'pt').toLowerCase();
+  const lang = (language === 'en') ? 'en' : 'es';
 
   const welcomeTexts = {
     pt: {
@@ -129,7 +129,7 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
   const funnel = db.getFunnel();
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
-  const lang = (language || 'pt').toLowerCase();
+  const lang = (language === 'en') ? 'en' : 'es';
 
   const currentValue = currentStageInfo.value || (lang === 'es' ? '39' : (lang === 'pt' ? '49,90' : '49.90'));
   let paidValue = currentStageInfo.paidValue;

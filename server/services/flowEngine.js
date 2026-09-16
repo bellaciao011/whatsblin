@@ -12,6 +12,10 @@ const fs = require('fs');
 
 const eventBus = new EventEmitter();
 
+// Trava física de gateway para impedir múltiplos disparos na rede uazapi/WhatsApp dentro de 8 segundos
+const lastPhysicalSendTimes = new Map();
+
+
 // Trava global de concorrência por lead para impedir execuções simultâneas paralelas
 const activeLeadLocks = new Map();
 // Histórico de timestamps do último envio do bot por lead para debounce rigoroso
@@ -117,6 +121,15 @@ async function simulateTyping(inst, cleanPhone, durationMs = 2000, presenceType 
 async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 2000) {
   if (!inst || !cleanPhone || !text) return;
 
+  const now = Date.now();
+  const lastSend = lastPhysicalSendTimes.get(cleanPhone) || 0;
+  if (now - lastSend < 8000) {
+    console.log(`[FlowEngine] 🛑 GATEWAY BLOCK: Envio físico para +${cleanPhone} bloqueado! Último envio há ${now - lastSend}ms.`);
+    return;
+  }
+  lastPhysicalSendTimes.set(cleanPhone, now);
+  recordBotReply(cleanPhone);
+
   if (typingDelay && typingDelay > 0) {
     await simulateTyping(inst, cleanPhone, typingDelay, 'composing');
   }
@@ -142,6 +155,14 @@ async function sendOutgoingTextMessage(inst, cleanPhone, text, typingDelay = 200
  */
 async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, mimeType, caption, typingDelay = 2500) {
   if (!inst || !cleanPhone) return;
+  const now = Date.now();
+  const lastSend = lastPhysicalSendTimes.get(cleanPhone) || 0;
+  if (now - lastSend < 8000) {
+    console.log(`[FlowEngine] 🛑 GATEWAY BLOCK: Envio de imagem para +${cleanPhone} bloqueado! Último envio há ${now - lastSend}ms.`);
+    return;
+  }
+  lastPhysicalSendTimes.set(cleanPhone, now);
+  recordBotReply(cleanPhone);
 
   if (typingDelay && typingDelay > 0) {
     await simulateTyping(inst, cleanPhone, typingDelay, 'composing');
@@ -996,6 +1017,10 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // CASO 2: LEAD ESTÁ AGUARDANDO O NÚMERO
   // =========================================================================
   if (chatData.state === 'AGUARDANDO_NUMERO') {
+    if (hasRecentBotReply(cleanPhone, 10000)) {
+      console.log(`[FlowEngine] ⏳ CASO 2: Resposta recente já enviada para +${cleanPhone}. Suprimindo duplicata.`);
+      return;
+    }
     const welcomeDecision = await aiService.classifyWelcomeReply(messageText, flowLanguage);
 
     if (welcomeDecision.type !== 'PHONE') {
@@ -1090,6 +1115,10 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // =========================================================================
   // CASO 3: PRIMEIRO CONTATO DO LEAD (BOAS-VINDAS)
   // =========================================================================
+  if (hasRecentBotReply(cleanPhone, 10000)) {
+    console.log(`[FlowEngine] ⏳ CASO 3: Boas-vindas recente já enviada para +${cleanPhone}. Suprimindo duplicata.`);
+    return;
+  }
   const fallbackWelcome = flowLanguage === 'es'
     ? "¡Hola! Guarda mi contacto y envíame el número de la persona que ya te mando la prueba."
     : (flowLanguage === 'en'
@@ -1110,9 +1139,28 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
  * Ponto de entrada chamado quando uma nova mensagem chega do WhatsApp (Webhook ou Simulador)
  */
 async function processIncomingMessage(instanceId, leadPhone, messageText, mediaAttachment = null, messageId = null, messageTimestamp = null, senderName = null, senderPhoto = null) {
-  const instances = db.getInstances();
-  const instance = instances.find(i => i.id === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
-  const cleanPhone = leadPhone.replace(/\D/g, '');
+  const cleanPhone = (leadPhone || '').replace(/\D/g, '');
+  if (!cleanPhone || cleanPhone.length < 8) return;
+
+  const msgId = messageId || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  const msgTs = messageTimestamp ? new Date(messageTimestamp).getTime() : Date.now();
+
+  // 1. DEDUPLICAÇÃO ABSOLUTA
+  if (isMessageAlreadyHandled(msgId, cleanPhone, messageText, msgTs)) {
+    console.log(`[FlowEngine] 🛡️ Mensagem duplicada/já tratada ignorada para +${cleanPhone} (ID: ${msgId})`);
+    return;
+  }
+  markMessageHandled(msgId);
+
+  // 2. TRAVA DE CONCORRÊNCIA / MUTEX POR LEAD
+  if (!acquireLeadLock(cleanPhone)) {
+    console.log(`[FlowEngine] ⚠️ Já existe fluxo em processamento ativo para +${cleanPhone}. Ignorando chamada concorrente duplicada.`);
+    return;
+  }
+
+  try {
+    const instances = db.getInstances();
+    const instance = instances.find(i => i.id === instanceId || i.instance_id === instanceId || i.name === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
 
   // 0. Atualiza dados de contato do lead (Nome e Foto de Perfil)
   const existingChat = db.getChat(cleanPhone) || {};
@@ -1180,10 +1228,13 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
   eventBus.emit('new_message', { phone: cleanPhone, message: newMessage });
 
   // 2. Executa o fluxo visual oficial configurado especificamente para este chip
-  try {
-    await executeFlowGraph(instance, cleanPhone, messageText, mediaAttachment);
-  } catch (err) {
-    console.error('[FlowEngine] Erro ao processar mensagem no fluxo:', err);
+    try {
+      await executeFlowGraph(instance, cleanPhone, messageText, mediaAttachment);
+    } catch (err) {
+      console.error('[FlowEngine] Erro ao processar mensagem no fluxo:', err);
+    }
+  } finally {
+    releaseLeadLock(cleanPhone);
   }
 }
 
