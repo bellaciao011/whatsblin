@@ -1393,6 +1393,17 @@ async function renderPixels() {
                 </p>
               </div>
 
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <label class="form-label" style="margin: 0;">Código de Evento de Teste / Test ID (TikTok Ads)</label>
+                  <span style="font-size: 11px; color: #25f4ee; font-weight: 600;">Opcional / Recomendado para Testes</span>
+                </div>
+                <input type="text" class="form-input" id="tt-pix-test-code" placeholder="Ex: TEST12345 (obtido na aba Test Events do TikTok)" style="font-family: monospace; border-color: rgba(37, 244, 238, 0.4);">
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Copie o código gerado na aba <b>"Test Events"</b> do seu Pixel no Gerenciador de Eventos da TikTok para ver seus testes caírem ao vivo lá!
+                </p>
+              </div>
+
               <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px; background: linear-gradient(135deg, #fe2c55, #e11d48); border: none;">
                 ✓ Salvar e Ativar Pixel TikTok
               </button>
@@ -1424,7 +1435,7 @@ async function renderPixels() {
                     </div>
                   </div>
                   <div style="display: flex; gap: 6px;">
-                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testTikTokPixelManual('${p.pixel_code}', '${p.access_token}')">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="testTikTokPixelManual('${p.pixel_code}', '${p.access_token}', '${p.test_event_code || ''}')">
                       ▶ Testar
                     </button>
                     <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteTikTokPixelConfig('${p.id}')">
@@ -1599,12 +1610,13 @@ async function saveTikTokPixelConfig(e) {
   const name = document.getElementById('tt-pix-name').value.trim();
   const pixel_code = document.getElementById('tt-pix-code').value.trim();
   const access_token = document.getElementById('tt-pix-token').value.trim();
+  const test_event_code = (document.getElementById('tt-pix-test-code')?.value || '').trim();
 
   try {
     const res = await fetch('/api/tiktok/pixels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, pixel_code, access_token })
+      body: JSON.stringify({ name, pixel_code, access_token, test_event_code })
     }).then(r => r.json());
 
     if (res.success) {
@@ -1629,7 +1641,7 @@ async function deleteTikTokPixelConfig(id) {
   }
 }
 
-async function testTikTokPixelManual(code, token) {
+async function testTikTokPixelManual(code, token, defaultTestCode = '') {
   document.getElementById('tiktok-test-modal')?.remove();
 
   const modalHtml = `
@@ -1659,7 +1671,7 @@ async function testTikTokPixelManual(code, token) {
               <label class="form-label" style="margin: 0;">Código de Evento de Teste (Test Event Code / Test ID)</label>
               <span style="font-size: 11px; color: #25f4ee; font-weight: 600;">Recomendado</span>
             </div>
-            <input type="text" class="form-input" id="tt-modal-test-code" placeholder="Ex: TEST12345 (da aba Test Events do TikTok)" style="border-color: rgba(37, 244, 238, 0.4); font-family: monospace;">
+            <input type="text" class="form-input" id="tt-modal-test-code" value="${defaultTestCode || ''}" placeholder="Ex: TEST12345 (da aba Test Events do TikTok)" style="border-color: rgba(37, 244, 238, 0.4); font-family: monospace;">
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
               Copie o código que aparece na aba <b>"Test Events"</b> do seu Pixel no Gerenciador de Eventos da TikTok para ver o evento bater em tempo real lá!
             </div>

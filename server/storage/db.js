@@ -345,6 +345,7 @@ module.exports = {
       name: pixelData.name || 'Pixel TikTok',
       pixel_code: String(pixelData.pixel_code || pixelData.pixelCode || '').trim(),
       access_token: String(pixelData.access_token || pixelData.accessToken || '').trim(),
+      test_event_code: String(pixelData.test_event_code || pixelData.testEventCode || '').trim(),
       createdAt: new Date().toISOString()
     };
     const idx = pixels.findIndex(p => p.id === newPixel.id || p.pixel_code === newPixel.pixel_code);

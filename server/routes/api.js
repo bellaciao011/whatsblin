@@ -2220,7 +2220,7 @@ router.get('/tiktok/pixels', (req, res) => {
 
 // Cadastrar/atualizar pixel
 router.post('/tiktok/pixels', (req, res) => {
-  const { name, pixel_code, access_token } = req.body;
+  const { name, pixel_code, access_token, test_event_code } = req.body;
   if (!pixel_code || !access_token) {
     return res.status(400).json({ error: 'pixel_code e access_token são obrigatórios' });
   }
@@ -2228,7 +2228,8 @@ router.post('/tiktok/pixels', (req, res) => {
   const saved = db.addTikTokPixel({
     name: name || 'Pixel TikTok',
     pixel_code,
-    access_token
+    access_token,
+    test_event_code: test_event_code ? String(test_event_code).trim() : ''
   });
 
   res.json({ success: true, pixel: saved });
