@@ -32,9 +32,7 @@ app.use((req, res, next) => {
 });
 
 // =========================================================================
-// ISOLAMENTO TOTAL DE DOMÍNIOS DE CAMPANHA (TRACKING ONLY)
-// Garante que domínios customizados (ex: expresstrackin-g.com, wtb.expresstrackin-g.com)
-// NUNCA exibam a tela de login, o painel administrativo ou o SaaS do WhatsHub Pro!
+// SEPARAÇÃO ABSOLUTA: PAINEL SAAS vs DOMÍNIOS DE ANÚNCIO / CAMPANHA
 // =========================================================================
 app.use((req, res, next) => {
   const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim();
@@ -43,24 +41,42 @@ app.use((req, res, next) => {
                        rawHost.endsWith('.railway.app') || 
                        rawHost.endsWith('.up.railway.app');
 
-  // Se o tráfego vier pelo domínio oficial do Railway ou localhost, libera acesso ao dashboard e APIs
+  // CASO 1: DOMÍNIO DO RAILWAY (whatsblin-production.up.railway.app)
+  // Esse domínio é EXCLUSIVAMENTE o painel administrativo do SaaS.
+  // Bloqueia rotas de campanha (/c/*) nele para que campanhas NUNCA usem o domínio do Railway.
   if (isSystemHost) {
+    if (req.path.startsWith('/c/')) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head><meta charset="utf-8"><title>404 - Não Encontrado</title></head>
+        <body style="background:#0a0a0f;color:#94a3b8;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+          <div style="text-align:center;max-width:400px;padding:20px;">
+            <h2 style="color:#f87171;margin-bottom:10px;">Link Indisponível</h2>
+            <p>Os links de campanha são veiculados exclusivamente nos domínios próprios configurados.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    // Permite login, dashboard e APIs normais do SaaS
     return next();
   }
 
-  // Se o tráfego vier por um domínio customizado de anúncio:
-  // 1. Se for rota de tracking de campanha (/c/*), permite o fluxo normal:
+  // CASO 2: DOMÍNIOS DE ANÚNCIO (ex: wtb.expresstrackin-g.com, expresstrackin-g.com)
+  // Esses domínios são EXCLUSIVAMENTE de tracking e redirecionamento para o WhatsApp.
+  // O painel do SaaS, tela de login e rotas de administração NÃO EXISTEM aqui!
   if (req.path.startsWith('/c/')) {
-    return next();
+    return next(); // Executa o tracking e redireciona imediatamente para o WhatsApp
   }
 
-  // 2. Se for arquivo estático essencial (favicon, imagens geradas):
+  // Assets necessários para renderização da pressel instantânea
   if (req.path === '/favicon.ico' || req.path.startsWith('/assets/')) {
     return next();
   }
 
-  // 3. Para QUALQUER outra rota acessada no domínio de campanha (ex: "/", "/login", "/admin"):
-  // NUNCA exibe o painel! Redireciona imediatamente para a campanha ou WhatsApp:
+  // Se qualquer pessoa acessar a raiz ("/") ou tentar entrar em "/login", "/api", etc.:
+  // NUNCA exibe nada do SaaS. Redireciona imediatamente para a campanha ou WhatsApp direto:
   const campaigns = db.getTrafficCampaigns();
   const matchedCamp = campaigns.find(c => c.custom_domain === rawHost) || campaigns[0];
 
@@ -68,7 +84,6 @@ app.use((req, res, next) => {
     return res.redirect(302, `/c/${matchedCamp.slug}`);
   }
 
-  // Se não houver campanha, faz redirect limpo para WhatsApp
   return res.redirect(302, 'https://wa.me/');
 });
 
@@ -166,7 +181,6 @@ app.listen(PORT, () => {
   console.log(`⚡ API Leona (Público): http://localhost:${PORT}/api/generate-proof`);
   console.log('====================================================');
 
-  // Auto-restaura conexão do WhatsApp com a uazapi no boot
   if (typeof apiRoutes.autoRestoreUazapiInstances === 'function') {
     apiRoutes.autoRestoreUazapiInstances().then(instances => {
       const connected = (instances || []).find(i => i.status === 'connected');

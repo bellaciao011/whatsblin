@@ -4459,10 +4459,10 @@ async function openCreateCampaignModal() {
               <label class="form-label" style="margin: 0;">Domínio do Link de Anúncio *</label>
               <a href="#dominios" onclick="document.getElementById('campaign-modal')?.remove();" style="color: #a855f7; font-size: 11px; text-decoration: none; font-weight: 600;">+ Adicionar Domínio Próprio</a>
             </div>
-            <select class="form-select" id="camp-input-domain" onchange="updateCampSlugPrefix(this.value)" style="border-color: rgba(254, 44, 85, 0.4);">
-              <option value="">Padrão do Sistema (${defaultHost})</option>
-              ${activeDomains.map(d => `
-                <option value="${d.dominio}">🌐 ${d.dominio} ${d.status === 'ativo' ? '(Ativo)' : '(Conectado no Railway)'}</option>
+            <select class="form-select" id="camp-input-domain" onchange="updateCampSlugPrefix(this.value)" style="border-color: rgba(254, 44, 85, 0.4);" required>
+              ${activeDomains.length === 0 ? '<option value="">⚠️ Nenhum domínio próprio configurado (Adicione em Domínios)</option>' : ''}
+              ${activeDomains.map((d, i) => `
+                <option value="${d.dominio}" ${i === 0 ? 'selected' : ''}>🌐 ${d.dominio} (Domínio Exclusivo de Campanha)</option>
               `).join('')}
             </select>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Selecione o domínio customizado com o qual este link será veiculado no anúncio.</div>
