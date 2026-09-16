@@ -4450,11 +4450,6 @@ async function renderTikTokAttribution() {
                           <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; color: var(--red);" onclick="handleDeleteCampaign('${c.id}')" title="Excluir">🗑️</button>
                         </div>
                       </td>
-                      <td>
-                        <button class="btn btn-secondary" style="padding: 3px 7px; font-size: 11px; color: #fe2c55; border-color: rgba(254,44,85,0.4);" onclick="resendTikTokLog('${l.id}')" title="Reenviar evento ao TikTok">
-                          ⚡ Reenviar
-                        </button>
-                      </td>
                     </tr>
                   `).join('') : `
                     <tr>
@@ -4594,7 +4589,7 @@ async function renderTikTokAttribution() {
                     </tr>
                   `).join('') : `
                     <tr>
-                      <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                      <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">
                         Nenhum log de disparo registrado ainda.
                       </td>
                     </tr>
