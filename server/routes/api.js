@@ -1701,8 +1701,8 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
 
     // 2. Extrai e-mail (essencial para Advanced Matching no TikTok)
     const email = 
-      body.email ||
       body.customer?.email ||
+      body.email ||
       body.buyer?.email ||
       body.client?.email ||
       body.data?.customer?.email ||
@@ -1710,66 +1710,87 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       body.transaction?.customer?.email ||
       null;
 
-    // 3. Extrai rastreamento e código único de atribuição da URL / UTM / SRC / SCK / CODE
-    // PerfectPay envia: sck, src, utm_source, utm_campaign, code, codigo, metadata
-    const candidates = [
+    // 3. Extrai IP e User-Agent do comprador (fornecido nativamente pela PerfectPay)
+    const buyerIp = body.customer?.ip || body.ip || null;
+    const buyerUserAgent = body.customer?.user_agent || body.user_agent || null;
+
+    // 4. Extrai ttclid direto da PerfectPay (metadata.ttclid)
+    const webhookTtclid = body.metadata?.ttclid || body.ttclid || body.data?.metadata?.ttclid || null;
+
+    // 5. Extração profunda de código de atribuição (UTM, SRC, SCK, CODE)
+    const candidateParams = [
+      body.metadata?.utm_source,
+      body.metadata?.src,
+      body.metadata?.sck,
+      body.metadata?.code,
+      body.metadata?.codigo,
+      body.metadata?.utm_campaign,
+      body.metadata?.utm_content,
+      body.utm_source,
+      body.src,
+      body.sck,
       body.code,
       body.codigo,
-      body.sck,
-      body.src,
-      body.utm_source,
-      body.utm_campaign,
-      body.utm_content,
-      body.custom_id,
-      body.tracking_code,
-      body.metadata,
-      body.metadata?.code,
-      body.metadata?.src,
-      body.metadata?.utm_source,
+      body.data?.metadata?.utm_source,
+      body.data?.metadata?.src,
+      body.data?.metadata?.sck,
+      body.data?.utm_source,
+      body.data?.src,
+      body.data?.sck,
       body.data?.code,
       body.data?.codigo,
-      body.data?.sck,
-      body.data?.src,
-      body.data?.utm_source,
-      body.data?.utm_campaign,
-      body.data?.utm_content,
-      body.data?.custom_id,
-      body.transaction?.code,
-      body.transaction?.codigo,
-      body.transaction?.sck,
-      body.transaction?.src,
-      body.transaction?.utm_source,
-      req.query?.code,
-      req.query?.codigo,
-      req.query?.sck,
+      req.query?.utm_source,
       req.query?.src,
-      req.query?.utm_source
-    ].filter(Boolean).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v));
+      req.query?.sck,
+      req.query?.code,
+      req.query?.codigo
+    ].filter(Boolean);
 
     let trackingCode = null;
-    for (const val of candidates) {
-      const match = val.match(/cw_sec_([A-Z0-9]{6})_2026/i) || val.match(/([A-Z0-9]{6})/i);
-      if (match && match[1]) {
-        trackingCode = match[1].toUpperCase();
-        break;
-      }
-    }
-
-    // Se o telefone não veio formatado no checkout mas temos o código de rastreamento:
     let attribution = null;
-    if (trackingCode) {
-      attribution = db.getTrafficAttributionByCode(trackingCode);
-      if (attribution?.telefone_vinculado && (!cleanPhone || cleanPhone.length < 8)) {
-        cleanPhone = attribution.telefone_vinculado;
-        console.log(`[Webhook ${gatewayName}] Lead localizado com sucesso via código ${trackingCode} -> Telefone: ${cleanPhone}`);
+
+    // 5.1 Tenta localizar por código único de 6 caracteres do funil
+    for (const val of candidateParams) {
+      const str = String(val).trim().toUpperCase();
+      if (str === 'TIKTOK' || str === 'FACEBOOK' || str === 'ORGANICO' || str.startsWith('PPCP')) continue;
+
+      const match = str.match(/cw_sec_([A-Z0-9]{6})_2026/i) || str.match(/^([A-Z0-9]{6})$/i) || str.match(/([A-Z0-9]{6})/i);
+      if (match && match[1]) {
+        const candidateCode = match[1].toUpperCase();
+        const foundAttr = db.getTrafficAttributionByCode(candidateCode);
+        if (foundAttr) {
+          trackingCode = candidateCode;
+          attribution = foundAttr;
+          console.log(`[Webhook ${gatewayName}] Atribuição localizada por código: ${trackingCode} -> Lead: ${foundAttr.telefone_vinculado || 'N/A'}`);
+          break;
+        } else if (!trackingCode) {
+          trackingCode = candidateCode;
+        }
       }
     }
 
+    // 5.2 Se não achou por código, tenta localizar por ttclid recebido da PerfectPay
+    if (!attribution && webhookTtclid) {
+      const foundByTtclid = db.getTrafficAttributionByTtclid(webhookTtclid);
+      if (foundByTtclid) {
+        attribution = foundByTtclid;
+        trackingCode = trackingCode || foundByTtclid.codigo;
+        console.log(`[Webhook ${gatewayName}] Atribuição localizada por ttclid da PerfectPay -> Lead: ${foundByTtclid.telefone_vinculado || 'N/A'}`);
+      }
+    }
+
+    // 5.3 Se não achou por código nem ttclid, tenta por telefone
     if (!attribution && cleanPhone) {
       attribution = db.getTrafficAttributionByPhone(cleanPhone);
     }
 
-    // 4. Extrai valor monetário (suporta PerfectPay sale_amount ou sale_amount_cents)
+    // Se temos a atribuição mas o checkout não passou o telefone, usamos o telefone vinculado do lead
+    if (attribution?.telefone_vinculado && (!cleanPhone || cleanPhone.length < 8)) {
+      cleanPhone = attribution.telefone_vinculado;
+      console.log(`[Webhook ${gatewayName}] Telefone do lead recuperado com sucesso via sessão: +${cleanPhone}`);
+    }
+
+    // 6. Extrai valor monetário (PerfectPay sale_amount ou sale_amount_cents)
     const rawAmount = 
       body.sale_amount ||
       (body.sale_amount_cents ? body.sale_amount_cents / 100 : null) ||
@@ -1778,20 +1799,19 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       body.value ||
       body.total ||
       body.data?.amount ||
-      body.data?.price ||
-      body.data?.total ||
-      body.transaction?.amount ||
       39.00;
 
     const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 39.00;
-    const currency = body.currency || body.data?.currency || (amount <= 40 ? 'USD' : 'BRL');
+    const currency = body.currency_enum_key || body.currency || (amount <= 40 ? 'USD' : 'BRL');
 
-    // 5. Extrai status e evento de aprovação (suporta PerfectPay sale_status_enum: 2 = Aprovado)
+    // 7. Extrai status e evento de aprovação (PerfectPay sale_status_enum: 2 = Aprovado)
     const rawStatusEnum = body.sale_status_enum || body.data?.sale_status_enum;
-    const status = (body.status || body.event || body.order_status || body.sale_status || body.status_name || body.data?.status || 'approved').toLowerCase();
-    
-    const isPerfectPayApproved = String(rawStatusEnum) === '2' || String(body.status_name || '').toLowerCase().includes('aprovad');
-    const isApproved = isPerfectPayApproved || status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success') || status.includes('complete');
+    const status = (body.sale_status_enum_key || body.sale_status || body.status || body.event || body.order_status || body.status_name || 'approved').toLowerCase();
+
+    const isPerfectPayApproved = String(rawStatusEnum) === '2' || status === 'approved' || status === 'paid' || status === 'completed';
+    const isApproved = isPerfectPayApproved || status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success');
+
+    const orderId = body.code || body.order_id || body.id || body.data?.id || `ord_${Date.now()}`;
 
     // Registra a venda no banco
     const sale = db.addSale({
@@ -1800,8 +1820,8 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       currency: currency,
       status: isApproved ? 'aprovado' : status,
       platform: body.platform || gatewayName,
-      orderId: body.order_id || body.id || body.code || body.data?.id || `ord_${Date.now()}`,
-      productName: body.product_name || body.product?.name || body.data?.product_name || 'Acesso Painel Monitoramento'
+      orderId: orderId,
+      productName: body.product?.name || body.product_name || 'Acesso Painel Monitoramento'
     });
 
     // Se estiver aprovado:
@@ -1840,7 +1860,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
           const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || trackingCode;
           const codeVal = trackingCode || chat?.codigo || attribution?.codigo || 'vip';
           const deliveryMsg = isEs
-            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
             : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
           try {
@@ -1856,16 +1876,24 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       // Dispara TikTok Events API v1.3 (CompletePayment) com dados completos
       const ttPixels = db.getTikTokPixels();
       if (ttPixels && ttPixels.length > 0) {
+        // Enriquece atribuição com IP e User-Agent do comprador caso não estivessem presentes
+        const enrichedAttr = attribution ? {
+          ...attribution,
+          ip: attribution.ip || buyerIp,
+          user_agent: attribution.user_agent || buyerUserAgent,
+          ttclid: attribution.ttclid || webhookTtclid
+        } : (webhookTtclid ? { ttclid: webhookTtclid, ip: buyerIp, user_agent: buyerUserAgent } : null);
+
         tiktokService.sendTikTokEvent({
           pixelCode: ttPixels[0].pixel_code,
           accessToken: ttPixels[0].access_token,
           eventName: 'CompletePayment',
           phone: cleanPhone,
           email: email,
-          attribution,
+          attribution: enrichedAttr,
           value: amount,
           currency: currency,
-          eventId: `tt_sale_${cleanPhone || trackingCode || 'lead'}_${Date.now()}`
+          eventId: `tt_sale_${orderId}_${Date.now()}`
         }).catch(ttErr => {
           console.warn('[Webhook Payment] Aviso disparando TikTok Events API:', ttErr.message);
         });
@@ -1891,170 +1919,19 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
     }
 
     eventBus.emit('new_sale', sale);
-    return res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id, matchedPhone: cleanPhone || null, matchedCode: trackingCode || null });
+    return res.json({
+      success: true,
+      message: 'Webhook processado com sucesso',
+      saleId: sale.id,
+      orderId: orderId,
+      matchedPhone: cleanPhone || null,
+      matchedCode: trackingCode || null
+    });
   } catch (err) {
     console.error(`[Webhook ${gatewayName} Error]`, err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
-
-// Endpoint oficial universal de pagamentos (Kirvano, CenterPag, Kiwify, etc.)
-router.post('/webhooks/payment', async (req, res) => {
-  return handlePaymentWebhook(req, res, 'Universal');
-});
-
-// Endpoint dedicado específico para CenterPag
-router.post('/webhooks/centerpag', async (req, res) => {
-  return handlePaymentWebhook(req, res, 'CenterPag');
-});
-
-// Endpoint dedicado específico para PerfectPay
-router.post('/webhooks/perfectpay', async (req, res) => {
-  return handlePaymentWebhook(req, res, 'PerfectPay');
-});
-
-// Endpoint para aprovação manual em 1 clique pelo Chat ao Vivo
-router.post('/sales/manual-approve', async (req, res) => {
-  try {
-    const { phone, amount, currency } = req.body;
-    const cleanPhone = String(phone || '').replace(/\D/g, '');
-    if (!cleanPhone) {
-      return res.status(400).json({ success: false, error: 'Telefone do lead é obrigatório.' });
-    }
-
-    const chats = db.getChats();
-    const chat = chats[cleanPhone] || { leadPhone: cleanPhone, messages: [] };
-    const isEs = (chat.language || '').toLowerCase() === 'es';
-    const finalAmount = parseFloat(amount) || (isEs ? 39 : 49.90);
-    const finalCurrency = currency || (isEs ? 'USD' : 'BRL');
-
-    // 1. Atualiza status no CRM
-    chat.orderStatus = 'PAGO';
-    chat.state = 'FINALIZADO';
-    chat.upsellStage = 'stage_finalizado';
-    chat.paidTotal = (chat.paidTotal || 0) + finalAmount;
-    chat.lastPaymentTime = new Date().toISOString();
-    chats[cleanPhone] = chat;
-    db.saveChats(chats);
-
-    // 2. Confirma na atribuição de tráfego
-    const attribution = db.confirmAttributionSale(cleanPhone, finalAmount);
-    const code = chat.codigo || attribution?.codigo || 'vip';
-
-    // 3. Envia mensagem de boas-vindas / acesso no WhatsApp
-    const instances = db.getInstances();
-    const inst = instances.find(i => i.status === 'connected') || instances[0];
-    if (inst) {
-      const deliveryMsg = isEs
-        ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${code}\n\nSi tienes cualquier duda, escríbeme por aquí.`
-        : `Pagamento de R$ ${finalAmount.toFixed(2)} aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
-
-      db.addChatMessage(cleanPhone, { from: 'bot', text: deliveryMsg, instanceId: inst.id }, 'FINALIZADO');
-      const { sendOutgoingTextMessage } = require('../services/flowEngine');
-      await sendOutgoingTextMessage(inst, cleanPhone, deliveryMsg);
-    }
-
-    // 4. Dispara evento no TikTok CAPI
-    let ttResult = null;
-    const ttPixels = db.getTikTokPixels();
-    if (ttPixels && ttPixels.length > 0) {
-      ttResult = await tiktokService.sendTikTokEvent({
-        pixelCode: ttPixels[0].pixel_code,
-        accessToken: ttPixels[0].access_token,
-        eventName: 'CompletePayment',
-        phone: cleanPhone,
-        attribution,
-        value: finalAmount,
-        currency: finalCurrency,
-        eventId: `tt_manual_${cleanPhone}_${Date.now()}`
-      });
-    }
-
-    // 5. Registra venda no histórico
-    const sale = db.addSale({
-      phone: cleanPhone,
-      amount: finalAmount,
-      currency: finalCurrency,
-      status: 'aprovado',
-      platform: 'Manual / Chat ao Vivo',
-      orderId: `ord_manual_${Date.now()}`,
-      productName: 'Acesso Painel Monitoramento ($39 Front)'
-    });
-
-    eventBus.emit('chat_updated', { phone: cleanPhone });
-    eventBus.emit('new_sale', sale);
-
-    return res.json({
-      success: true,
-      message: 'Acesso aprovado com sucesso! Mensagem enviada e evento TikTok CAPI disparado.',
-      tiktok: ttResult
-    });
-  } catch (err) {
-    console.error('[Manual Approve Error]', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Endpoint para reenviar evento TikTok CAPI a partir de uma atribuição ou log com 1 clique
-router.post('/tiktok/resend', async (req, res) => {
-  try {
-    const { code, phone, attribution_id, log_id, pixel_code, value, event_name } = req.body;
-
-    // Localiza registro de atribuição
-    let attr = null;
-    if (code) attr = db.getTrafficAttributionByCode(code);
-    if (!attr && phone) attr = db.getTrafficAttributionByPhone(phone);
-    if (!attr && attribution_id) {
-      const allAttrs = db.getTrafficAttributions();
-      attr = allAttrs.find(a => a.id === attribution_id);
-    }
-
-    let targetPhone = phone || attr?.telefone_vinculado || '';
-    if (!targetPhone && log_id) {
-      const logs = db.getTikTokLogs();
-      const l = logs.find(item => item.id === log_id);
-      if (l) {
-        targetPhone = l.phone || targetPhone;
-        if (!attr && l.ttclid) attr = { ttclid: l.ttclid, ttp: l.ttp, ip: l.ip, user_agent: l.user_agent };
-      }
-    }
-
-    // Busca Pixel TikTok ativo
-    const pixels = db.getTikTokPixels();
-    const pixel = (pixel_code ? pixels.find(p => p.pixel_code === pixel_code) : null) || pixels[0];
-    if (!pixel) {
-      return res.status(400).json({ success: false, error: 'Nenhum Pixel TikTok cadastrado no painel.' });
-    }
-
-    const numValue = parseFloat(value) || attr?.venda_valor || 39.00;
-    const isEs = attr?.pressel_url?.includes('es') || numValue <= 40;
-    const currency = isEs ? 'USD' : 'BRL';
-    const eventName = event_name || 'CompletePayment';
-
-    console.log(`[TikTok CAPI Resend] Reenviando evento "${eventName}" para lead ${targetPhone || 'sem fone'} | ttclid: ${attr?.ttclid || '-'}`);
-
-    const result = await tiktokService.sendTikTokEvent({
-      pixelCode: pixel.pixel_code,
-      accessToken: pixel.access_token,
-      eventName,
-      phone: targetPhone,
-      attribution: attr,
-      value: numValue,
-      currency,
-      eventId: `tt_resend_${targetPhone || 'lead'}_${Date.now()}`
-    });
-
-    return res.json({
-      success: result.success,
-      message: result.success ? 'Evento CompletePayment reenviado ao TikTok com sucesso!' : 'Falha ao reenviar evento.',
-      tiktok: result
-    });
-  } catch (err) {
-    console.error('[TikTok Resend Error]', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 router.get('/dashboard/stats', (req, res) => {
   const chats = db.getChats();
   const sales = db.getSales();

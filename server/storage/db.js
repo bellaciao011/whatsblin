@@ -380,6 +380,12 @@ module.exports = {
     const attributions = readJson('traffic_attributions.json', []);
     return attributions.find(a => a.telefone_vinculado && a.telefone_vinculado.replace(/\D/g, '') === cleanPhone) || null;
   },
+  getTrafficAttributionByTtclid: (ttclid) => {
+    if (!ttclid) return null;
+    const cleanTtclid = String(ttclid).trim();
+    const attributions = readJson('traffic_attributions.json', []);
+    return attributions.find(a => a.ttclid && a.ttclid.trim() === cleanTtclid) || null;
+  },
   linkPhoneToAttribution: (code, phone) => {
     if (!code || !phone) return null;
     const cleanCode = String(code).trim().toUpperCase();
