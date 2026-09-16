@@ -2185,6 +2185,9 @@ async function renderInbox(showLoading = true) {
                   <span>⋮</span>
                 </button>
                 <div id="flow-menu-${activeChat.leadPhone}" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); z-index: 100; min-width: 220px; overflow: hidden;">
+                  <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #34d399; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 700; transition: background 0.15s;" onmouseover="this.style.background='rgba(16,185,129,0.1)'" onmouseout="this.style.background='transparent'" onclick="manualApproveSale('${activeChat.leadPhone}')">
+                    <span>✅</span> Aprovar Acesso & Disparar TikTok
+                  </button>
                   <button style="width: 100%; text-align: left; padding: 10px 14px; background: transparent; border: none; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'welcome')">
                     <span>👋</span> Reiniciar Boas-Vindas
                   </button>
@@ -2226,6 +2229,9 @@ async function renderInbox(showLoading = true) {
             <!-- Barra de Atalhos Rápidos -->
             <div class="chat-quick-actions">
               <span style="font-size: 11px; color: var(--text-muted); margin-right: 4px;">⚡ Ações:</span>
+              <button type="button" class="quick-action-pill" style="background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.4); color: #34d399; font-weight: 700;" onclick="manualApproveSale('${activeChat.leadPhone}')" title="Aprovar compra do Front ($39 USD / R$ 49,90) e disparar TikTok CAPI">
+                <span>✅ Aprovar Acesso ($39)</span>
+              </button>
               <button type="button" class="quick-action-pill" onclick="triggerManualFlowForLead('${activeChat.leadPhone}', 'start')">
                 <span>⚡ Iniciar Automação</span>
               </button>
@@ -4277,6 +4283,7 @@ async function renderTikTokAttribution() {
                     <th>_ttp Cookie</th>
                     <th>Criado Em</th>
                     <th>Status</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4423,6 +4430,11 @@ async function renderTikTokAttribution() {
                           <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; color: var(--red);" onclick="handleDeleteCampaign('${c.id}')" title="Excluir">🗑️</button>
                         </div>
                       </td>
+                      <td>
+                        <button class="btn btn-secondary" style="padding: 3px 7px; font-size: 11px; color: #fe2c55; border-color: rgba(254,44,85,0.4);" onclick="resendTikTokLog('${l.id}')" title="Reenviar evento ao TikTok">
+                          ⚡ Reenviar
+                        </button>
+                      </td>
                     </tr>
                   `).join('') : `
                     <tr>
@@ -4521,6 +4533,7 @@ async function renderTikTokAttribution() {
                     <th>ttclid / Ad Callback</th>
                     <th>Status HTTP</th>
                     <th>Resposta da API</th>
+                    <th>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4552,6 +4565,11 @@ async function renderTikTokAttribution() {
                         <div style="font-size: 11px; font-family: monospace; color: #cbd5e1; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${JSON.stringify(l.response || {})}">
                           ${typeof l.response === 'object' ? JSON.stringify(l.response) : String(l.response || l.error || 'OK')}
                         </div>
+                      </td>
+                      <td>
+                        <button class="btn btn-secondary" style="padding: 3px 7px; font-size: 11px; color: #fe2c55; border-color: rgba(254,44,85,0.4);" onclick="resendTikTokLog('${l.id}')" title="Reenviar evento ao TikTok">
+                          ⚡ Reenviar
+                        </button>
                       </td>
                     </tr>
                   `).join('') : `
@@ -5488,3 +5506,76 @@ async function handleSaveRailwayConfig(e) {
 
 
 
+
+// =========================================================================
+// FUNÇÕES GLOBAIS DE ATRIBUIÇÃO, APROVAÇÃO MANUAL E REENVIO TIKTOK CAPI
+// =========================================================================
+window.manualApproveSale = async function(phone) {
+  if (!phone) return;
+  if (!confirm('Deseja aprovar o acesso deste lead ($39 USD / R$ 49,90), enviar a mensagem de liberação no WhatsApp e disparar o evento CompletePayment ao TikTok CAPI?')) {
+    return;
+  }
+
+  showToast('Aprovando acesso e disparando TikTok CAPI...');
+  try {
+    const res = await fetch('/api/sales/manual-approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      showToast('🎉 Acesso liberado no WhatsApp e evento TikTok CAPI disparado com sucesso!');
+      if (typeof loadChats === 'function') loadChats();
+      if (typeof renderChat === 'function') renderChat();
+    } else {
+      showToast('Erro: ' + (data.error || 'Falha ao aprovar venda'));
+    }
+  } catch (err) {
+    showToast('Erro na requisição: ' + err.message);
+  }
+};
+
+window.resendTikTokAttribution = async function(code, phone) {
+  showToast('Reenviando evento CompletePayment ao TikTok Ads Manager...');
+  try {
+    const res = await fetch('/api/tiktok/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, phone })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      showToast('⚡ Evento aceito com sucesso pelo TikTok Ads Manager!');
+      if (typeof renderTikTokAttribution === 'function') renderTikTokAttribution();
+    } else {
+      showToast('Aviso TikTok: ' + (data.error || data.tiktok?.error || 'Verifique o log da API'));
+    }
+  } catch (err) {
+    showToast('Erro ao reenviar: ' + err.message);
+  }
+};
+
+window.resendTikTokLog = async function(logId) {
+  if (!logId) return;
+  showToast('Reenviando evento ao TikTok...');
+  try {
+    const res = await fetch('/api/tiktok/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: logId })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      showToast('⚡ Evento reenviado ao TikTok com sucesso!');
+      if (typeof renderTikTokAttribution === 'function') renderTikTokAttribution();
+    } else {
+      showToast('Erro TikTok: ' + (data.error || data.tiktok?.error || 'Falha ao disparar'));
+    }
+  } catch (err) {
+    showToast('Erro na conexão: ' + err.message);
+  }
+};

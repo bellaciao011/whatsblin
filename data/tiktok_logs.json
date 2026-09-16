@@ -1,1 +1,51 @@
-[]
+[
+  {
+    "id": "tt_log_1789534128478_23",
+    "timestamp": "2026-09-16T04:48:48.478Z",
+    "pixel_code": "DAKL63JC77U0846PIET0",
+    "event": "CompletePayment",
+    "phone": "525584769542",
+    "phone_hash": "ae851aaa9724f38b6920ddbaf0bf576e6d50674df47f36641a2baa37bb93c37c",
+    "ttclid": "TEST_TTCLID_1789534127751",
+    "ttp": "TEST_TTP_COOKIE_1789534127751",
+    "ip": "189.200.45.12",
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+    "value": 39,
+    "currency": "USD",
+    "status": "sucesso",
+    "payload": {
+      "event_source": "web",
+      "event_source_id": "DAKL63JC77U0846PIET0",
+      "test_event_code": "TEST07597",
+      "data": [
+        {
+          "event": "CompletePayment",
+          "event_time": 1789534127,
+          "event_id": "tt_test_chain_1789534127755",
+          "user": {
+            "phone": "ae851aaa9724f38b6920ddbaf0bf576e6d50674df47f36641a2baa37bb93c37c",
+            "external_id": "ae851aaa9724f38b6920ddbaf0bf576e6d50674df47f36641a2baa37bb93c37c",
+            "ttclid": "TEST_TTCLID_1789534127751",
+            "ttp": "TEST_TTP_COOKIE_1789534127751",
+            "ip": "189.200.45.12",
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
+          },
+          "page": {
+            "url": "https://wtb.expresstrackin-g.com/c/campanha"
+          },
+          "properties": {
+            "value": 39,
+            "currency": "USD",
+            "content_type": "product"
+          }
+        }
+      ]
+    },
+    "response": {
+      "code": 0,
+      "message": "OK",
+      "request_id": "202609160448489C51DC25A46B14DE58B8",
+      "data": {}
+    }
+  }
+]

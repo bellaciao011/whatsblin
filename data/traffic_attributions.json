@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "id": "attr_1789534127752_804",
+    "ip": "189.200.45.12",
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+    "platform": "tiktok",
+    "host": null,
+    "dominio_customizado_id": null,
+    "dominio_customizado": null,
+    "fbclid": null,
+    "codigo": "LAX7L8",
+    "ttclid": "TEST_TTCLID_1789534127751",
+    "ttp": "TEST_TTP_COOKIE_1789534127751",
+    "utm_source": "tiktok",
+    "utm_medium": null,
+    "utm_campaign": "campanha_espiao_espanhol",
+    "utm_content": null,
+    "utm_term": null,
+    "campanha_id": null,
+    "campanha_nome": null,
+    "pressel_url": "https://wtb.expresstrackin-g.com/c/campanha",
+    "criado_em": "2026-09-16T04:48:47.752Z",
+    "expira_em": "2026-09-18T04:48:47.752Z",
+    "telefone_vinculado": "525584769542",
+    "vinculado_em": "2026-09-16T04:48:47.754Z",
+    "venda_confirmada": true,
+    "venda_valor": 39,
+    "confirmado_em": "2026-09-16T04:48:48.478Z"
+  }
+]

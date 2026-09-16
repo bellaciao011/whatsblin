@@ -60,6 +60,8 @@ async function sendTikTokEvent(options = {}) {
       phone: phone || '',
       ttclid: attribution?.ttclid || null,
       ttp: attribution?.ttp || null,
+      ip: attribution?.ip || null,
+      user_agent: attribution?.user_agent || null,
       value: parseFloat(value) || 0,
       currency: currency || 'BRL',
       status: 'erro',
@@ -86,6 +88,15 @@ async function sendTikTokEvent(options = {}) {
   }
   if (attribution?.ttp) {
     userData.ttp = attribution.ttp;
+  }
+  if (attribution?.ip) {
+    userData.ip = attribution.ip;
+  }
+  if (attribution?.user_agent) {
+    userData.user_agent = attribution.user_agent;
+  }
+  if (options.email) {
+    userData.email = sha256(options.email);
   }
 
   // Página da conversão
@@ -129,6 +140,8 @@ async function sendTikTokEvent(options = {}) {
       phone_hash: phoneHash,
       ttclid: attribution?.ttclid || null,
       ttp: attribution?.ttp || null,
+      ip: attribution?.ip || null,
+      user_agent: attribution?.user_agent || null,
       value: numValue,
       currency,
       status: 'sucesso',
@@ -165,7 +178,9 @@ async function sendTikTokEvent(options = {}) {
         phone: cleanPhone,
         phone_hash: phoneHash,
         ttclid: attribution?.ttclid || null,
-        ttp: attribution?.ttp || null,
+      ttp: attribution?.ttp || null,
+      ip: attribution?.ip || null,
+      user_agent: attribution?.user_agent || null,
         value: numValue,
         currency,
         status: 'sucesso',
@@ -184,7 +199,9 @@ async function sendTikTokEvent(options = {}) {
         phone: cleanPhone,
         phone_hash: phoneHash,
         ttclid: attribution?.ttclid || null,
-        ttp: attribution?.ttp || null,
+      ttp: attribution?.ttp || null,
+      ip: attribution?.ip || null,
+      user_agent: attribution?.user_agent || null,
         value: numValue,
         currency,
         status: 'erro',
@@ -206,6 +223,8 @@ async function sendTikTokEvent(options = {}) {
       phone_hash: phoneHash,
       ttclid: attribution?.ttclid || null,
       ttp: attribution?.ttp || null,
+      ip: attribution?.ip || null,
+      user_agent: attribution?.user_agent || null,
       value: numValue,
       currency,
       status: 'erro',

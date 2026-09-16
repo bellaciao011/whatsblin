@@ -1670,12 +1670,15 @@ router.get('/pixels/logs', (req, res) => {
    WEBHOOK UNIVERSAL DE PAGAMENTOS (KIRVANO, KIWIFY, PERFECTPAY, ETC.)
    ========================================================================= */
 
-router.post('/webhooks/payment', async (req, res) => {
+// =========================================================================
+// PROCESSADOR UNIVERSAL DE WEBHOOK DE PAGAMENTO (CENTERPAG, KIRVANO, ETC.)
+// =========================================================================
+async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
   try {
     const body = req.body || {};
-    console.log('[Webhook Payment] Notificação recebida:', JSON.stringify(body));
+    console.log(`[Webhook ${gatewayName}] Notificação recebida:`, JSON.stringify(body));
 
-    // Extrai telefone do cliente em diferentes formatos de gateway
+    // 1. Extrai telefone do cliente em diferentes formatos
     const rawPhone = 
       body.phone ||
       body.customer?.phone ||
@@ -1683,104 +1686,331 @@ router.post('/webhooks/payment', async (req, res) => {
       body.buyer?.phone ||
       body.client?.phone ||
       body.data?.customer?.phone ||
-      body.data?.phone || '';
+      body.data?.phone ||
+      body.transaction?.customer?.phone ||
+      '';
 
-    const cleanPhone = String(rawPhone).replace(/\D/g, '');
+    let cleanPhone = String(rawPhone).replace(/\D/g, '');
 
-    // Extrai valor monetário
+    // 2. Extrai e-mail (essencial para Advanced Matching no TikTok)
+    const email = 
+      body.email ||
+      body.customer?.email ||
+      body.buyer?.email ||
+      body.client?.email ||
+      body.data?.customer?.email ||
+      body.data?.email ||
+      body.transaction?.customer?.email ||
+      null;
+
+    // 3. Extrai rastreamento e código único de atribuição da URL / SRC
+    const rawSrc = 
+      body.src ||
+      body.utm_source ||
+      body.tracking_code ||
+      body.custom_id ||
+      body.metadata?.src ||
+      body.metadata?.utm_source ||
+      body.data?.src ||
+      body.data?.utm_source ||
+      body.data?.tracking_code ||
+      body.transaction?.src ||
+      body.transaction?.tracking_code ||
+      req.query?.src ||
+      '';
+
+    const codeMatch = String(rawSrc).match(/cw_sec_([A-Z0-9]{6})_2026/i) || String(rawSrc).match(/([A-Z0-9]{6})/i);
+    const trackingCode = codeMatch ? codeMatch[1].toUpperCase() : null;
+
+    // Se o telefone não veio formatado no checkout mas temos o código de rastreamento:
+    let attribution = null;
+    if (trackingCode) {
+      attribution = db.getTrafficAttributionByCode(trackingCode);
+      if (attribution?.telefone_vinculado && (!cleanPhone || cleanPhone.length < 8)) {
+        cleanPhone = attribution.telefone_vinculado;
+        console.log(`[Webhook ${gatewayName}] Lead localizado com sucesso via código ${trackingCode} -> Telefone: ${cleanPhone}`);
+      }
+    }
+
+    if (!attribution && cleanPhone) {
+      attribution = db.getTrafficAttributionByPhone(cleanPhone);
+    }
+
+    // 4. Extrai valor monetário
     const rawAmount = 
       body.amount ||
       body.price ||
       body.value ||
       body.total ||
       body.data?.amount ||
-      body.data?.price || 49.90;
+      body.data?.price ||
+      body.data?.total ||
+      body.transaction?.amount ||
+      39.00;
 
-    const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 49.90;
+    const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 39.00;
+    const currency = body.currency || body.data?.currency || (amount <= 40 ? 'USD' : 'BRL');
 
-    // Extrai status e evento
-    const status = (body.status || body.event || body.order_status || 'approved').toLowerCase();
-    const isApproved = status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud');
+    // 5. Extrai status e evento de aprovação
+    const status = (body.status || body.event || body.order_status || body.data?.status || 'approved').toLowerCase();
+    const isApproved = status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success');
 
     // Registra a venda no banco
     const sale = db.addSale({
       phone: cleanPhone || 'desconhecido',
       amount: amount,
-      currency: body.currency || 'BRL',
+      currency: currency,
       status: isApproved ? 'aprovado' : status,
-      platform: body.platform || 'Kirvano / Gateway',
-      orderId: body.order_id || body.id || `ord_${Date.now()}`,
-      productName: body.product_name || body.product?.name || 'Acesso Painel Mavrol'
+      platform: body.platform || gatewayName,
+      orderId: body.order_id || body.id || body.data?.id || `ord_${Date.now()}`,
+      productName: body.product_name || body.product?.name || body.data?.product_name || 'Acesso Painel Monitoramento'
     });
 
-    // Se tiver telefone válido, atualiza o lead no CRM
-    if (cleanPhone) {
-      const chats = db.getChats();
-      let chat = chats[cleanPhone];
-      if (chat) {
-        chat.paidTotal = (chat.paidTotal || 0) + amount;
-        chat.lastPaymentTime = new Date().toISOString();
-        chat.orderStatus = isApproved ? 'PAGO' : status;
-        db.saveChats(chats);
-        eventBus.emit('chat_updated', { phone: cleanPhone });
-      }
-    }
-
-    // Se estiver aprovado, confirma venda na atribuição de tráfego e dispara Pixels
+    // Se estiver aprovado:
     if (isApproved) {
-      db.confirmAttributionSale(cleanPhone, amount);
-
-      const pixels = db.getPixels();
-      if (pixels && pixels.length > 0) {
-        const primaryPixel = pixels[0];
-        try {
-          await metaService.sendPixelConversion(
-            primaryPixel.pixelId,
-            primaryPixel.accessToken,
-            'Purchase',
-            cleanPhone,
-            {
-              value: amount,
-              currency: 'BRL',
-              pageId: primaryPixel.pageId || undefined,
-              testEventCode: primaryPixel.testEventCode || undefined
-            }
-          );
-        } catch (pixErr) {
-          console.warn('[Webhook Payment] Aviso disparando CAPI:', pixErr.message);
+      // Confirma venda na tabela de atribuições
+      if (cleanPhone) {
+        db.confirmAttributionSale(cleanPhone, amount);
+      } else if (trackingCode) {
+        const attrByCode = db.getTrafficAttributionByCode(trackingCode);
+        if (attrByCode) {
+          attrByCode.venda_confirmada = true;
+          attrByCode.venda_valor = amount;
+          attrByCode.confirmado_em = new Date().toISOString();
         }
       }
 
-      // Disparo TikTok Events API v1.3
+      // Atualiza estado do lead no CRM para FINALIZADO / PAGO
+      if (cleanPhone) {
+        const chats = db.getChats();
+        let chat = chats[cleanPhone];
+        if (chat) {
+          chat.paidTotal = (chat.paidTotal || 0) + amount;
+          chat.lastPaymentTime = new Date().toISOString();
+          chat.orderStatus = 'PAGO';
+          chat.state = 'FINALIZADO';
+          chat.upsellStage = 'stage_finalizado';
+          if (trackingCode) chat.codigo = trackingCode;
+          db.saveChats(chats);
+          eventBus.emit('chat_updated', { phone: cleanPhone });
+        }
+
+        // Entrega o acesso imediatamente no WhatsApp via chip conectado
+        const instances = db.getInstances();
+        const inst = instances.find(i => i.status === 'connected') || instances[0];
+        if (inst) {
+          const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || String(rawSrc).includes('es');
+          const codeVal = trackingCode || chat?.codigo || attribution?.codigo || 'vip';
+          const deliveryMsg = isEs
+            ? `¡Tu pago de $39 USD fue aprobado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${codeVal}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+            : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
+
+          try {
+            db.addChatMessage(cleanPhone, { from: 'bot', text: deliveryMsg, instanceId: inst.id }, 'FINALIZADO');
+            const { sendOutgoingTextMessage } = require('../services/flowEngine');
+            sendOutgoingTextMessage(inst, cleanPhone, deliveryMsg).catch(err => console.warn('[Webhook] Falha ao enviar WhatsApp:', err.message));
+          } catch (e) {
+            console.warn('[Webhook Delivery Warning]', e.message);
+          }
+        }
+      }
+
+      // Dispara TikTok Events API v1.3 (CompletePayment) com dados completos
       const ttPixels = db.getTikTokPixels();
       if (ttPixels && ttPixels.length > 0) {
-        const attribution = db.getTrafficAttributionByPhone(cleanPhone);
         tiktokService.sendTikTokEvent({
           pixelCode: ttPixels[0].pixel_code,
           accessToken: ttPixels[0].access_token,
           eventName: 'CompletePayment',
           phone: cleanPhone,
+          email: email,
           attribution,
           value: amount,
-          currency: 'BRL',
-          eventId: `tt_sale_${cleanPhone}_${Date.now()}`
+          currency: currency,
+          eventId: `tt_sale_${cleanPhone || trackingCode || 'lead'}_${Date.now()}`
         }).catch(ttErr => {
           console.warn('[Webhook Payment] Aviso disparando TikTok Events API:', ttErr.message);
         });
       }
+
+      // Disparo Meta CAPI (Purchase) caso configurado
+      const pixels = db.getPixels();
+      if (pixels && pixels.length > 0 && cleanPhone) {
+        const primaryPixel = pixels[0];
+        metaService.sendPixelConversion(
+          primaryPixel.pixelId,
+          primaryPixel.accessToken,
+          'Purchase',
+          cleanPhone,
+          {
+            value: amount,
+            currency: currency,
+            pageId: primaryPixel.pageId || undefined,
+            testEventCode: primaryPixel.testEventCode || undefined
+          }
+        ).catch(pixErr => console.warn('[Webhook Payment] Aviso Meta CAPI:', pixErr.message));
+      }
     }
 
     eventBus.emit('new_sale', sale);
-    res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id });
+    return res.json({ success: true, message: 'Webhook processado com sucesso', saleId: sale.id, matchedPhone: cleanPhone || null });
   } catch (err) {
-    console.error('[Webhook Payment Error]', err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error(`[Webhook ${gatewayName} Error]`, err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// Endpoint oficial universal de pagamentos (Kirvano, CenterPag, Kiwify, etc.)
+router.post('/webhooks/payment', async (req, res) => {
+  return handlePaymentWebhook(req, res, 'CenterPag / Kirvano');
+});
+
+// Endpoint dedicado específico para CenterPag
+router.post('/webhooks/centerpag', async (req, res) => {
+  return handlePaymentWebhook(req, res, 'CenterPag');
+});
+
+// Endpoint para aprovação manual em 1 clique pelo Chat ao Vivo
+router.post('/sales/manual-approve', async (req, res) => {
+  try {
+    const { phone, amount, currency } = req.body;
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanPhone) {
+      return res.status(400).json({ success: false, error: 'Telefone do lead é obrigatório.' });
+    }
+
+    const chats = db.getChats();
+    const chat = chats[cleanPhone] || { leadPhone: cleanPhone, messages: [] };
+    const isEs = (chat.language || '').toLowerCase() === 'es';
+    const finalAmount = parseFloat(amount) || (isEs ? 39 : 49.90);
+    const finalCurrency = currency || (isEs ? 'USD' : 'BRL');
+
+    // 1. Atualiza status no CRM
+    chat.orderStatus = 'PAGO';
+    chat.state = 'FINALIZADO';
+    chat.upsellStage = 'stage_finalizado';
+    chat.paidTotal = (chat.paidTotal || 0) + finalAmount;
+    chat.lastPaymentTime = new Date().toISOString();
+    chats[cleanPhone] = chat;
+    db.saveChats(chats);
+
+    // 2. Confirma na atribuição de tráfego
+    const attribution = db.confirmAttributionSale(cleanPhone, finalAmount);
+    const code = chat.codigo || attribution?.codigo || 'vip';
+
+    // 3. Envia mensagem de boas-vindas / acesso no WhatsApp
+    const instances = db.getInstances();
+    const inst = instances.find(i => i.status === 'connected') || instances[0];
+    if (inst) {
+      const deliveryMsg = isEs
+        ? `¡Tu pago de $39 USD fue confirmado con éxito! 🎉\n\nTu acceso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 https://spysfunills.vercel.app/upsell1/?code=${code}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+        : `Pagamento de R$ ${finalAmount.toFixed(2)} aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
+
+      db.addChatMessage(cleanPhone, { from: 'bot', text: deliveryMsg, instanceId: inst.id }, 'FINALIZADO');
+      const { sendOutgoingTextMessage } = require('../services/flowEngine');
+      await sendOutgoingTextMessage(inst, cleanPhone, deliveryMsg);
+    }
+
+    // 4. Dispara evento no TikTok CAPI
+    let ttResult = null;
+    const ttPixels = db.getTikTokPixels();
+    if (ttPixels && ttPixels.length > 0) {
+      ttResult = await tiktokService.sendTikTokEvent({
+        pixelCode: ttPixels[0].pixel_code,
+        accessToken: ttPixels[0].access_token,
+        eventName: 'CompletePayment',
+        phone: cleanPhone,
+        attribution,
+        value: finalAmount,
+        currency: finalCurrency,
+        eventId: `tt_manual_${cleanPhone}_${Date.now()}`
+      });
+    }
+
+    // 5. Registra venda no histórico
+    const sale = db.addSale({
+      phone: cleanPhone,
+      amount: finalAmount,
+      currency: finalCurrency,
+      status: 'aprovado',
+      platform: 'Manual / Chat ao Vivo',
+      orderId: `ord_manual_${Date.now()}`,
+      productName: 'Acesso Painel Monitoramento ($39 Front)'
+    });
+
+    eventBus.emit('chat_updated', { phone: cleanPhone });
+    eventBus.emit('new_sale', sale);
+
+    return res.json({
+      success: true,
+      message: 'Acesso aprovado com sucesso! Mensagem enviada e evento TikTok CAPI disparado.',
+      tiktok: ttResult
+    });
+  } catch (err) {
+    console.error('[Manual Approve Error]', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-/* =========================================================================
-   ESTATÍSTICAS DA DASHBOARD & FUNIL DE CONVERSÃO
-   ========================================================================= */
+// Endpoint para reenviar evento TikTok CAPI a partir de uma atribuição ou log com 1 clique
+router.post('/tiktok/resend', async (req, res) => {
+  try {
+    const { code, phone, attribution_id, log_id, pixel_code, value, event_name } = req.body;
+
+    // Localiza registro de atribuição
+    let attr = null;
+    if (code) attr = db.getTrafficAttributionByCode(code);
+    if (!attr && phone) attr = db.getTrafficAttributionByPhone(phone);
+    if (!attr && attribution_id) {
+      const allAttrs = db.getTrafficAttributions();
+      attr = allAttrs.find(a => a.id === attribution_id);
+    }
+
+    let targetPhone = phone || attr?.telefone_vinculado || '';
+    if (!targetPhone && log_id) {
+      const logs = db.getTikTokLogs();
+      const l = logs.find(item => item.id === log_id);
+      if (l) {
+        targetPhone = l.phone || targetPhone;
+        if (!attr && l.ttclid) attr = { ttclid: l.ttclid, ttp: l.ttp, ip: l.ip, user_agent: l.user_agent };
+      }
+    }
+
+    // Busca Pixel TikTok ativo
+    const pixels = db.getTikTokPixels();
+    const pixel = (pixel_code ? pixels.find(p => p.pixel_code === pixel_code) : null) || pixels[0];
+    if (!pixel) {
+      return res.status(400).json({ success: false, error: 'Nenhum Pixel TikTok cadastrado no painel.' });
+    }
+
+    const numValue = parseFloat(value) || attr?.venda_valor || 39.00;
+    const isEs = attr?.pressel_url?.includes('es') || numValue <= 40;
+    const currency = isEs ? 'USD' : 'BRL';
+    const eventName = event_name || 'CompletePayment';
+
+    console.log(`[TikTok CAPI Resend] Reenviando evento "${eventName}" para lead ${targetPhone || 'sem fone'} | ttclid: ${attr?.ttclid || '-'}`);
+
+    const result = await tiktokService.sendTikTokEvent({
+      pixelCode: pixel.pixel_code,
+      accessToken: pixel.access_token,
+      eventName,
+      phone: targetPhone,
+      attribution: attr,
+      value: numValue,
+      currency,
+      eventId: `tt_resend_${targetPhone || 'lead'}_${Date.now()}`
+    });
+
+    return res.json({
+      success: result.success,
+      message: result.success ? 'Evento CompletePayment reenviado ao TikTok com sucesso!' : 'Falha ao reenviar evento.',
+      tiktok: result
+    });
+  } catch (err) {
+    console.error('[TikTok Resend Error]', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 router.get('/dashboard/stats', (req, res) => {
   const chats = db.getChats();

@@ -72,6 +72,10 @@ router.get('/:slug', (req, res) => {
     const utm_content = req.query.utm_content || null;
     const utm_term = req.query.utm_term || null;
 
+    // Captura IP e User-Agent do lead para mǭxima precisǜo no TikTok CAPI
+    const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.headers['x-real-ip'] || req.socket?.remoteAddress || null;
+    const userAgent = req.headers['user-agent'] || null;
+
     // Captura cookie _ttp do TikTok se presente no request
     let ttp = req.query.ttp || req.query._ttp || null;
     if (!ttp && req.headers.cookie) {
@@ -92,6 +96,8 @@ router.get('/:slug', (req, res) => {
       ttclid,
       fbclid,
       ttp,
+      ip: clientIp,
+      user_agent: userAgent,
       utm_source,
       utm_medium,
       utm_campaign,

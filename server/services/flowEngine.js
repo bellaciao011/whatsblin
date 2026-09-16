@@ -483,6 +483,11 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   chatData.variables.checkoutUrl200 = funnel.upsellStages?.stage_200?.checkoutUrl || 'https://pay.kirvano.com/checkout-200';
   chatData.variables.checkoutUrl400 = funnel.upsellStages?.stage_400?.checkoutUrl || 'https://pay.kirvano.com/checkout-400';
 
+  const storedAttr = db.getTrafficAttributionByPhone(cleanPhone);
+  if (!chatData.codigo && storedAttr?.codigo) {
+    chatData.codigo = storedAttr.codigo;
+    chatData.attribution = storedAttr;
+  }
   const rawDigits = (messageText || '').replace(/\D/g, '');
   const stageInfo = getCurrentStageInfo(chatData.upsellStage, funnel, flowLanguage, chatData.codigo || 'lead');
   
@@ -514,6 +519,41 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // CASO 1: LEAD JÁ ESTÁ NA ETAPA DE OFERTA / UPSELL (REPOSTAS, OBJEÇÕES, COMPROVANTES)
   // =========================================================================
   if (chatData.state === 'OFERTA_ENVIADA' || chatData.state === 'NEGOCIACAO' || chatData.state === 'DUVIDAS') {
+    // 1.0 Detecção de intenção / aviso de pagamento ("ya pagué", "já paguei", "pago realizado", etc.)
+    const isPaymentClaim = /(?:ya\s*pag[uú][eé]|listo\s*pag|pago\s*realizado|ya\s*compr[eé]|acabo\s*de\s*pagar|pagu[eé]\s*con\s*tarjeta|pago\s*hecho|j[aá]\s*paguei|paguei)/i.test(messageText);
+
+    if (isPaymentClaim) {
+      const isAlreadyPaid = chatData.orderStatus === 'PAGO' || chatData.state === 'FINALIZADO' || storedAttr?.venda_confirmada;
+
+      if (isAlreadyPaid) {
+        const accessCode = chatData.codigo || storedAttr?.codigo || 'vip';
+        const accessUrl = `https://spysfunills.vercel.app/upsell1/?code=${accessCode}`;
+        const paidMsg = flowLanguage === 'es'
+          ? `¡Tu pago ya está confirmado y activo en nuestro sistema! 🎉\n\nTu acceso completo e ilimitado al panel está disponible aquí:\n👉 ${accessUrl}\n\n¡Ingresa y aprovecha todas las herramientas!`
+          : `Seu pagamento já está aprovado e ativo! 🎉\n\nSeu acesso foi liberado com sucesso!`;
+
+        db.addChatMessage(cleanPhone, { from: 'bot', text: paidMsg, instanceId: inst.id }, 'FINALIZADO');
+        await sendOutgoingTextMessage(inst, cleanPhone, paidMsg);
+        chatData.state = 'FINALIZADO';
+        chatData.upsellStage = 'stage_finalizado';
+        chats[cleanPhone] = chatData;
+        db.saveChats(chats);
+        eventBus.emit('chat_updated', { phone: cleanPhone });
+        return;
+      } else {
+        const pendingMsg = flowLanguage === 'es'
+          ? `¡Excelente! Los pagos con tarjeta se confirman de forma automática en pocos segundos por el procesador bancario. En cuanto el banco lo valide, tu acceso quedará activo de inmediato.\n\nSi ya completaste la compra, por favor indícame el correo electrónico que usaste para verificarlo en el sistema.`
+          : `Que ótimo! Os pagamentos com cartão são confirmados automaticamente pelo banco em poucos instantes. Qual foi o e-mail cadastrado na compra para acelerar a liberação?`;
+
+        db.addChatMessage(cleanPhone, { from: 'bot', text: pendingMsg, instanceId: inst.id }, 'DUVIDAS');
+        await sendOutgoingTextMessage(inst, cleanPhone, pendingMsg);
+        chatData.state = 'DUVIDAS';
+        chats[cleanPhone] = chatData;
+        db.saveChats(chats);
+        eventBus.emit('chat_updated', { phone: cleanPhone });
+        return;
+      }
+    }
     // 1.1 Se o lead enviou imagem ou comprovante válido
     const isComprovanteValido = mediaAttachment || messageText.toLowerCase().includes('[comprovante_valido]') || messageText.toLowerCase().includes('comprovante aprovado') || messageText.toLowerCase().includes('comprobante aprobado') || messageText.toLowerCase().includes('receipt approved');
     const isImagemInvalida = messageText.toLowerCase().includes('[print_invalido]') || messageText.toLowerCase().includes('[imagem_aleatoria]');
@@ -898,7 +938,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
 
     // Envia a instrução de comprovante
     const fallbackProofInstruction = flowLanguage === 'es'
-      ? "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear el acceso completo!"
+      ? "El pago con tarjeta se confirma automáticamente en pocos segundos. ¡Avísame por aquí en cuanto lo completes para confirmar tu acceso!"
       : (flowLanguage === 'en'
         ? "As soon as you pay, send me the receipt here to unlock full access!"
         : "Assim que pagar, me envia o comprovante por aqui para liberar o acesso completo.");
@@ -983,7 +1023,10 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
       const code = codeMatch[1].toUpperCase();
       const linkedAttr = db.linkPhoneToAttribution(code, cleanPhone);
       if (linkedAttr) {
-        console.log(`[FlowEngine] 🎯 TikTok Attribution vinculada com sucesso! Código: ${code} ➔ Lead: ${cleanPhone} (Campanha: ${linkedAttr.campanha_nome || linkedAttr.utm_campaign || 'N/A'})`);
+        console.log(`[FlowEngine] 🎯 TikTok Attribution vinculada com sucesso! Código: ${code} → Lead: ${cleanPhone} (Campanha: ${linkedAttr.campanha_nome || linkedAttr.utm_campaign || 'N/A'})`);
+        existingChat.codigo = code;
+        existingChat.attribution = linkedAttr;
+        chatNeedsSave = true;
       } else {
         console.log(`[FlowEngine] ℹ️ Código de campanha ${code} recebido de ${cleanPhone}, mas não encontrado ou já expirado.`);
       }

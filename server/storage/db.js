@@ -312,6 +312,13 @@ module.exports = {
 
     const newAttr = {
       id: 'attr_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      ip: attrData.ip || null,
+      user_agent: attrData.user_agent || null,
+      platform: attrData.platform || 'organico',
+      host: attrData.host || null,
+      dominio_customizado_id: attrData.dominio_customizado_id || null,
+      dominio_customizado: attrData.dominio_customizado || null,
+      fbclid: attrData.fbclid || null,
       codigo: attrData.codigo,
       ttclid: attrData.ttclid || null,
       ttp: attrData.ttp || null,
