@@ -1967,7 +1967,7 @@ router.get('/traffic/campaigns', (req, res) => {
 
 // Criar nova campanha (Pressel própria ultra-rápida padrão ou externa opcional)
 router.post('/traffic/campaigns', (req, res) => {
-  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain } = req.body;
+  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain, idioma } = req.body;
 
   if (!name || !whatsapp_number) {
     return res.status(400).json({ error: 'Nome da campanha e WhatsApp de destino são obrigatórios' });
@@ -1986,7 +1986,8 @@ router.post('/traffic/campaigns', (req, res) => {
     message_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
     mensagem_template: message_template || 'Oii vim pelo anúncio (código {codigo})',
     slug,
-    custom_domain: selectedDomain
+    custom_domain: selectedDomain,
+    idioma: idioma || 'es'
   });
 
   const host = req.get('host') || 'localhost:3000';
@@ -2010,7 +2011,8 @@ router.patch('/traffic/campaigns/:id', (req, res) => {
   const idx = campaigns.findIndex(c => c.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: 'Campanha não encontrada' });
 
-  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain } = req.body;
+  const { name, presell_url, whatsapp_number, message_template, slug, custom_domain, idioma } = req.body;
+  if (idioma) campaigns[idx].idioma = campaigns[idx].language = idioma;
   if (name) campaigns[idx].name = campaigns[idx].nome = name;
   if (slug) campaigns[idx].slug = slug;
   if (custom_domain !== undefined) campaigns[idx].custom_domain = custom_domain;

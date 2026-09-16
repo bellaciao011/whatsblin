@@ -167,131 +167,130 @@ router.get('/:slug', (req, res) => {
       } catch(e){}
     `).join('\n');
 
+        // Determina o idioma da pressel (ES ou PT)
+    const rawLang = String(campaign.idioma || campaign.language || '').toLowerCase().trim();
+    const isSpanish = rawLang === 'es' || (!rawLang && (
+      (campaign.mensagem_template || '').toLowerCase().includes('hola') ||
+      (campaign.mensagem_template || '').toLowerCase().includes('espiar') ||
+      (campaign.mensagem_template || '').toLowerCase().includes('borres')
+    ));
+
+    const langCode = isSpanish ? 'es' : 'pt-BR';
+    const titleText = isSpanish ? 'Redirigiendo a WhatsApp...' : 'Redirecionando para o WhatsApp...';
+    const statusMsg = isSpanish 
+      ? 'Aguarde, usted será redirigido a WhatsApp...' 
+      : 'Aguarde, você será redirecionado para o WhatsApp...';
+    const fallbackText = isSpanish 
+      ? 'Haga clic aquí si no es redirigido automáticamente' 
+      : 'Clique aqui caso não seja redirecionado automaticamente';
+
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="${langCode}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Conectando ao WhatsApp...</title>
+  <title>${titleText}</title>
   <meta name="theme-color" content="#0a0a0f">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: radial-gradient(circle at 50% 30%, #151522 0%, #0a0a0f 100%);
-      color: #f8fafc;
+      background: #0a0a0f;
+      color: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
+      margin: 0;
       padding: 20px;
+      overflow: hidden;
+      user-select: none;
     }
-    .card {
-      background: rgba(18, 18, 26, 0.85);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 36px 28px;
+    .splash-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       text-align: center;
-      max-width: 420px;
+      max-width: 380px;
       width: 100%;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
     }
-    .icon-container {
+    .logo-wrapper {
       position: relative;
-      width: 84px;
-      height: 84px;
-      margin: 0 auto 24px;
+      width: 76px;
+      height: 76px;
+      margin-bottom: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .pulse-ring {
       position: absolute;
-      width: 100%;
-      height: 100%;
+      inset: -8px;
       border-radius: 50%;
-      background: rgba(37, 211, 102, 0.25);
-      animation: pulse 1.6s infinite cubic-bezier(0.4, 0, 0.6, 1);
+      border: 2px solid rgba(37, 211, 102, 0.4);
+      animation: ripple 1.4s infinite cubic-bezier(0.25, 1, 0.5, 1);
     }
-    .wa-icon {
-      position: relative;
-      width: 68px;
-      height: 68px;
-      background: linear-gradient(135deg, #25d366, #128c7e);
+    .wa-circle {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4);
+      box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
     }
-    .wa-icon svg {
-      width: 36px;
-      height: 36px;
+    .wa-circle svg {
+      width: 34px;
+      height: 34px;
       fill: #ffffff;
     }
-    h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: #ffffff;
-      margin-bottom: 8px;
-    }
-    p {
-      font-size: 14px;
-      color: #94a3b8;
-      line-height: 1.5;
-      margin-bottom: 24px;
-    }
-    .loading-bar {
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 24px;
-    }
-    .loading-progress {
-      width: 0%;
-      height: 100%;
-      background: linear-gradient(90deg, #25d366, #25f4ee);
-      border-radius: 10px;
-      animation: progress 0.6s ease-in-out forwards;
-    }
-    .btn-wa {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      width: 100%;
-      padding: 15px 24px;
-      background: linear-gradient(135deg, #25d366, #1da851);
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 700;
+    .status-msg {
       font-size: 15px;
-      border-radius: 12px;
-      box-shadow: 0 10px 20px -5px rgba(37, 211, 102, 0.4);
-      transition: all 0.2s ease;
+      font-weight: 500;
+      color: #f1f5f9;
+      margin-bottom: 20px;
+      letter-spacing: -0.2px;
     }
-    .btn-wa:active {
-      transform: scale(0.98);
+    .spinner-bar {
+      width: 140px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 24px;
     }
-    .badge {
-      display: inline-block;
-      margin-top: 16px;
-      font-size: 11px;
+    .spinner-bar::after {
+      content: '';
+      position: absolute;
+      left: -50%;
+      height: 100%;
+      width: 50%;
+      background: linear-gradient(90deg, #25d366, #25f4ee);
+      border-radius: 3px;
+      animation: indeterminate 0.8s infinite linear;
+    }
+    .fallback-link {
+      font-size: 12px;
       color: #64748b;
+      text-decoration: none;
+      transition: color 0.2s;
     }
-    @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      50% { transform: scale(1.25); opacity: 0.2; }
-      100% { transform: scale(0.95); opacity: 0.8; }
+    .fallback-link:hover {
+      color: #94a3b8;
+      text-decoration: underline;
     }
-    @keyframes progress {
-      0% { width: 10%; }
-      60% { width: 85%; }
-      100% { width: 100%; }
+    @keyframes ripple {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+    @keyframes indeterminate {
+      0% { left: -50%; width: 50%; }
+      50% { left: 25%; width: 60%; }
+      100% { left: 100%; width: 50%; }
     }
   </style>
   <script>
@@ -300,36 +299,30 @@ router.get('/:slug', (req, res) => {
   </script>
 </head>
 <body>
-  <div class="card">
-    <div class="icon-container">
+  <div class="splash-container">
+    <div class="logo-wrapper">
       <div class="pulse-ring"></div>
-      <div class="wa-icon">
+      <div class="wa-circle">
         <svg viewBox="0 0 24 24">
           <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.04 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/>
         </svg>
       </div>
     </div>
-    <h1>Iniciando Atendimento...</h1>
-    <p>Você está sendo redirecionado com segurança para o WhatsApp oficial.</p>
-    <div class="loading-bar">
-      <div class="loading-progress"></div>
-    </div>
-    <a id="btn-redirect" href="${whatsappUrl}" class="btn-wa">
-      👉 Abrir WhatsApp Agora
-    </a>
-    <div class="badge">Código de atendimento: #${codigo}</div>
+    <div class="status-msg">${statusMsg}</div>
+    <div class="spinner-bar"></div>
+    <a id="btn-redirect" href="${whatsappUrl}" class="fallback-link">${fallbackText}</a>
   </div>
 
   <script>
     const target = "${whatsappUrl}";
-    // Redirecionamento automático ultra-rápido (350ms para permitir execução do pixel)
+    // Redirecionamento automático ultra-rápido (300ms para permitir execução do pixel)
     setTimeout(function() {
       try {
         window.location.replace(target);
       } catch (e) {
         window.location.href = target;
       }
-    }, 350);
+    }, 300);
   </script>
 </body>
 </html>`);

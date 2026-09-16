@@ -4297,7 +4297,10 @@ async function renderTikTokAttribution() {
                   ${campaignsRes.length > 0 ? campaignsRes.map(c => `
                     <tr>
                       <td>
-                        <strong style="color: #fff; font-size: 14px;">${c.name}</strong>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong style="color: #fff; font-size: 14px;">${c.name}</strong>
+                          ${c.idioma === 'pt' ? '<span style="font-size: 10px; font-weight: 700; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1px 6px; border-radius: 4px;">🇧🇷 PT</span>' : '<span style="font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 1px 6px; border-radius: 4px;">🇪🇸 ES</span>'}
+                        </div>
                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ID: ${c.id}</div>
                         ${c.custom_domain ? `<div style="margin-top: 4px;"><span style="font-size: 10.5px; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace;">🌐 ${c.custom_domain}</span></div>` : ''}
                       </td>
@@ -4577,6 +4580,16 @@ async function openCreateCampaignModal() {
             <input type="text" class="form-input" id="camp-input-name" placeholder="Ex: Espião WhatsApp - VSL 01" required>
           </div>
 
+          <!-- Seletor de Idioma da Pressel (Espanhol / Português) -->
+          <div class="form-group">
+            <label class="form-label" style="font-weight: 600;">Idioma da Tela de Redirecionamento (Pressel) *</label>
+            <select class="form-select" id="camp-input-lang" onchange="updateCampLangDefaults(this.value)" style="border-color: rgba(37, 244, 238, 0.4);">
+              <option value="es" selected>🇪🇸 Espanhol (Aguarde, usted será redirigido a WhatsApp...)</option>
+              <option value="pt">🇧🇷 Português (Aguarde, você será redirecionado para o WhatsApp...)</option>
+            </select>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Define o idioma exibido na tela rápida de carregamento e redirecionamento.</div>
+          </div>
+
           <!-- Seletor de Domínio Customizado (Requisito 8) -->
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -4630,7 +4643,7 @@ async function openCreateCampaignModal() {
 
           <div class="form-group">
             <label class="form-label">Template da Mensagem do WhatsApp *</label>
-            <textarea class="form-textarea" id="camp-input-template" style="min-height: 80px;" required>Oii vim pelo anúncio (código {codigo})</textarea>
+            <textarea class="form-textarea" id="camp-input-template" style="min-height: 80px;" required>Hola, quiero espiar un número. ({codigo} No borres este código.)</textarea>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">A tag <code>{codigo}</code> será substituída pelo código único de 6 caracteres na pressel.</div>
           </div>
 
@@ -4644,6 +4657,21 @@ async function openCreateCampaignModal() {
   `;
 
   document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+
+function updateCampLangDefaults(lang) {
+  const tplArea = document.getElementById('camp-input-template');
+  if (!tplArea) return;
+  if (lang === 'es') {
+    if (!tplArea.value || tplArea.value.includes('Oii vim pelo')) {
+      tplArea.value = 'Hola, quiero espiar un número. ({codigo} No borres este código.)';
+    }
+  } else {
+    if (!tplArea.value || tplArea.value.includes('Hola, quiero')) {
+      tplArea.value = 'Oii vim pelo anúncio (código {codigo})';
+    }
+  }
 }
 
 function updateCampSlugPrefix(selectedDomain) {
@@ -4662,12 +4690,13 @@ async function handleCreateCampaign(e) {
   const presell_url = (document.getElementById('camp-input-presell')?.value || '').trim();
   const whatsapp_number = document.getElementById('camp-input-whatsapp').value.trim();
   const message_template = document.getElementById('camp-input-template').value.trim();
+  const idioma = document.getElementById('camp-input-lang')?.value || 'es';
 
   try {
     const res = await fetch('/api/traffic/campaigns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, presell_url, whatsapp_number, message_template, custom_domain })
+      body: JSON.stringify({ name, slug, presell_url, whatsapp_number, message_template, custom_domain, idioma })
     });
     const data = await res.json();
 

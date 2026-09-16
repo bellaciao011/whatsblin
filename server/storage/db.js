@@ -260,6 +260,8 @@ module.exports = {
       name: data.name || data.nome || 'Nova Campanha TikTok',
       slug: cleanSlug || 'campanha-' + Date.now(),
       custom_domain: customDomain,
+      idioma: data.idioma || 'es',
+      language: data.idioma || 'es',
       url_destino: cleanPresell,
       presell_url: cleanPresell,
       whatsapp_destino: data.whatsapp_destino || data.whatsapp_number || '',
