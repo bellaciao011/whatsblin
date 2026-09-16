@@ -333,17 +333,25 @@ async function syncChatsFromUazapi(inst) {
       const leadName = c.name || c.wa_name || c.wa_contactName || `Lead +${cleanPhone}`;
 
       if (!allChats[cleanPhone]) {
+        const leadPhoto = c.image || c.profilePicUrl || c.photo || c.wa_profilePicUrl || c.avatarUrl || null;
         allChats[cleanPhone] = {
           leadPhone: cleanPhone,
           leadName,
+          leadPhotoUrl: leadPhoto,
           instanceId: inst.id,
           state: 'NOVO',
           lastMessageTime: parseUazapiTimestamp(c.wa_lastMsgTimestamp),
           messages: []
         };
         importedChats++;
-      } else if (c.name && (!allChats[cleanPhone].leadName || allChats[cleanPhone].leadName.startsWith('Lead '))) {
-        allChats[cleanPhone].leadName = leadName;
+      } else {
+        if (c.name && (!allChats[cleanPhone].leadName || allChats[cleanPhone].leadName.startsWith('Lead '))) {
+          allChats[cleanPhone].leadName = leadName;
+        }
+        const leadPhoto = c.image || c.profilePicUrl || c.photo || c.wa_profilePicUrl || c.avatarUrl || null;
+        if (leadPhoto && !allChats[cleanPhone].leadPhotoUrl) {
+          allChats[cleanPhone].leadPhotoUrl = leadPhoto;
+        }
       }
 
       // Busca mensagens recentes desta conversa e sincroniza qualquer mensagem faltante

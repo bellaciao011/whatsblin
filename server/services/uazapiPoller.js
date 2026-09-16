@@ -179,6 +179,7 @@ async function syncUazapiInstancesNow() {
         if (!cleanPhone || cleanPhone.length < 8) continue;
 
         const leadName = c.name || c.wa_name || c.wa_contactName || `Lead +${cleanPhone}`;
+        const leadPhoto = c.image || c.profilePicUrl || c.photo || c.wa_profilePicUrl || c.avatarUrl || null;
         let chat = db.getChat(cleanPhone);
 
         const remoteTimestampMs = getTimestampMs(c.wa_lastMsgTimestamp);
@@ -193,6 +194,13 @@ async function syncUazapiInstancesNow() {
             lastProcessedTimestamp: 0,
             messages: []
           };
+          const allChats = db.getChats();
+          if (leadPhoto) chat.leadPhotoUrl = leadPhoto;
+          allChats[cleanPhone] = chat;
+          db.saveChats(allChats);
+          anyUpdate = true;
+        } else if (leadPhoto && !chat.leadPhotoUrl) {
+          chat.leadPhotoUrl = leadPhoto;
           const allChats = db.getChats();
           allChats[cleanPhone] = chat;
           db.saveChats(allChats);

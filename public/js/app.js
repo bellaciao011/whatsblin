@@ -2100,7 +2100,7 @@ async function renderInbox(showLoading = true) {
             const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
             const isActive = p === state.activeChatPhone;
             const badge = getLeadStageBadge(c);
-            const photoUrl = c.leadPhotoUrl || c.targetPhotoUrl || null;
+            const photoUrl = c.leadPhotoUrl || null;
             const rawName = c.leadName;
             const contactName = rawName && !rawName.startsWith('Lead ') && rawName !== ('+' + p) ? rawName : formatPhoneDisplay(p);
             const phoneFormatted = formatPhoneDisplay(p);
@@ -2147,7 +2147,7 @@ async function renderInbox(showLoading = true) {
           <div class="chat-header">
             <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
               <div class="chat-avatar" style="width: 48px; height: 48px;">
-                ${(activeChat.leadPhotoUrl || activeChat.targetPhotoUrl) ? `<img src="${activeChat.leadPhotoUrl || activeChat.targetPhotoUrl}" alt="" onerror="this.style.display='none';">` : activeChat.leadPhone.slice(-2)}
+                ${activeChat.leadPhotoUrl ? `<img src="${activeChat.leadPhotoUrl}" alt="" onerror="this.style.display='none';">` : (activeChat.leadName && !activeChat.leadName.startsWith('Lead ') ? activeChat.leadName.slice(0, 2).toUpperCase() : activeChat.leadPhone.slice(-2))}
                 <span class="avatar-online-dot"></span>
               </div>
               <div style="min-width: 0;">
@@ -2164,7 +2164,7 @@ async function renderInbox(showLoading = true) {
                       <span class="typing-dot"></span>
                     </span>
                   ` : `
-                    <span style="color: var(--text-muted);">${formatPhoneDisplay(activeChat.leadPhone)} ${activeChat.variables?.alvo ? `• Alvo: ${formatPhoneDisplay(activeChat.variables.alvo)}` : ''}</span>
+                    <span style="color: var(--text-muted);">${formatPhoneDisplay(activeChat.leadPhone)} ${activeChat.variables?.alvo ? `<span style="display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; margin-left: 6px;">🎯 Alvo: ${activeChat.targetPhotoUrl ? `<img src="${activeChat.targetPhotoUrl}" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.2);">` : ''} ${formatPhoneDisplay(activeChat.variables.alvo)}</span>` : ''}</span>
                   `}
                 </div>
               </div>
