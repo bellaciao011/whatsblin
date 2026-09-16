@@ -1018,10 +1018,20 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   }
 
   // =========================================================================
-  // CASO 2: LEAD ESTÁ AGUARDANDO O NÚMERO
+  // CASO 2: LEAD ENVIOU O NÚMERO ALVO (OU ESTÁ EM AGUARDANDO_NUMERO)
   // =========================================================================
-  if (chatData.state === 'AGUARDANDO_NUMERO') {
-    const welcomeDecision = await aiService.classifyWelcomeReply(messageText, flowLanguage);
+  const isLikelyPhoneNumber = Boolean(
+    !isCampaignStart &&
+    rawDigits.length >= 8 &&
+    rawDigits.length <= 15 &&
+    !messageText.includes('(') &&
+    !messageText.includes(')')
+  );
+
+  if (chatData.state === 'AGUARDANDO_NUMERO' || isLikelyPhoneNumber) {
+    const welcomeDecision = isLikelyPhoneNumber 
+      ? { type: 'PHONE', targetPhone: rawDigits }
+      : await aiService.classifyWelcomeReply(messageText, flowLanguage);
 
     if (welcomeDecision.type !== 'PHONE') {
       console.log(`[FlowEngine] Resposta pós-boas-vindas classificada como: ${welcomeDecision.type}`);
@@ -1128,6 +1138,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   const welcomeText = getNodeText('node-welcome', fallbackWelcome);
   chatData.state = 'AGUARDANDO_NUMERO';
   chats[cleanPhone] = chatData;
+  db.saveChat(cleanPhone, chatData);
   db.saveChats(chats);
 
   db.addChatMessage(cleanPhone, { from: 'bot', text: welcomeText, instanceId: inst.id }, 'AGUARDANDO_NUMERO');
