@@ -2212,7 +2212,8 @@ async function renderInbox(showLoading = true) {
     return timeB - timeA;
   });
 
-  if ((!state.activeChatPhone || !state.chats[state.activeChatPhone]) && phones.length > 0) {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
+  if (!isMobile && (!state.activeChatPhone || !state.chats[state.activeChatPhone]) && phones.length > 0) {
     state.activeChatPhone = phones[0];
   }
 
