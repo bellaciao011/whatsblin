@@ -1943,7 +1943,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       body.data?.amount ||
       39.00;
 
-    const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 39.00;
+    const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 19.00;
     const currency = body.currency_enum_key || body.currency || (amount <= 40 ? 'USD' : 'BRL');
 
     // 7. Extrai status e evento de aprovação (PerfectPay sale_status_enum: 2 = Aprovado)
@@ -2004,7 +2004,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
           const leadToken = `cw_sec_${String(codeVal).toLowerCase()}_2026`;
           const upsellUrl = `https://spysfunills.vercel.app/upsell1/?code=${codeVal}&cw_token=${leadToken}&view=lead`;
           const deliveryMsg = isEs
-            ? `¡Tu pago de $39 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 ${upsellUrl}\n\nSi tienes cualquier duda, escríbeme por aquí.`
+            ? `¡Tu pago de $19 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 ${upsellUrl}\n\nSi tienes cualquier duda, escríbeme por aquí.`
             : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
 
           try {
@@ -2784,7 +2784,7 @@ router.post('/sales/manual-approve', async (req, res) => {
     chat.upsellStage = 'stage_finalizado';
     db.saveChat(cleanPhone, chat);
 
-    db.confirmAttributionSale(cleanPhone, 39);
+    db.confirmAttributionSale(cleanPhone, 19);
 
     const instances = db.getInstances();
     const inst = instances.find(i => i.status === 'connected') || instances[0];
@@ -2799,7 +2799,7 @@ router.post('/sales/manual-approve', async (req, res) => {
     }
 
     eventBus.emit('new_sale', {
-      amount: 39,
+      amount: 19,
       currency: 'USD',
       phone: cleanPhone,
       code: accessCode,

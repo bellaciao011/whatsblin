@@ -160,14 +160,14 @@
       {
         "id": "node-offer-pix-49",
         "type": "pix",
-        "label": "Oferta $39 (Checkout Seguro)",
+        "label": "Oferta $19 (Checkout Seguro)",
         "icon": "💳",
         "color": "green",
         "x": 2400,
         "y": 440,
         "data": {
-          "text": "Enlace para el pago de $39 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.",
-          "amount": "39"
+          "text": "Enlace para el pago de $19 👇\n{checkoutUrl}\n\nDatos del pago: 🔒 Pago 100% seguro y encriptado.",
+          "amount": "19"
         }
       },
       {
@@ -197,13 +197,13 @@
       {
         "id": "node-ai-sentiment",
         "type": "ai",
-        "label": "GPT: Objeciones Oferta $39",
+        "label": "GPT: Objeciones Oferta $19",
         "icon": "🤖",
         "color": "emerald",
         "x": 3180,
         "y": 440,
         "data": {
-          "prompt": "Clasificar objeciones: Por qué pagar $39, Rechazo, Denuncia/Estafa, Qué es la tarifa de $39, Acceso, Enviar enlace"
+          "prompt": "Clasificar objeciones: Por qué pagar $19, Rechazo, Denuncia/Estafa, Qué es la tarifa de $19, Acceso, Enviar enlace"
         }
       },
       {
@@ -215,7 +215,7 @@
         "x": 6020,
         "y": 440,
         "data": {
-          "text": "Pago de $39 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas."
+          "text": "Pago de $19 recibido con éxito ✅\n\n¡Tu acceso completo e ilimitado al panel ha sido desbloqueado! Accede a tu panel y aprovecha todas las herramientas."
         }
       }
     ],
@@ -338,7 +338,7 @@
         "id": "e19",
         "from": "node-ai-sentiment",
         "to": "node-access-released",
-        "label": "✅ Comprobante $39 Aprobado / Entrega de Acceso"
+        "label": "✅ Comprobante $19 Aprobado / Entrega de Acceso"
       }
     ],
     "language": "es",

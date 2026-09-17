@@ -524,7 +524,7 @@ function initRealtimeEvents() {
         } else if (payload.type === 'new_sale') {
           playSaleSound();
           const saleData = payload.data || {};
-          const msg = `🎉 VENDA APROVADA! +${saleData.amount || 39} ${saleData.currency || 'USD'}`;
+          const msg = `🎉 VENDA APROVADA! +${saleData.amount || 19} ${saleData.currency || 'USD'}`;
           showPushNotification(msg, `Cliente: ${saleData.email || saleData.phone || saleData.code || ''}`);
           showToast(msg, 'success');
           updateBadges();
