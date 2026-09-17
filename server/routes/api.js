@@ -2837,13 +2837,54 @@ router.post('/sales/manual-approve', async (req, res) => {
 
 
 /**
+ * Consulta em tempo real a foto de perfil do alvo (WhatsApp / Cache)
+ * Permite que a Dashboard mostre o avatar e o status antes de gerar a prova.
+ */
+router.all('/manual-proof/lookup-photo', async (req, res) => {
+  try {
+    const ddi = req.query.ddi || req.body?.ddi;
+    const numero = req.query.numero || req.body?.numero;
+
+    if (!numero) {
+      return res.status(400).json({ success: false, error: 'Número não informado.' });
+    }
+
+    const rawDigits = String(numero).replace(/\D/g, '');
+    const cleanDdi = String(ddi || '').replace(/\D/g, '');
+
+    let targetPhone = rawDigits;
+    if (cleanDdi && !rawDigits.startsWith(cleanDdi)) {
+      targetPhone = cleanDdi + rawDigits;
+    } else if (!cleanDdi) {
+      const commonDdis = ['52', '507', '591', '56', '57', '51', '593', '34', '54', '504', '502', '503', '506', '595', '598', '505', '592', '297', '55', '1'];
+      const startsWithDdi = commonDdis.some(code => targetPhone.startsWith(code));
+      if (!startsWithDdi && (targetPhone.length === 10 || targetPhone.length === 11)) {
+        targetPhone = '55' + targetPhone;
+      }
+    }
+
+    const photoUrl = await lookupProfilePicture(targetPhone, null, cleanDdi);
+
+    res.json({
+      success: true,
+      phone: targetPhone,
+      hasPhoto: Boolean(photoUrl),
+      photoUrl: photoUrl || null
+    });
+  } catch (err) {
+    console.error('[Lookup Photo API Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * Gerador Manual de Imagem de Prova (Dashboard):
  * Suporta qualquer DDI internacional (Panamá, Bolívia, Chile, Colômbia, México, etc.)
- * Permite foto customizada opcional ou busca automática.
+ * Permite foto customizada opcional (upload ou URL) ou busca automática multi-estratégia.
  */
 router.post('/manual-proof/generate', async (req, res) => {
   try {
-    const { ddi, numero, lang, customPhotoBase64 } = req.body || {};
+    const { ddi, numero, lang, customPhotoBase64, customPhotoUrl } = req.body || {};
     
     if (!numero) {
       return res.status(400).json({ success: false, error: 'Por favor, informe o número de telefone.' });
@@ -2865,16 +2906,23 @@ router.post('/manual-proof/generate', async (req, res) => {
 
     const selectedLang = (lang || 'es').toLowerCase();
 
-    // 1. Resolução da foto de perfil: foto customizada enviada ou busca automática
+    // 1. Resolução da foto de perfil:
+    // A) Foto enviada via Base64 (upload direto)
+    // B) URL de foto colada pelo usuário
+    // C) Busca automática inteligente (UAZAPI chats / db local / chat details)
     let photoUrl = null;
     let isCustomPhoto = false;
 
     if (customPhotoBase64 && typeof customPhotoBase64 === 'string' && customPhotoBase64.length > 50) {
       photoUrl = customPhotoBase64;
       isCustomPhoto = true;
-      console.log(`[Manual Proof] Usando foto personalizada enviada pelo usuário para: +${targetPhone}`);
+      console.log(`[Manual Proof] Usando foto enviada (Base64) para: +${targetPhone}`);
+    } else if (customPhotoUrl && typeof customPhotoUrl === 'string' && customPhotoUrl.startsWith('http')) {
+      photoUrl = customPhotoUrl.trim();
+      isCustomPhoto = true;
+      console.log(`[Manual Proof] Usando foto por link informado para: +${targetPhone} (${photoUrl.slice(0, 60)}...)`);
     } else {
-      console.log(`[Manual Proof] Buscando foto pública para: +${targetPhone} (DDI: ${cleanDdi || 'auto'})`);
+      console.log(`[Manual Proof] Buscando foto pública automática para: +${targetPhone} (DDI: ${cleanDdi || 'auto'})`);
       photoUrl = await lookupProfilePicture(targetPhone, null, cleanDdi);
     }
 
@@ -2901,6 +2949,7 @@ router.post('/manual-proof/generate', async (req, res) => {
       filename: filename,
       phone: targetPhone,
       hasPhoto: Boolean(photoUrl),
+      photoUrl: photoUrl || null,
       isCustomPhoto,
       language: selectedLang
     });
@@ -2909,6 +2958,5 @@ router.post('/manual-proof/generate', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 
 module.exports = router;

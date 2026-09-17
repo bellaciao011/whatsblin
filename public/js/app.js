@@ -725,91 +725,120 @@ async function renderOverview() {
       <!-- Card: Gerador Manual de Imagem de Prova (Multi-Países) -->
       <div class="card" id="manual-proof-card" style="margin-bottom: 24px; border: 1px solid rgba(139, 92, 246, 0.45); background: linear-gradient(180deg, rgba(24, 18, 48, 0.7) 0%, rgba(13, 13, 20, 0.96) 100%); box-shadow: 0 8px 30px rgba(124, 58, 237, 0.16);">
         <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 12px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);">
-              📸
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);">
+                📸
+              </div>
+              <div>
+                <h3 class="card-title" style="color: #f8fafc; font-size: 16px; margin: 0;">Gerador Manual de Imagens de Prova</h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Gere prints de investigação instantâneos com foto de perfil para responder leads manualmente em qualquer país.</p>
+              </div>
             </div>
+            <span class="badge" style="background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); font-size: 11.5px; padding: 4px 10px;">⚡ Modo Manual Ativo</span>
+          </div>
+        </div>
+
+        <form id="form-manual-proof" onsubmit="event.preventDefault(); generateManualProof();">
+          <div class="proof-form-grid" style="display: grid; grid-template-columns: 180px 1.4fr 160px auto; gap: 12px; align-items: flex-end;">
+            <!-- Campo 1: Seletor de DDI -->
             <div>
-              <h3 class="card-title" style="color: #f8fafc; font-size: 16px; font-weight: 800;">Gerador de Imagem de Prova (Manual)</h3>
-              <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
-                Gere o print de investigação para responder leads de qualquer país manualmente no WhatsApp.
-              </p>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+                🌍 País (DDI)
+              </label>
+              <select id="proof-ddi-select" class="form-select" onchange="handleProofDdiChange(this.value); autoLookupProofPhoto();" style="width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 9px 10px; font-size: 13px;">
+                <option value="507" selected>🇵🇦 Panamá (+507)</option>
+                <option value="591">🇧🇴 Bolívia (+591)</option>
+                <option value="56">🇨🇱 Chile (+56)</option>
+                <option value="57">🇨🇴 Colômbia (+57)</option>
+                <option value="52">🇲🇽 México (+52)</option>
+                <option value="51">🇵🇪 Peru (+51)</option>
+                <option value="593">🇪🇨 Equador (+593)</option>
+                <option value="34">🇪🇸 Espanha (+34)</option>
+                <option value="54">🇦🇷 Argentina (+54)</option>
+                <option value="504">🇭🇳 Honduras (+504)</option>
+                <option value="502">🇬🇹 Guatemala (+502)</option>
+                <option value="503">🇸🇻 El Salvador (+503)</option>
+                <option value="506">🇨🇷 Costa Rica (+506)</option>
+                <option value="595">🇵🇾 Paraguai (+595)</option>
+                <option value="598">🇺🇾 Uruguai (+598)</option>
+                <option value="505">🇳🇮 Nicarágua (+505)</option>
+                <option value="1809">🇩🇴 Rep. Dominicana (+1809)</option>
+                <option value="1">🇺🇸 Estados Unidos (+1)</option>
+                <option value="55">🇧🇷 Brasil (+55)</option>
+                <option value="custom">🌐 Outro DDI...</option>
+              </select>
+              <input type="text" id="proof-ddi-custom" placeholder="Ex: 58" style="display: none; width: 100%; margin-top: 6px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 13px;" />
+            </div>
+
+            <!-- Campo 2: Número do Alvo + Botão Buscar Foto -->
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+                📱 Número do Alvo / Lead
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <input type="tel" id="proof-target-phone" class="form-input" placeholder="Ex: 61578213 ou 985883926" onblur="autoLookupProofPhoto();" onkeyup="if(event.key==='Enter') autoLookupProofPhoto();" style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 13.5px;" />
+                <button type="button" class="btn btn-secondary" onclick="lookupManualProofPhoto(true)" title="Buscar foto de perfil no WhatsApp" style="padding: 0 12px; font-size: 12px; white-space: nowrap; border-color: rgba(139,92,246,0.4); display: flex; align-items: center; gap: 5px;">
+                  <span id="lookup-photo-spinner" class="spinner" style="display: none; width: 12px; height: 12px; border-width: 2px;"></span>
+                  <span>🔍 Buscar Foto</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Campo 3: Idioma do Template -->
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+                🗣️ Idioma do Print
+              </label>
+              <select id="proof-lang-select" class="form-select" style="width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 9px 10px; font-size: 13px;">
+                <option value="es" selected>Español (es)</option>
+                <option value="pt">Português (pt)</option>
+                <option value="en">English (en)</option>
+              </select>
+            </div>
+
+            <!-- Botão Principal de Geração -->
+            <div>
+              <button type="submit" id="btn-generate-proof" class="btn btn-primary" style="width: 100%; padding: 9px 18px; font-weight: 700; font-size: 13.5px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: none; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px;">
+                <span id="btn-proof-spinner" class="spinner" style="display: none; width: 14px; height: 14px; border-width: 2px;"></span>
+                <span id="btn-proof-text">⚡ Gerar Imagem</span>
+              </button>
             </div>
           </div>
-          <span class="nav-badge" style="background: rgba(139,92,246,0.22); color: #c084fc; border: 1px solid rgba(139,92,246,0.45); font-weight: 700;">
-            🌎 Multi-Países
-          </span>
-        </div>
 
-        <!-- Formulário de Seleção de País e Número -->
-        <div class="proof-form-grid">
-          <div>
-            <label class="form-label" style="font-size: 12px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
-              <span>🏳️</span> <span>DDI / País:</span>
-            </label>
-            <select id="proof-ddi-select" class="form-select" onchange="handleProofDdiChange(this.value)" style="width: 100%; font-size: 12.5px; font-weight: 600; padding: 10px 10px; background: rgba(18, 18, 28, 0.95); border: 1px solid rgba(255, 255, 255, 0.16); color: #fff; border-radius: 10px;">
-              <option value="507" selected>🇵🇦 Panamá (+507)</option>
-              <option value="591">🇧🇴 Bolívia (+591)</option>
-              <option value="56">🇨🇱 Chile (+56)</option>
-              <option value="57">🇨🇴 Colômbia (+57)</option>
-              <option value="52">🇲🇽 México (+52)</option>
-              <option value="51">🇵🇪 Peru (+51)</option>
-              <option value="593">🇪🇨 Equador (+593)</option>
-              <option value="34">🇪🇸 Espanha (+34)</option>
-              <option value="54">🇦🇷 Argentina (+54)</option>
-              <option value="504">🇭🇳 Honduras (+504)</option>
-              <option value="502">🇬🇹 Guatemala (+502)</option>
-              <option value="503">🇸🇻 El Salvador (+503)</option>
-              <option value="506">🇨🇷 Costa Rica (+506)</option>
-              <option value="595">🇵🇾 Paraguai (+595)</option>
-              <option value="598">🇺🇾 Uruguai (+598)</option>
-              <option value="592">🇬🇾 Guiana (+592)</option>
-              <option value="297">🇦🇼 Aruba (+297)</option>
-              <option value="55">🇧🇷 Brasil (+55)</option>
-              <option value="custom">🌐 Outro DDI manual...</option>
-            </select>
-          </div>
+          <!-- Status da Foto Detectada no WhatsApp -->
+          <div id="proof-photo-status-wrap" style="display: none; margin-top: 12px;"></div>
 
-          <div>
-            <label class="form-label" style="font-size: 12px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-              <span><span>📱</span> Número do Alvo (sem ou com DDI):</span>
-              <span style="font-size: 11px; color: var(--text-muted);">Ex: 61578213</span>
-            </label>
-            <div style="display: flex; gap: 6px;">
-              <input type="text" id="proof-ddi-custom" placeholder="+DDI" style="display: none; width: 75px; padding: 10px; font-size: 13px; font-weight: 700; background: rgba(18, 18, 28, 0.95); border: 1px solid rgba(139, 92, 246, 0.5); color: #c084fc; border-radius: 10px; text-align: center;" value="507">
-              <input type="tel" id="proof-target-phone" class="form-input" placeholder="Digite o número (ex: 61578213)" style="flex: 1; padding: 10px 14px; font-size: 14px; font-weight: 600; border-radius: 10px;" onkeydown="if(event.key==='Enter') generateManualProof()">
+          <!-- Opções Avançadas: Foto Personalizada (URL ou Arquivo) -->
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: #94a3b8;">
+                <input type="checkbox" id="proof-opt-custom-photo" onchange="toggleCustomPhotoUpload(this.checked)" style="accent-color: #8b5cf6; width: 15px; height: 15px;">
+                <span>Personalizar foto do perfil (colar link da foto ou enviar arquivo do celular)</span>
+              </label>
+              <span style="font-size: 11.5px; color: #64748b;">(Se não anexar, o sistema usa a foto do WhatsApp automaticamente)</span>
+            </div>
+
+            <div id="proof-custom-photo-wrap" style="display: none; margin-top: 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <label style="display: block; font-size: 11.5px; color: #cbd5e1; margin-bottom: 4px;">🔗 Cole o Link Direto da Foto (URL):</label>
+                  <input type="url" id="proof-custom-url" placeholder="https://exemplo.com/foto.jpg" class="form-input" oninput="handleCustomUrlPreview(this.value)" style="width: 100%; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 6px; padding: 7px 10px; font-size: 12px;" />
+                </div>
+                <div>
+                  <label style="display: block; font-size: 11.5px; color: #cbd5e1; margin-bottom: 4px;">📁 Ou Selecione do seu Computador / Celular:</label>
+                  <input type="file" id="proof-custom-file" accept="image/png, image/jpeg, image/webp" class="form-input" onchange="handleCustomFilePreview(this)" style="width: 100%; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12px;" />
+                </div>
+              </div>
+              <div id="proof-custom-preview-box" style="display: none; margin-top: 10px; align-items: center; gap: 10px;">
+                <img id="proof-custom-preview-img" src="" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid #a855f7;">
+                <span style="font-size: 12px; color: #c084fc;">✓ Foto personalizada pronta para uso!</span>
+              </div>
             </div>
           </div>
+        </form>
 
-          <div>
-            <button type="button" class="btn btn-primary" id="btn-generate-proof" onclick="generateManualProof()" style="width: 100%; height: 42px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border: none; font-weight: 800; font-size: 13px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35);">
-              <span id="btn-proof-spinner" style="display: none;">⏳</span>
-              <span id="btn-proof-text">⚡ Gerar Imagem</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Opções Avançadas -->
-        <div style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.07);">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; cursor: pointer;">
-            <input type="checkbox" id="proof-opt-custom-photo" onchange="toggleCustomPhotoUpload(this.checked)" style="accent-color: #8b5cf6; width: 15px; height: 15px;">
-            <span>Desejo anexar foto de perfil personalizada (opcional)</span>
-          </label>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Idioma do Print:</span>
-            <select id="proof-lang-select" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; font-size: 11.5px; padding: 4px 8px; border-radius: 6px;">
-              <option value="es" selected>🇪🇸 Espanhol (Recomendado)</option>
-              <option value="pt">🇧🇷 Português</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="proof-custom-photo-wrap" style="display: none; margin-top: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px dashed rgba(139,92,246,0.35);">
-          <label style="font-size: 11.5px; color: #cbd5e1; display: block; margin-bottom: 6px; font-weight: 600;">Selecione a foto para estampar no áudio:</label>
-          <input type="file" id="proof-custom-file" accept="image/*" style="font-size: 12px; color: #94a3b8;">
-        </div>
-
-        <!-- Área de Preview e Download da Imagem Gerada -->
+        <!-- Container para o Resultado da Prova Gerada -->
         <div id="proof-result-container" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);"></div>
       </div>
 
@@ -6012,6 +6041,8 @@ window.switchMobileLiveMode = function(mode) {
 // =========================================================================
 // FUNÇÕES DO GERADOR MANUAL DE IMAGENS DE PROVA (DASHBOARD)
 // =========================================================================
+let currentFoundPhotoUrl = null;
+
 window.focusManualProofGenerator = function() {
   const card = document.getElementById('manual-proof-card');
   const input = document.getElementById('proof-target-phone');
@@ -6045,12 +6076,109 @@ window.toggleCustomPhotoUpload = function(checked) {
   if (wrap) wrap.style.display = checked ? 'block' : 'none';
 };
 
+window.handleCustomUrlPreview = function(url) {
+  const box = document.getElementById('proof-custom-preview-box');
+  const img = document.getElementById('proof-custom-preview-img');
+  if (url && url.startsWith('http')) {
+    if (img) img.src = url;
+    if (box) box.style.display = 'flex';
+  } else {
+    if (box) box.style.display = 'none';
+  }
+};
+
+window.handleCustomFilePreview = function(input) {
+  const box = document.getElementById('proof-custom-preview-box');
+  const img = document.getElementById('proof-custom-preview-img');
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (img) img.src = e.target.result;
+      if (box) box.style.display = 'flex';
+    };
+    reader.readAsDataURL(input.files[0]);
+  } else {
+    if (box) box.style.display = 'none';
+  }
+};
+
+window.autoLookupProofPhoto = function() {
+  const phoneInput = document.getElementById('proof-target-phone');
+  const raw = (phoneInput?.value || '').replace(/\D/g, '');
+  if (raw.length >= 7) {
+    lookupManualProofPhoto(false);
+  }
+};
+
+window.lookupManualProofPhoto = async function(showToastFeedback = true) {
+  const ddiSelect = document.getElementById('proof-ddi-select');
+  const ddiCustom = document.getElementById('proof-ddi-custom');
+  const phoneInput = document.getElementById('proof-target-phone');
+  const spinner = document.getElementById('lookup-photo-spinner');
+  const statusWrap = document.getElementById('proof-photo-status-wrap');
+
+  const rawPhone = (phoneInput?.value || '').trim();
+  if (!rawPhone) {
+    if (showToastFeedback) showToast('⚠️ Digite o número antes de buscar a foto.', 'warning');
+    return;
+  }
+
+  const ddiVal = (ddiSelect?.value === 'custom')
+    ? (ddiCustom?.value || '').replace(/\D/g, '')
+    : (ddiSelect?.value || '507');
+
+  if (spinner) spinner.style.display = 'inline-block';
+
+  try {
+    const res = await fetch(`/api/manual-proof/lookup-photo?ddi=${encodeURIComponent(ddiVal)}&numero=${encodeURIComponent(rawPhone)}`);
+    const data = await res.json();
+
+    if (data.success && data.hasPhoto && data.photoUrl) {
+      currentFoundPhotoUrl = data.photoUrl;
+      if (statusWrap) {
+        statusWrap.style.display = 'block';
+        statusWrap.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 9px 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="${data.photoUrl}" alt="Avatar" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);" onerror="this.src='/images/default-avatar.png';">
+              <div>
+                <div style="color: #34d399; font-weight: 700; font-size: 13.5px;">✓ Foto do WhatsApp Carregada com Sucesso!</div>
+                <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 1px;">Número Alvo: <strong>+${data.phone}</strong> • Esta foto será estampada na imagem de prova.</div>
+              </div>
+            </div>
+            <span class="badge" style="background: #10b981; color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 6px;">Foto Pronta ✓</span>
+          </div>
+        `;
+      }
+      if (showToastFeedback) showToast('✓ Foto do perfil encontrada com sucesso!', 'success');
+    } else {
+      currentFoundPhotoUrl = null;
+      if (statusWrap) {
+        statusWrap.style.display = 'block';
+        statusWrap.innerHTML = `
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 9px 14px; font-size: 12px; color: #fbbf24;">
+            ⚠️ <strong>Foto pública não encontrada automaticamente para +${data.phone || rawPhone}:</strong><br>
+            O número pode estar sem foto pública ou seu chip está offline. Você pode <strong>colar o link da foto</strong> ou <strong>fazer upload</strong> nas opções abaixo, ou gerar normalmente com o áudio criptografado.
+          </div>
+        `;
+      }
+      if (showToastFeedback) showToast('Foto pública não encontrada. Você pode anexar uma foto ou gerar com áudio.', 'info');
+    }
+  } catch (err) {
+    console.warn('[Lookup Photo Error]', err);
+    if (showToastFeedback) showToast('Erro na consulta de foto: ' + err.message, 'error');
+  } finally {
+    if (spinner) spinner.style.display = 'none';
+  }
+};
+
 window.generateManualProof = async function() {
   const ddiSelect = document.getElementById('proof-ddi-select');
   const ddiCustom = document.getElementById('proof-ddi-custom');
   const phoneInput = document.getElementById('proof-target-phone');
   const langSelect = document.getElementById('proof-lang-select');
   const customPhotoCheck = document.getElementById('proof-opt-custom-photo');
+  const customUrlInput = document.getElementById('proof-custom-url');
   const customFileInput = document.getElementById('proof-custom-file');
   const btn = document.getElementById('btn-generate-proof');
   const spinner = document.getElementById('btn-proof-spinner');
@@ -6073,18 +6201,24 @@ window.generateManualProof = async function() {
   // Desativa botão e mostra carregamento
   if (btn) btn.disabled = true;
   if (spinner) spinner.style.display = 'inline-block';
-  if (btnText) btnText.textContent = 'Gerando...';
+  if (btnText) btnText.textContent = 'Gerando Imagem...';
 
   try {
     let customPhotoBase64 = null;
-    if (customPhotoCheck?.checked && customFileInput?.files?.length > 0) {
-      const file = customFileInput.files[0];
-      customPhotoBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      });
+    let customPhotoUrl = null;
+
+    if (customPhotoCheck?.checked) {
+      if (customFileInput?.files?.length > 0) {
+        const file = customFileInput.files[0];
+        customPhotoBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      } else if (customUrlInput?.value && customUrlInput.value.startsWith('http')) {
+        customPhotoUrl = customUrlInput.value.trim();
+      }
     }
 
     const res = await fetch('/api/manual-proof/generate', {
@@ -6094,7 +6228,8 @@ window.generateManualProof = async function() {
         ddi: ddiVal,
         numero: rawPhone,
         lang: langVal,
-        customPhotoBase64
+        customPhotoBase64,
+        customPhotoUrl
       })
     });
 
@@ -6109,11 +6244,11 @@ window.generateManualProof = async function() {
       resultContainer.innerHTML = `
         <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 20px;">✅</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              ${data.photoUrl ? `<img src="${data.photoUrl}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #10b981;">` : `<span style="font-size: 24px;">✅</span>`}
               <div>
                 <strong style="color: #34d399; font-size: 14px;">Imagem de Prova Pronta para Envio!</strong>
-                <div style="font-size: 12px; color: #cbd5e1; margin-top: 1px;">Número Alvo: <strong>+${data.phone}</strong> ${data.hasPhoto ? '• (Foto estampada ✓)' : '• (Áudio criptografado ✓)'}</div>
+                <div style="font-size: 12px; color: #cbd5e1; margin-top: 1px;">Número Alvo: <strong>+${data.phone}</strong> ${data.hasPhoto ? '• (Foto do rosto estampada ✓)' : '• (Áudio criptografado ✓)'}</div>
               </div>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -6131,7 +6266,7 @@ window.generateManualProof = async function() {
         </div>
 
         <div style="display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px;">
-          <div style="max-width: 320px; width: 100%; text-align: center;">
+          <div style="max-width: 330px; width: 100%; text-align: center;">
             <img src="${data.url}" alt="Print de Prova" style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 12px 35px rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="window.open('${data.url}', '_blank')">
             <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 8px;">Toque na imagem para ampliar em tela cheia</div>
           </div>
