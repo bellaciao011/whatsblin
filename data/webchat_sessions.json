@@ -53,5 +53,59 @@
     },
     "createdAt": "2026-09-17T16:04:55.195Z",
     "updatedAt": "2026-09-17T16:04:55.198Z"
+  },
+  "test_no_photo_1789662227487": {
+    "id": "test_no_photo_1789662227487",
+    "slug": "campanha",
+    "state": "OFERTA_ENVIADA",
+    "targetPhone": "34910000000",
+    "photoUrl": null,
+    "messages": [
+      {
+        "from": "bot",
+        "text": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨",
+        "timestamp": "2026-09-17T16:23:47.489Z"
+      },
+      {
+        "from": "bot",
+        "text": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+        "timestamp": "2026-09-17T16:23:48.890Z"
+      },
+      {
+        "from": "user",
+        "text": "34910000000",
+        "timestamp": "2026-09-17T16:23:47.493Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-17T16:23:55.494Z"
+      },
+      {
+        "from": "bot",
+        "text": "🔒 Prueba con audio protegido por encriptación vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_34910000000_1789662235492.png",
+        "timestamp": "2026-09-17T16:23:55.494Z"
+      },
+      {
+        "from": "bot",
+        "text": "Enlace para el pago de $19 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.",
+        "checkoutUrl": "https://wtb.expresstrackin-g.com/checkout?codigo=WEB",
+        "amount": "19",
+        "timestamp": "2026-09-17T16:23:55.494Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!",
+        "timestamp": "2026-09-17T16:23:55.494Z"
+      }
+    ],
+    "utm": {
+      "timeZone": "Europe/Madrid",
+      "clientIp": "83.50.100.10"
+    },
+    "createdAt": "2026-09-17T16:23:47.490Z",
+    "updatedAt": "2026-09-17T16:23:47.493Z"
   }
 }

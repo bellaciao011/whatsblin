@@ -3,7 +3,19 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-// 1. Timezone to Major City Map
+// Carrega a fonte TrueType embutida em Base64 uma única vez para garantir
+// que NENHUM servidor Linux/Docker/Railway fique com caixas '□□□□□' por falta de fontes no sistema
+const FONT_PATH = path.join(__dirname, '../../assets/fonts/Roboto-Medium.ttf');
+let FONT_BASE64 = '';
+try {
+  if (fs.existsSync(FONT_PATH)) {
+    FONT_BASE64 = fs.readFileSync(FONT_PATH).toString('base64');
+  }
+} catch (e) {
+  console.warn('[LocationService] Aviso: Não foi possível carregar fonte embutida:', e.message);
+}
+
+// 1. Mapeamento de Fuso Horário para Cidade / Coordenadas
 const TIMEZONE_GEO_MAP = {
   'Europe/Madrid': { city: 'Madrid', country: 'España', countryCode: 'ES', lat: 40.4168, lon: -3.7038 },
   'Atlantic/Canary': { city: 'Las Palmas', country: 'España', countryCode: 'ES', lat: 28.1235, lon: -15.4363 },
@@ -30,7 +42,7 @@ const TIMEZONE_GEO_MAP = {
   'America/Rio_de_Janeiro': { city: 'Rio de Janeiro', country: 'Brasil', countryCode: 'BR', lat: -22.9068, lon: -43.1729 }
 };
 
-// 2. DDI to Major City Map
+// 2. Mapeamento de DDI para Cidade / Coordenadas
 const DDI_GEO_MAP = {
   '34': { city: 'Madrid', country: 'España', countryCode: 'ES', lat: 40.4168, lon: -3.7038 },
   '52': { city: 'Ciudad de México', country: 'México', countryCode: 'MX', lat: 19.4326, lon: -99.1332 },
@@ -53,11 +65,11 @@ const DDI_GEO_MAP = {
   '1': { city: 'Miami', country: 'Estados Unidos', countryCode: 'US', lat: 25.7617, lon: -80.1918 }
 };
 
-// 3. Curated Authentic Motels Fallback
+// 3. Lista Curada de Motéis de Alta Credibilidade (Backup Instantâneo)
 const CURATED_MOTELS = {
   'ES': [
+    { name: 'Motel Avenue Madrid', address: 'Avenida de Aragón, 362 - Madrid', lat: 40.4485, lon: -3.5850 },
     { name: 'Motel Los Cipreses', address: 'Calle Alcalá, 312 - Madrid', lat: 40.4320, lon: -3.6510 },
-    { name: 'Motel Venus Madrid', address: 'Avenida de Aragón, 362 - Madrid', lat: 40.4485, lon: -3.5850 },
     { name: 'Motel Punt 14', address: 'Autovía de Castelldefels, km 14 - Barcelona', lat: 41.2850, lon: 2.0120 }
   ],
   'PA': [
@@ -92,7 +104,7 @@ const CURATED_MOTELS = {
   ]
 };
 
-// Caches em memória para desempenho máximo
+// Caches em memória
 const motelCache = new Map();
 const tileCache = new Map();
 
@@ -182,14 +194,14 @@ async function getNearestMotel(geo) {
     let nomUrl = 'https://nominatim.openstreetmap.org/search?q=motel+' + encodeURIComponent(city) + '&countrycodes=' + countryCode + '&format=json&limit=4&addressdetails=1';
     let nomRes = await axios.get(nomUrl, {
       headers: { 'User-Agent': 'WhatsAppSimulationEngine/2.0' },
-      timeout: 3500
+      timeout: 3000
     });
 
     if (!nomRes.data || nomRes.data.length === 0) {
       nomUrl = 'https://nominatim.openstreetmap.org/search?q=hotel+' + encodeURIComponent(city) + '&countrycodes=' + countryCode + '&format=json&limit=4&addressdetails=1';
       nomRes = await axios.get(nomUrl, {
         headers: { 'User-Agent': 'WhatsAppSimulationEngine/2.0' },
-        timeout: 3500
+        timeout: 3000
       });
     }
 
@@ -205,8 +217,8 @@ async function getNearestMotel(geo) {
       const address = road + ', ' + houseNumber + ' - ' + city;
 
       const result = {
-        name: name.slice(0, 36),
-        address: address.slice(0, 48),
+        name: name.slice(0, 34),
+        address: address.slice(0, 46),
         city: city,
         country: geo.country,
         countryCode: geo.countryCode,
@@ -239,50 +251,89 @@ async function getNearestMotel(geo) {
 }
 
 /**
- * Renderiza o Card de Localização completo (Mapa Dark + Pin + Nome do Motel + Endereço)
+ * Busca tile do mapa sem watermark:
+ * 1. Esri World Dark Gray Canvas (OFICIAL, GRATUITO, SEM MARCA D'ÁGUA)
+ * 2. OpenStreetMap Oficial tratado em Dark Mode via Sharp
+ * 3. Fallback SVG vetorial limpo
+ */
+async function getMapTile(lat, lon, zoom = 15) {
+  const { x, y } = latLonToTile(lat, lon, zoom);
+  const tileKey = zoom + '_' + x + '_' + y;
+
+  if (tileCache.has(tileKey)) {
+    return tileCache.get(tileKey);
+  }
+
+  // TENTATIVA 1: Esri ArcGIS World Dark Gray Base (Sem watermark, alta fidelidade dark)
+  // Notação Esri: tile/{level}/{row}/{col} -> tile/{zoom}/{y}/{x}
+  const esriUrl = 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/' + zoom + '/' + y + '/' + x;
+  try {
+    const esriRes = await axios.get(esriUrl, {
+      timeout: 3500,
+      responseType: 'arraybuffer',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    if (esriRes.data && esriRes.data.length > 500) {
+      const buf = Buffer.from(esriRes.data);
+      tileCache.set(tileKey, buf);
+      return buf;
+    }
+  } catch (e) {
+    console.warn('[LocationService] Esri Dark fallback:', e.message);
+  }
+
+  // TENTATIVA 2: OpenStreetMap Standard convertido em Dark Mode (sem watermark)
+  const osmUrl = 'https://tile.openstreetmap.org/' + zoom + '/' + x + '/' + y + '.png';
+  try {
+    const osmRes = await axios.get(osmUrl, {
+      timeout: 3500,
+      responseType: 'arraybuffer',
+      headers: { 'User-Agent': 'WhatsAppBotSimulation/1.0 (contact: admin@whatsblin.com)' }
+    });
+    if (osmRes.data && osmRes.data.length > 500) {
+      const darkOsm = await sharp(osmRes.data)
+        .modulate({ brightness: 0.8, saturation: 0.2 })
+        .negate({ alpha: false })
+        .tint({ r: 27, g: 38, b: 46 })
+        .png()
+        .toBuffer();
+      tileCache.set(tileKey, darkOsm);
+      return darkOsm;
+    }
+  } catch (e) {
+    console.warn('[LocationService] OSM Dark fallback:', e.message);
+  }
+
+  // TENTATIVA 3: Fallback mapa vetorial SVG escuro estilo WhatsApp
+  return Buffer.from(
+    '<svg width="380" height="215" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="100%" height="100%" fill="#1f2c34"/>' +
+    '<path d="M0,45 Q190,85 380,45" stroke="#2a3942" stroke-width="8" fill="none"/>' +
+    '<path d="M0,155 Q190,125 380,165" stroke="#2a3942" stroke-width="12" fill="none"/>' +
+    '<path d="M120,0 L145,215" stroke="#374248" stroke-width="6" fill="none"/>' +
+    '<path d="M260,0 L235,215" stroke="#374248" stroke-width="8" fill="none"/>' +
+    '</svg>'
+  );
+}
+
+/**
+ * Renderiza o Card de Localização completo (Mapa Dark Sem Watermark + Pin + Nome do Motel + Endereço com Fonte Embutida)
  */
 async function renderLocationCard(motel, width = 380, height = 325) {
   const mapHeight = 215;
   const footerHeight = height - mapHeight; // 110px
 
-  // 1. Busca tile do mapa dark
+  // 1. Busca tile do mapa sem nenhuma marca d'água
   const zoom = 15;
-  const { x, y } = latLonToTile(motel.lat, motel.lon, zoom);
-  const tileKey = zoom + '_' + x + '_' + y;
+  const rawTileBuffer = await getMapTile(motel.lat, motel.lon, zoom);
 
-  let mapTileBuffer = tileCache.get(tileKey);
-
-  if (!mapTileBuffer) {
-    const tileUrl = 'https://a.basemaps.cartocdn.com/rastertiles/dark_all/' + zoom + '/' + x + '/' + y + '.png';
-    try {
-      const tileRes = await axios.get(tileUrl, {
-        responseType: 'arraybuffer',
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        timeout: 4000
-      });
-      mapTileBuffer = Buffer.from(tileRes.data);
-      tileCache.set(tileKey, mapTileBuffer);
-    } catch (e) {
-      // Fallback SVG mapa escuro com ruas
-      mapTileBuffer = Buffer.from(
-        '<svg width="' + width + '" height="' + mapHeight + '" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="100%" height="100%" fill="#1f2c34"/>' +
-        '<path d="M0,45 Q190,85 380,45" stroke="#2a3942" stroke-width="8" fill="none"/>' +
-        '<path d="M0,155 Q190,125 380,165" stroke="#2a3942" stroke-width="12" fill="none"/>' +
-        '<path d="M120,0 L145,215" stroke="#374248" stroke-width="6" fill="none"/>' +
-        '<path d="M260,0 L235,215" stroke="#374248" stroke-width="8" fill="none"/>' +
-        '</svg>'
-      );
-    }
-  }
-
-  // Redimensiona mapa
-  const resizedMap = await sharp(mapTileBuffer)
+  // Redimensiona mapa para cobrir width x mapHeight
+  const resizedMap = await sharp(rawTileBuffer)
     .resize(width, mapHeight, { fit: 'cover' })
     .png()
     .toBuffer();
 
-  // 2. Pin do WhatsApp Vermelho com sombra
+  // 2. Pin do WhatsApp Vermelho com sombra e ponto central
   const pinSvg =
     '<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
@@ -304,17 +355,30 @@ async function renderLocationCard(motel, width = 380, height = 325) {
     .png()
     .toBuffer();
 
-  // 3. Rodapé com informações do Motel
+  // 3. Rodapé com Fonte Embutida em Base64 (zero caixas '□□□□□')
   const escapedName = (motel.name || 'Motel').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const escapedAddress = (motel.address || 'Calle Principal').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  const fontStyle = FONT_BASE64
+    ? '@font-face { font-family: "WhatsAppFont"; src: url("data:font/truetype;charset=utf-8;base64,' + FONT_BASE64 + '") format("truetype"); }'
+    : '';
+
   const footerSvg =
     '<svg width="' + width + '" height="' + footerHeight + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs>' +
+    '<style>' +
+    fontStyle +
+    '.motel-title { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 15px; font-weight: bold; fill: #e9edef; }' +
+    '.motel-addr { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 12px; fill: #8696a0; }' +
+    '.maps-link { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11.5px; font-weight: bold; fill: #53bdeb; }' +
+    '.time-label { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11px; fill: #8696a0; }' +
+    '</style>' +
+    '</defs>' +
     '<rect width="100%" height="100%" fill="#1f2c34"/>' +
-    '<text x="16" y="32" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15.5" font-weight="bold" fill="#e9edef">' + escapedName + '</text>' +
-    '<text x="16" y="56" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" fill="#8696a0">' + escapedAddress + '</text>' +
-    '<text x="16" y="82" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#53bdeb">maps.google.com</text>' +
-    '<text x="' + (width - 48) + '" y="82" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" fill="#8696a0">16:09</text>' +
+    '<text x="16" y="32" class="motel-title">' + escapedName + '</text>' +
+    '<text x="16" y="56" class="motel-addr">' + escapedAddress + '</text>' +
+    '<text x="16" y="82" class="maps-link">maps.google.com</text>' +
+    '<text x="' + (width - 48) + '" y="82" class="time-label">16:09</text>' +
     '</svg>';
 
   // 4. Monta o card inteiro com cantos arredondados (estilo balão do WhatsApp)
