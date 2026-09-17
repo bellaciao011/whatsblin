@@ -45,7 +45,7 @@ app.use((req, res, next) => {
   // Esse domínio é EXCLUSIVAMENTE o painel administrativo do SaaS.
   // Bloqueia rotas de campanha (/c/*) nele para que campanhas NUNCA usem o domínio do Railway.
   if (isSystemHost) {
-    if (req.path.startsWith('/c/')) {
+    if (req.path.startsWith('/c/') && req.query.preview !== '1' && req.query.mode !== 'chat') {
       return res.status(404).send(`
         <!DOCTYPE html>
         <html lang="pt-BR">
