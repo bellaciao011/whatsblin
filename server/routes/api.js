@@ -1426,6 +1426,20 @@ router.post('/instances/test-disconnect', (req, res) => {
   res.json({ success: true, message: `Alerta de desconexão enviado para "${chipName}"` });
 });
 
+// Rota para testar notificação de novo lead no celular / navegador
+router.post('/notifications/test-lead', (req, res) => {
+  const { phone, codigo, campaign } = req.body || {};
+  eventBus.emit('new_lead', {
+    phone: phone || '5511999998888',
+    codigo: codigo || 'LEAD-TESTE',
+    campaign: campaign || 'Meta Ads (Teste)',
+    text: 'Hola, quiero espiar un número',
+    timestamp: new Date().toISOString()
+  });
+  console.log('[Alert Test] 🚀 Notificação de teste de Novo Lead disparada!');
+  res.json({ success: true, message: 'Notificação de teste de Novo Lead enviada!' });
+});
+
 router.get('/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
