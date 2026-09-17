@@ -59,8 +59,22 @@ html, body {
   }
 }
 
+/* CAMADA DO WALLPAPER ORIGINAL WHATSAPP */
+.wa-wallpaper-layer {
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/whatsapp-wallpaper.png');
+  background-repeat: repeat;
+  background-size: 380px auto;
+  opacity: 0.065;
+  filter: invert(1);
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* CABEÇALHO DO WHATSAPP */
 .wa-header {
+  position: relative;
   height: 60px;
   background-color: var(--wa-header-bg);
   display: flex;
@@ -188,11 +202,9 @@ html, body {
   flex-direction: column;
   gap: 6px;
   position: relative;
-  background-color: #0b141a;
-  background-image: radial-gradient(circle at 50% 50%, rgba(18, 27, 34, 0.4) 0%, rgba(11, 20, 26, 0.85) 100%),
-    url("data:image/svg+xml,%3Csvg width='300' height='300' viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg' opacity='0.05'%3E%3Cpath fill='%23ffffff' d='M50 30a10 10 0 0 1 10 10v10a10 10 0 0 1-20 0V40a10 10 0 0 1 10-10zm180 20a12 12 0 0 1 12 12c0 8-12 20-12 20s-12-12-12-20a12 12 0 0 1 12-12zm-90 60a15 15 0 1 1 0 30 15 15 0 0 1 0-30zm-95 75a8 8 0 0 1 8 8v15a8 8 0 0 1-16 0v-15a8 8 0 0 1 8-8zm200 40a14 14 0 1 1-14-14 14 14 0 0 1 14 14zm-110 50a10 10 0 1 1-20 0 10 10 0 0 1 20 0z'/%3E%3Cpath fill='%23ffffff' d='M15 120h30v20H15zm230-60h25v25h-25zm-80 160h20v20h-20z'/%3E%3C/svg%3E");
-  background-repeat: repeat;
+  background-color: transparent;
   scroll-behavior: smooth;
+  z-index: 2;
 }
 
 .wa-chat-area::-webkit-scrollbar {
@@ -476,6 +488,8 @@ html, body {
 
 /* BARRA INFERIOR DE DIGITAÇÃO */
 .wa-input-bar {
+  position: relative;
+  z-index: 10;
   background-color: var(--wa-header-bg);
   padding: 6px 8px;
   display: flex;

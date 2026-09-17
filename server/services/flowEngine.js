@@ -226,12 +226,32 @@ async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
     }
   }
 
-  // Candidatos para consulta
+  // Candidatos para consulta multi-formato internacional
   const candidates = [digits];
-  if (digits.startsWith('55') && digits.length === 13 && digits[4] === '9') {
-    candidates.push('55' + digits.substring(2, 4) + digits.substring(5)); // 8 dígitos BR
-  } else if (digits.startsWith('55') && digits.length === 12) {
-    candidates.push('55' + digits.substring(2, 4) + '9' + digits.substring(4)); // 9 dígitos BR
+
+  // Brasil: 12 dígitos (55 + DDD + 8 dígitos) <-> 13 dígitos (55 + DDD + 9 + 8 dígitos)
+  if (digits.startsWith('55')) {
+    const after55 = digits.substring(2);
+    if (after55.length === 11 && after55[2] === '9') {
+      candidates.push('55' + after55.substring(0, 2) + after55.substring(3)); // 8 dígitos sem o 9
+    } else if (after55.length === 10) {
+      candidates.push('55' + after55.substring(0, 2) + '9' + after55.substring(2)); // 9 dígitos com o 9
+    }
+    candidates.push(after55); // sem o 55
+  }
+
+  // México: 52 1 ... <-> 52 ...
+  if (digits.startsWith('521')) {
+    candidates.push('52' + digits.substring(3));
+  } else if (digits.startsWith('52') && !digits.startsWith('521')) {
+    candidates.push('521' + digits.substring(2));
+  }
+
+  // Argentina: 54 9 ... <-> 54 ...
+  if (digits.startsWith('549')) {
+    candidates.push('54' + digits.substring(3));
+  } else if (digits.startsWith('54') && !digits.startsWith('549')) {
+    candidates.push('549' + digits.substring(2));
   }
 
   const instances = db.getInstances();
@@ -239,8 +259,45 @@ async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
   const decToken = inst && inst.instance_token ? cryptoService.decrypt(inst.instance_token) : null;
   const baseUrl = inst ? (inst.url_servidor || 'https://whatsblin.uazapi.com') : 'https://whatsblin.uazapi.com';
 
-  // 1. PRIORIDADE MÁXIMA: Consulta no cache oficial de conversas da UAZAPI (/chat/find por wa_chatid)
-  // Esta rota retorna chats salvos com suas fotos oficiais do WhatsApp (imagePreview / image) mesmo quando desconectado!
+  // 1. PRIORIDADE MÁXIMA: Verifica se o número consultado pertence a uma das instâncias do sistema (ex: próprio chip / atendente)
+  for (const i of instances) {
+    const iOwner = String(i.owner || i.phone || '').replace(/\D/g, '');
+    if (iOwner && candidates.some(c => c === iOwner || c.endsWith(iOwner) || iOwner.endsWith(c))) {
+      const pUrl = i.profilePicUrl || i.photo || i.image;
+      if (pUrl && typeof pUrl === 'string' && pUrl.startsWith('http')) {
+        console.log(`[Lookup API] ✓ Foto encontrada no cadastro da instância (${i.name}): ${pUrl.slice(0, 75)}...`);
+        return pUrl;
+      }
+    }
+  }
+
+  // 1.1 Consulta ao vivo /instance/status caso o Uazapi guarde a foto do chip conectado
+  if (decToken) {
+    try {
+      const statusRes = await axios.get(`${baseUrl}/instance/status`, {
+        headers: { token: decToken },
+        timeout: 4000
+      });
+      const instData = statusRes.data?.instance;
+      if (instData) {
+        // Atualiza campos da instância local em memória/cache se faltavam
+        if (inst && instData.owner && !inst.owner) inst.owner = instData.owner;
+        if (inst && instData.profilePicUrl && !inst.profilePicUrl) inst.profilePicUrl = instData.profilePicUrl;
+
+        const ownerDigits = String(instData.owner || '').replace(/\D/g, '');
+        if (ownerDigits && candidates.some(c => c === ownerDigits || c.endsWith(ownerDigits) || ownerDigits.endsWith(c))) {
+          if (instData.profilePicUrl && typeof instData.profilePicUrl === 'string' && instData.profilePicUrl.startsWith('http')) {
+            console.log(`[Lookup API] ✓ Foto encontrada via /instance/status para ${targetPhone}: ${instData.profilePicUrl.slice(0, 75)}...`);
+            return instData.profilePicUrl;
+          }
+        }
+      }
+    } catch (e) {
+      // continua
+    }
+  }
+
+  // 2. Consulta no cache de conversas do WhatsApp na UAZAPI (/chat/find por wa_chatid)
   if (decToken) {
     for (const num of candidates) {
       try {
@@ -248,7 +305,7 @@ async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
           wa_chatid: `${num}@s.whatsapp.net`
         }, {
           headers: { token: decToken, 'Content-Type': 'application/json' },
-          timeout: 5000
+          timeout: 4000
         });
         const chat = res.data?.chats?.[0];
         const photo = chat?.image || chat?.imagePreview || chat?.photo || chat?.profilePicUrl || chat?.wa_profilePicUrl;
@@ -261,17 +318,22 @@ async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
       }
     }
 
-    // 2. Busca na lista recente de /chat/find comparando dígitos
+    // 2.1 Busca na lista recente de /chat/find comparando dígitos
     try {
       const res = await axios.post(`${baseUrl}/chat/find`, { limit: 100 }, {
         headers: { token: decToken, 'Content-Type': 'application/json' },
-        timeout: 6000
+        timeout: 5000
       });
       const chats = res.data?.chats || [];
       for (const c of chats) {
         const cPhoneDigits = String(c.phone || '').replace(/\D/g, '');
         const cChatIdDigits = String(c.wa_chatid || '').replace(/\D/g, '');
-        const match = candidates.some(num => (cPhoneDigits && cPhoneDigits === num) || (cChatIdDigits && cChatIdDigits === num));
+        const cFastIdDigits = String(c.wa_fastid || '').replace(/\D/g, '');
+        const match = candidates.some(num =>
+          (cPhoneDigits && (cPhoneDigits === num || cPhoneDigits.endsWith(num) || num.endsWith(cPhoneDigits))) ||
+          (cChatIdDigits && (cChatIdDigits === num || cChatIdDigits.endsWith(num) || num.endsWith(cChatIdDigits))) ||
+          (cFastIdDigits && (cFastIdDigits.endsWith(num) || num.endsWith(cFastIdDigits)))
+        );
         if (match) {
           const photo = c.image || c.imagePreview || c.photo || c.profilePicUrl || c.wa_profilePicUrl;
           if (photo && typeof photo === 'string' && photo.startsWith('http')) {
@@ -304,37 +366,48 @@ async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
     // ignora
   }
 
-  // 4. Se a instância estiver conectada na Uazapi, consulta /chat/details ao vivo no WhatsApp
-  if (decToken && inst && inst.status === 'connected') {
+  // 4. Se houver token na Uazapi, tenta consulta direta /chat/details (resolução original e preview)
+  if (decToken) {
     for (const num of candidates) {
       try {
-        console.log(`[Lookup API] Consultando /chat/details ao vivo via Uazapi para: ${num}`);
         const res = await axios.post(`${baseUrl}/chat/details`, { number: num, preview: false }, {
           headers: { token: decToken, 'Content-Type': 'application/json' },
-          timeout: 6000
+          timeout: 4000
         });
         const d = res.data;
         const photo = d?.image || d?.imagePreview || d?.profilePicUrl || d?.photo || d?.picture || d?.data?.image || d?.data?.imagePreview || d?.data?.profilePicUrl;
         if (photo && typeof photo === 'string' && photo.startsWith('http')) {
-          console.log(`[Lookup API] ✓ Foto pública encontrada ao vivo via /chat/details: ${photo}`);
+          console.log(`[Lookup API] ✓ Foto pública encontrada ao vivo via /chat/details (full): ${photo.slice(0, 75)}...`);
           return photo;
         }
+        // Fallback preview
+        if (!photo) {
+          const resPrev = await axios.post(`${baseUrl}/chat/details`, { number: num, preview: true }, {
+            headers: { token: decToken, 'Content-Type': 'application/json' },
+            timeout: 3000
+          });
+          const pPrev = resPrev.data?.imagePreview || resPrev.data?.image;
+          if (pPrev && typeof pPrev === 'string' && pPrev.startsWith('http')) {
+            console.log(`[Lookup API] ✓ Foto pública encontrada ao vivo via /chat/details (preview): ${pPrev.slice(0, 75)}...`);
+            return pPrev;
+          }
+        }
       } catch (uazErr) {
-        // ignora
+        // ignora erro e continua tentativas
       }
     }
   }
 
-  // 5. Fallback Stalkea.app se configurado
+  // 5. Fallback Stalkea.app
   for (const num of candidates) {
     try {
       const url = `https://stalkea.app/spp/api/profile-picture.php?phone=${encodeURIComponent(num)}`;
       const res = await axios.get(url, {
-        timeout: 4000,
+        timeout: 3500,
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
-      if (res.data && res.data.urlImage) {
-        console.log(`[Lookup API] ✓ Foto encontrada via stalkea.app: ${res.data.urlImage}`);
+      if (res.data && res.data.urlImage && typeof res.data.urlImage === 'string' && res.data.urlImage.startsWith('http')) {
+        console.log(`[Lookup API] ✓ Foto encontrada via stalkea.app: ${res.data.urlImage.slice(0, 75)}...`);
         return res.data.urlImage;
       }
     } catch (stalkErr) {
