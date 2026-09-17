@@ -23,6 +23,8 @@
   },
   "webchat": {
     "attendantName": "María",
-    "welcomeMessage": "¡Hola! Mucho gusto. Me llamo María y soy especialista en investigación de relaciones. Envíame a continuación el número que deseas investigar hoy."
+    "welcomeMessage": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨\n\nPor favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+    "welcomeMsg1": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨",
+    "welcomeMsg2": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲"
   }
 }

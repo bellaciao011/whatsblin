@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
   <link rel="icon" href="https://static.whatsapp.net/rsrc.php/v3/yP/r/rNqzzdltrash.png" type="image/png">
-  <link rel="stylesheet" href="/css/whatsapp-chat.css?v=20260917_v4">
+  <link rel="stylesheet" href="/css/whatsapp-chat.css?v=20260917_v5">
   
   <!-- PIXEL_SCRIPTS_PLACEHOLDER -->
 </head>
@@ -61,29 +61,11 @@
 
     <!-- Barra de Digitação Inferior com Seletor de País / Bandeiras -->
     <footer class="wa-input-bar">
-      <!-- Seletor de País com Bandeira e DDI -->
-      <div class="wa-country-picker-wrap">
-        <button type="button" id="wa-country-btn" class="wa-country-btn" title="Seleccionar país">
-          <span id="wa-country-flag" class="wa-country-flag">🇵🇦</span>
-          <span id="wa-country-code" class="wa-country-code">+507</span>
-          <span class="wa-country-arrow">▾</span>
-        </button>
-
-        <!-- Dropdown com Lista de Países -->
-        <div id="wa-country-dropdown" class="wa-country-dropdown">
-          <div class="wa-country-search-box">
-            <input type="text" id="wa-country-search" placeholder="Buscar país o prefijo..." autocomplete="off" />
-          </div>
-          <div id="wa-country-list" class="wa-country-list"></div>
-        </div>
-      </div>
-
       <div class="wa-input-wrap">
         <button type="button" class="wa-input-icon" title="Emojis">😊</button>
-        <input type="tel" id="wa-input-field" class="wa-input-field" placeholder="Ingresa el número a investigar..." autocomplete="off" />
+        <input type="text" id="wa-input-field" class="wa-input-field" placeholder="Escribe un mensaje" autocomplete="off" />
         <button type="button" class="wa-input-icon" title="Adjuntar">📎</button>
       </div>
-
       <button type="button" id="wa-send-btn" class="wa-send-btn" aria-label="Enviar">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="transform: rotate(-30deg) translate(2px, -1px);">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -98,6 +80,6 @@
     <img id="wa-modal-img" src="" alt="Prueba ampliada" class="wa-modal-img" onclick="event.stopPropagation()">
   </div>
 
-  <script src="/js/whatsapp-chat.js?v=20260917_v4"></script>
+  <script src="/js/whatsapp-chat.js?v=20260917_v5"></script>
 </body>
 </html>

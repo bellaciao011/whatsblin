@@ -29,15 +29,21 @@ function saveSessions(sessions) {
 /**
  * Retorna as configurações ativas da atendente e do webchat
  */
+const DEFAULT_WELCOME_1 = '¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨';
+const DEFAULT_WELCOME_2 = 'Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲';
+
 function getWebChatConfig() {
   const settings = db.getSettings() || {};
   const webchat = settings.webchat || {};
+  const msg1 = webchat.welcomeMsg1 || DEFAULT_WELCOME_1;
+  const msg2 = webchat.welcomeMsg2 || DEFAULT_WELCOME_2;
   return {
     attendantName: webchat.attendantName || 'María',
     attendantAvatar: webchat.attendantAvatar || 'https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111',
-    welcomeMessage: webchat.welcomeMessage || '¡Hola! Mucho gusto. Me llamo María y soy especialista en investigación de relaciones. Envíame a continuación el número que deseas investigar hoy.',
+    welcomeMessages: [msg1, msg2],
+    welcomeMessage: msg1 + '\n\n' + msg2,
     offerAmount: webchat.offerAmount || '19',
-    campaignMode: webchat.campaignMode || 'webchat' // 'webchat' ou 'whatsapp'
+    campaignMode: webchat.campaignMode || 'webchat'
   };
 }
 
@@ -57,7 +63,10 @@ async function initSession(sessionId, utmData = {}) {
       state: 'INITIAL',
       targetPhone: null,
       photoUrl: null,
-      messages: [],
+      messages: [
+        { from: 'bot', text: config.welcomeMessages[0], timestamp: new Date().toISOString() },
+        { from: 'bot', text: config.welcomeMessages[1], timestamp: new Date(Date.now() + 1400).toISOString() }
+      ],
       utm: utmData,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -73,6 +82,7 @@ async function initSession(sessionId, utmData = {}) {
       name: config.attendantName,
       avatar: config.attendantAvatar
     },
+    welcomeMessages: config.welcomeMessages,
     welcomeMessage: config.welcomeMessage,
     history: session.messages || []
   };
