@@ -193,6 +193,11 @@ app.use((req, res, next) => {
   // Rotas que dispensam autenticação:
   if (
     req.path.startsWith('/c/') ||
+    req.path.startsWith('/chat') ||
+    req.path.startsWith('/api/webchat/') ||
+    req.path.startsWith('/css/whatsapp-chat.css') ||
+    req.path.startsWith('/js/whatsapp-chat.js') ||
+    req.path.startsWith('/whatsapp-chat.html') ||
     req.path.startsWith('/api/auth/') ||
     req.path.startsWith('/api/webhooks/') ||
     req.path.startsWith('/api/generate-proof') ||
