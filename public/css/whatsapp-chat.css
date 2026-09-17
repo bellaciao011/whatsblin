@@ -1,20 +1,23 @@
 /* =========================================================================
-   WhatsApp Web/Mobile Simulator CSS (Dark Theme Authentic Replica)
+   WhatsApp Web/Mobile Simulator CSS (Standard Default Light Theme Replica)
    ========================================================================= */
 
 :root {
-  --wa-bg-deep: #0b141a;
-  --wa-header-bg: #202c33;
-  --wa-input-bg: #202c33;
-  --wa-bubble-incoming: #202c33;
-  --wa-bubble-outgoing: #005c4b;
-  --wa-text-primary: #e9edef;
-  --wa-text-secondary: #8696a0;
-  --wa-text-muted: #667781;
+  --wa-bg-deep: #efeae2;
+  --wa-header-bg: #008069;
+  --wa-header-text: #ffffff;
+  --wa-input-bar-bg: #f0f2f5;
+  --wa-input-bg: #ffffff;
+  --wa-bubble-incoming: #ffffff;
+  --wa-bubble-outgoing: #d9fdd3;
+  --wa-text-primary: #111b21;
+  --wa-text-secondary: #667781;
+  --wa-text-muted: #8696a0;
   --wa-accent-green: #00a884;
   --wa-accent-light-green: #25d366;
   --wa-blue-check: #53bdeb;
-  --wa-border: rgba(134, 150, 160, 0.15);
+  --wa-border: rgba(11, 20, 26, 0.08);
+  --wa-bubble-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
   --wa-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -29,7 +32,7 @@ html, body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: var(--wa-bg-deep);
+  background-color: #eae6df;
   font-family: var(--wa-font);
   color: var(--wa-text-primary);
   display: flex;
@@ -40,34 +43,33 @@ html, body {
 /* Container do App (Mobile 100%, Desktop tipo WhatsApp Web centralizado) */
 .wa-app-container {
   width: 100%;
-  height: 100%;
   max-width: 480px;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   background-color: var(--wa-bg-deep);
   position: relative;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
 }
 
 @media (min-width: 768px) {
   .wa-app-container {
     height: 94vh;
     border-radius: 18px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.08);
   }
 }
 
-/* CAMADA DO WALLPAPER ORIGINAL WHATSAPP */
+/* CAMADA DO WALLPAPER ORIGINAL WHATSAPP (PADRÃO BRANCO/BEGE) */
 .wa-wallpaper-layer {
   position: absolute;
   inset: 0;
+  background-color: #efeae2;
   background-image: url('/images/whatsapp-wallpaper.png');
   background-repeat: repeat;
   background-size: 380px auto;
-  opacity: 0.065;
-  filter: invert(1);
+  opacity: 1; /* PAPEL DE PAREDE 100% VISÍVEL, CLARO E NÍTIDO */
   pointer-events: none;
   z-index: 1;
 }
@@ -77,12 +79,13 @@ html, body {
   position: relative;
   height: 60px;
   background-color: var(--wa-header-bg);
+  color: var(--wa-header-text);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
   z-index: 10;
-  border-bottom: 1px solid var(--wa-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
 
@@ -98,13 +101,14 @@ html, body {
 .wa-back-btn {
   background: none;
   border: none;
-  color: var(--wa-text-secondary);
-  font-size: 22px;
+  color: #ffffff;
+  font-size: 24px;
   cursor: pointer;
   padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
 }
 
 .wa-avatar-wrap {
@@ -119,7 +123,7 @@ html, body {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  background-color: #374248;
+  background-color: #dfe5e7;
 }
 
 .wa-online-dot {
@@ -141,7 +145,7 @@ html, body {
 .wa-user-name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--wa-text-primary);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -151,13 +155,13 @@ html, body {
 }
 
 .wa-verified-badge {
-  color: var(--wa-accent-light-green);
+  color: #a7f3d0;
   font-size: 13px;
 }
 
 .wa-user-status {
   font-size: 12px;
-  color: var(--wa-text-secondary);
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -165,7 +169,7 @@ html, body {
 }
 
 .wa-user-status.typing {
-  color: var(--wa-accent-light-green);
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -173,7 +177,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 16px;
-  color: var(--wa-text-secondary);
+  color: #ffffff;
   font-size: 18px;
 }
 
@@ -186,11 +190,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .wa-icon-btn:hover {
-  color: var(--wa-text-primary);
+  opacity: 0.85;
 }
 
 /* ÁREA DE MENSAGENS */
@@ -202,7 +206,10 @@ html, body {
   flex-direction: column;
   gap: 6px;
   position: relative;
-  background-color: transparent;
+  background-color: #efeae2;
+  background-image: url('/images/whatsapp-wallpaper.png');
+  background-repeat: repeat;
+  background-size: 380px auto;
   scroll-behavior: smooth;
   z-index: 2;
 }
@@ -212,21 +219,21 @@ html, body {
 }
 
 .wa-chat-area::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 4px;
 }
 
 .wa-encryption-notice {
   align-self: center;
-  background-color: #182229;
+  background-color: #ffeecd;
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 11.5px;
-  color: #ffd279;
+  color: #54656f;
   text-align: center;
   max-width: 90%;
   margin: 6px auto 10px auto;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--wa-bubble-shadow);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -235,14 +242,15 @@ html, body {
 
 .wa-date-pill {
   align-self: center;
-  background-color: #182229;
+  background-color: #ffffff;
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 11px;
-  color: var(--wa-text-secondary);
+  color: #54656f;
   text-transform: uppercase;
   font-weight: 500;
   margin: 4px auto 8px auto;
+  box-shadow: var(--wa-bubble-shadow);
 }
 
 /* BOLHAS DE MENSAGEM */
@@ -268,7 +276,7 @@ html, body {
   font-size: 14.2px;
   line-height: 1.42;
   word-wrap: break-word;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--wa-bubble-shadow);
   animation: bubblePop 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 
@@ -306,7 +314,7 @@ html, body {
 }
 
 .wa-bubble.outgoing .wa-msg-meta {
-  color: rgba(255, 255, 255, 0.6);
+  color: #667781;
 }
 
 .wa-blue-ticks {
@@ -356,7 +364,7 @@ html, body {
 .wa-audio-play-btn {
   background: none;
   border: none;
-  color: var(--wa-text-primary);
+  color: #54656f;
   font-size: 22px;
   cursor: pointer;
   display: flex;
@@ -382,13 +390,13 @@ html, body {
 
 .wa-waveform-bar {
   flex: 1;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: #d1d7db;
   border-radius: 2px;
   transition: background-color 0.2s;
 }
 
 .wa-waveform-bar.played {
-  background-color: var(--wa-accent-light-green);
+  background-color: var(--wa-accent-green);
 }
 
 .wa-audio-time-row {
@@ -400,7 +408,7 @@ html, body {
 
 /* IMAGEM DE PROVA */
 .wa-image-bubble {
-  padding: 3px 3px 6px 3px !important;
+  padding: 4px 4px 6px 4px !important;
   max-width: 280px;
 }
 
@@ -410,7 +418,7 @@ html, body {
   overflow: hidden;
   cursor: pointer;
   position: relative;
-  background-color: #1a2329;
+  background-color: #f0f2f5;
 }
 
 .wa-proof-img {
@@ -429,12 +437,13 @@ html, body {
   padding: 6px 6px 2px 6px;
   font-size: 13.5px;
   line-height: 1.35;
+  color: #111b21;
 }
 
 /* BOTÃO DE CHECKOUT */
 .wa-checkout-card {
   margin-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(11, 20, 26, 0.08);
   padding-top: 8px;
 }
 
@@ -451,7 +460,7 @@ html, body {
   font-size: 13.5px;
   padding: 10px 14px;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 168, 132, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 168, 132, 0.3);
   transition: transform 0.15s ease, background 0.2s;
   text-align: center;
 }
@@ -467,13 +476,17 @@ html, body {
   align-items: center;
   gap: 4px;
   padding: 10px 14px;
+  background-color: #ffffff;
+  box-shadow: var(--wa-bubble-shadow);
+  border-radius: 8px;
+  border-top-left-radius: 0px;
 }
 
 .wa-typing-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: var(--wa-text-secondary);
+  background-color: #8696a0;
   animation: typingBounce 1.3s infinite ease-in-out;
 }
 
@@ -490,29 +503,30 @@ html, body {
 .wa-input-bar {
   position: relative;
   z-index: 10;
-  background-color: var(--wa-header-bg);
+  background-color: var(--wa-input-bar-bg);
   padding: 6px 8px;
   display: flex;
   align-items: center;
   gap: 6px;
-  border-top: 1px solid var(--wa-border);
+  border-top: 1px solid rgba(11, 20, 26, 0.08);
   flex-shrink: 0;
 }
 
 .wa-input-wrap {
   flex: 1;
-  background-color: #2a3942;
+  background-color: var(--wa-input-bg);
   border-radius: 20px;
   display: flex;
   align-items: center;
   padding: 0 12px;
   min-height: 42px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.1);
 }
 
 .wa-input-icon {
   background: none;
   border: none;
-  color: var(--wa-text-secondary);
+  color: #54656f;
   font-size: 18px;
   cursor: pointer;
   padding: 4px;
@@ -524,7 +538,7 @@ html, body {
   flex: 1;
   background: none;
   border: none;
-  color: var(--wa-text-primary);
+  color: #111b21;
   font-size: 14.5px;
   font-family: inherit;
   padding: 8px 8px;
@@ -532,7 +546,7 @@ html, body {
 }
 
 .wa-input-field::placeholder {
-  color: var(--wa-text-secondary);
+  color: #8696a0;
 }
 
 .wa-send-btn {
@@ -549,6 +563,7 @@ html, body {
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.15s ease, background 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .wa-send-btn:active {

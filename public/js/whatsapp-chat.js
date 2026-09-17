@@ -113,7 +113,7 @@
     // Converte links em texto para links clicáveis
     const linkedText = text.replace(
       /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" style="color: #53bdeb; text-decoration: underline; word-break: break-all;">$1</a>'
+      '<a href="$1" target="_blank" style="color: #027eb5; text-decoration: underline; word-break: break-all;">$1</a>'
     );
 
     row.innerHTML = `
