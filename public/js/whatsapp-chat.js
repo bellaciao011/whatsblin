@@ -217,13 +217,23 @@
     // Exibe digitação
     setTyping(true);
 
+    // Formata o número com o DDI selecionado se for apenas dígitos locais
+    let messageToSend = text;
+    const cleanDigits = text.replace(/\D/g, '');
+    const isOnlyDigits = cleanDigits.length >= 7 && cleanDigits.length <= 13 && (text.length - cleanDigits.length) <= 4;
+    
+    if (isOnlyDigits && !text.startsWith('+') && !cleanDigits.startsWith(selectedCountry.code)) {
+      messageToSend = '+' + selectedCountry.code + ' ' + text;
+    }
+
     try {
       const res = await fetch('/api/webchat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionId,
-          message: text,
+          message: messageToSend,
+          ddi: selectedCountry.code,
           ...utmData
         })
       });

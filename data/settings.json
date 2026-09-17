@@ -22,6 +22,7 @@
     "adminToken": "dqg32oldH10iBvp3AQ3ofUiZ1Kifz5MK5Ca0q6v3kdRyQxYZp9"
   },
   "webchat": {
-    "attendantName": "Maria Carvalho"
+    "attendantName": "María",
+    "welcomeMessage": "¡Hola! Mucho gusto. Me llamo María y soy especialista en investigación de relaciones. Envíame a continuación el número que deseas investigar hoy."
   }
 }

@@ -658,30 +658,39 @@ function extractNewTargetPhone(text) {
   // Ignora se for comprovante ou comando entre colchetes
   if (clean.startsWith('[') && clean.endsWith(']')) return null;
 
-  // 1. Procura ocorrências de telefones formatados (+507 6157-8213, +55 11 99999-8888, etc.)
-  const phonePattern = /(?:\+?\d{1,4}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,5}[\s-]?\d{4}/g;
+  // 1. Procura ocorrências explícitas começando com '+' (ex: +52 1 686 193 2796, +54 9 11..., +507 6157-8213)
+  const plusMatch = clean.match(/\+\s*\d[\d\s\-\(\)\.]{6,22}\d/);
+  if (plusMatch) {
+    const digits = plusMatch[0].replace(/\D/g, '');
+    if (digits.length >= 8 && digits.length <= 16) {
+      return digits;
+    }
+  }
+
+  // 2. Procura ocorrências de telefones formatados com espaços, hífens ou parênteses
+  const phonePattern = /(?:\+?\d{1,4}[\s\-\.]*)?(?:\(?\d{2,4}\)?[\s\-\.]*)?\d{3,5}[\s\-\.]*\d{3,5}(?:[\s\-\.]*\d{2,5})?/g;
   const matches = clean.match(phonePattern);
   if (matches) {
     for (const m of matches) {
       const digits = m.replace(/\D/g, '');
-      if (digits.length >= 8 && digits.length <= 15) {
+      if (digits.length >= 8 && digits.length <= 16) {
         return digits;
       }
     }
   }
 
-  // 2. Sequência contínua de dígitos em palavras
+  // 3. Sequência contínua de dígitos em palavras
   const words = clean.split(/[\s,;:!?]+/);
   for (const w of words) {
     const d = w.replace(/\D/g, '');
-    if (d.length >= 8 && d.length <= 15) {
+    if (d.length >= 8 && d.length <= 16) {
       return d;
     }
   }
 
-  // 3. Fallback: dígitos totais
+  // 4. Fallback: dígitos totais
   const rawDigits = clean.replace(/\D/g, '');
-  if (rawDigits.length >= 8 && rawDigits.length <= 15) {
+  if (rawDigits.length >= 8 && rawDigits.length <= 16) {
     return rawDigits;
   }
 

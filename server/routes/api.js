@@ -2978,9 +2978,9 @@ router.post('/webchat/init', async (req, res) => {
 
 router.post('/webchat/message', async (req, res) => {
   try {
-    const { sessionId, message, ...utmData } = req.body || {};
+    const { sessionId, message, ddi, ...utmData } = req.body || {};
     if (!message) return res.status(400).json({ success: false, error: 'Mensagem vazia.' });
-    const result = await webChatService.handleIncomingMessage(sessionId, message, utmData);
+    const result = await webChatService.handleIncomingMessage(sessionId, message, utmData, ddi);
     res.json(result);
   } catch (err) {
     console.error('[WebChat API Message Error]', err);

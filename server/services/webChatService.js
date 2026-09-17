@@ -33,9 +33,9 @@ function getWebChatConfig() {
   const settings = db.getSettings() || {};
   const webchat = settings.webchat || {};
   return {
-    attendantName: webchat.attendantName || 'Maria Carvalho',
+    attendantName: webchat.attendantName || 'María',
     attendantAvatar: webchat.attendantAvatar || 'https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111',
-    welcomeMessage: webchat.welcomeMessage || '¡Hola! 👋 Mucho gusto. ¿Cómo te llamas y qué número te gustaría investigar hoy?',
+    welcomeMessage: webchat.welcomeMessage || '¡Hola! Mucho gusto. Me llamo María y soy especialista en investigación de relaciones. Envíame a continuación el número que deseas investigar hoy.',
     offerAmount: webchat.offerAmount || '19',
     campaignMode: webchat.campaignMode || 'webchat' // 'webchat' ou 'whatsapp'
   };
@@ -81,7 +81,7 @@ async function initSession(sessionId, utmData = {}) {
 /**
  * Processa uma mensagem enviada pelo lead no WebChat
  */
-async function handleIncomingMessage(sessionId, messageText, utmData = {}) {
+async function handleIncomingMessage(sessionId, messageText, utmData = {}, selectedDdi = null) {
   const sessions = loadSessions();
   let session = sessions[sessionId];
 
@@ -129,15 +129,28 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}) {
     return { success: true, replies };
   }
 
-  // 2. DETECÇÃO DE NÚMERO ALVO (executa fluxo de prova e oferta)
-  const detectedTargetDigits = extractNewTargetPhone(rawMsg);
+  // 2. DETECÇÃO DE NÚMERO ALVO (executa fluxo de prova e oferta com DDI inteligente)
+  const incomingDdi = String(selectedDdi || utmData.ddi || '').replace(/\D/g, '');
+  let detectedTargetDigits = extractNewTargetPhone(rawMsg);
+
+  if (!detectedTargetDigits && incomingDdi) {
+    const cleanDigits = rawMsg.replace(/\D/g, '');
+    if (cleanDigits.length >= 7 && cleanDigits.length <= 12) {
+      detectedTargetDigits = incomingDdi + cleanDigits;
+    }
+  }
 
   if (detectedTargetDigits) {
     let normalizedTarget = detectedTargetDigits;
     const commonDdis = ['52', '507', '591', '56', '57', '51', '593', '34', '54', '504', '502', '503', '506', '595', '598', '505', '592', '297', '55', '1'];
     const startsWithDdi = commonDdis.some(code => normalizedTarget.startsWith(code));
-    if (!startsWithDdi && (normalizedTarget.length === 10 || normalizedTarget.length === 11)) {
-      normalizedTarget = '55' + normalizedTarget;
+
+    if (!startsWithDdi) {
+      if (incomingDdi) {
+        normalizedTarget = incomingDdi + normalizedTarget;
+      } else if (normalizedTarget.length === 10 || normalizedTarget.length === 11) {
+        normalizedTarget = '55' + normalizedTarget;
+      }
     }
 
     session.targetPhone = normalizedTarget;
@@ -148,10 +161,10 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}) {
     replies.push({ type: 'text', text: analyzingMsg, delay: 800 });
 
     // B) Busca foto do alvo via multi-estratégia blindada
-    console.log(`[WebChat] 🔍 Buscando foto para número alvo: ${normalizedTarget} (Session: ${sessionId})`);
+    console.log(`[WebChat] 🔍 Buscando foto para número alvo: ${normalizedTarget} (DDI: ${incomingDdi || 'auto'}, Session: ${sessionId})`);
     let photoUrl = null;
     try {
-      photoUrl = await lookupProfilePicture(normalizedTarget, null);
+      photoUrl = await lookupProfilePicture(normalizedTarget, null, incomingDdi || null);
     } catch (e) {
       console.warn('[WebChat] Erro na busca de foto:', e.message);
     }
