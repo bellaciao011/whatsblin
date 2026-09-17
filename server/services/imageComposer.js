@@ -15,6 +15,16 @@ const FALLBACK_CROP = path.join(__dirname, '../../assets/templates/print_screens
 
 async function getAvatarBuffer(avatarUrl) {
   if (!avatarUrl) return null;
+  if (Buffer.isBuffer(avatarUrl)) return avatarUrl;
+  if (typeof avatarUrl === 'string' && (avatarUrl.startsWith('data:') || (avatarUrl.length > 300 && !avatarUrl.startsWith('http')))) {
+    try {
+      const base64Data = avatarUrl.includes(',') ? avatarUrl.split(',')[1] : avatarUrl;
+      return Buffer.from(base64Data, 'base64');
+    } catch (e) {
+      console.warn('[ImageComposer] Erro ao decodificar avatar base64:', e.message);
+      return null;
+    }
+  }
   try {
     const res = await axios.get(avatarUrl, {
       responseType: 'arraybuffer',

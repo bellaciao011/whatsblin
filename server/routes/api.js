@@ -2835,4 +2835,80 @@ router.post('/sales/manual-approve', async (req, res) => {
   }
 });
 
+
+/**
+ * Gerador Manual de Imagem de Prova (Dashboard):
+ * Suporta qualquer DDI internacional (Panamá, Bolívia, Chile, Colômbia, México, etc.)
+ * Permite foto customizada opcional ou busca automática.
+ */
+router.post('/manual-proof/generate', async (req, res) => {
+  try {
+    const { ddi, numero, lang, customPhotoBase64 } = req.body || {};
+    
+    if (!numero) {
+      return res.status(400).json({ success: false, error: 'Por favor, informe o número de telefone.' });
+    }
+
+    const rawDigits = String(numero).replace(/\D/g, '');
+    const cleanDdi = String(ddi || '').replace(/\D/g, '');
+    
+    let targetPhone = rawDigits;
+    if (cleanDdi && !rawDigits.startsWith(cleanDdi)) {
+      targetPhone = cleanDdi + rawDigits;
+    } else if (!cleanDdi) {
+      const commonDdis = ['52', '507', '591', '56', '57', '51', '593', '34', '54', '504', '502', '503', '506', '595', '598', '505', '592', '297', '55', '1'];
+      const startsWithDdi = commonDdis.some(code => targetPhone.startsWith(code));
+      if (!startsWithDdi && (targetPhone.length === 10 || targetPhone.length === 11)) {
+        targetPhone = '55' + targetPhone;
+      }
+    }
+
+    const selectedLang = (lang || 'es').toLowerCase();
+
+    // 1. Resolução da foto de perfil: foto customizada enviada ou busca automática
+    let photoUrl = null;
+    let isCustomPhoto = false;
+
+    if (customPhotoBase64 && typeof customPhotoBase64 === 'string' && customPhotoBase64.length > 50) {
+      photoUrl = customPhotoBase64;
+      isCustomPhoto = true;
+      console.log(`[Manual Proof] Usando foto personalizada enviada pelo usuário para: +${targetPhone}`);
+    } else {
+      console.log(`[Manual Proof] Buscando foto pública para: +${targetPhone} (DDI: ${cleanDdi || 'auto'})`);
+      photoUrl = await lookupProfilePicture(targetPhone, null, cleanDdi);
+    }
+
+    // 2. Compõe a imagem com o template do idioma escolhido
+    const funnel = db.getFunnel();
+    const imgBuffer = await composeProofImage(photoUrl, funnel?.avatarCoordinates, selectedLang);
+
+    // 3. Salva no diretório público
+    const proofsDir = path.join(__dirname, '../../public/generated');
+    fs.mkdirSync(proofsDir, { recursive: true });
+    const filename = `proof_${targetPhone}_${Date.now()}.png`;
+    fs.writeFileSync(path.join(proofsDir, filename), imgBuffer);
+
+    // 4. Monta a URL pública absoluta automaticamente
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const fullUrl = `${protocol}://${host}/generated/${filename}`;
+
+    console.log(`[Manual Proof] ✓ Imagem gerada com sucesso: ${fullUrl} (hasPhoto: ${Boolean(photoUrl)})`);
+
+    res.json({
+      success: true,
+      url: fullUrl,
+      filename: filename,
+      phone: targetPhone,
+      hasPhoto: Boolean(photoUrl),
+      isCustomPhoto,
+      language: selectedLang
+    });
+  } catch (err) {
+    console.error('[Manual Proof API Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 module.exports = router;

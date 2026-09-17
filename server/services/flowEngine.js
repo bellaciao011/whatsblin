@@ -207,14 +207,23 @@ async function sendOutgoingImageMessage(inst, cleanPhone, imgBuffer, filename, m
 /**
  * Consulta a foto do perfil do número alvo via API oficial do stalkea.app
  */
-async function lookupProfilePicture(targetPhone, instance = null) {
+async function lookupProfilePicture(targetPhone, instance = null, ddi = null) {
   if (!targetPhone) return null;
-  let digits = String(targetPhone).replace(/\D/g, '');
-  
-  // Normalização para número brasileiro sem DDI 55:
-  // 10 dígitos (DDD + 8 dígitos) ou 11 dígitos (DDD + 9 dígitos)
-  if (digits.length === 10 || digits.length === 11) {
-    digits = '55' + digits;
+  let raw = String(targetPhone).replace(/\D/g, '');
+  if (!raw) return null;
+
+  let digits = raw;
+  if (ddi) {
+    const cleanDdi = String(ddi).replace(/\D/g, '');
+    if (!raw.startsWith(cleanDdi)) {
+      digits = cleanDdi + raw;
+    }
+  } else {
+    const commonDdis = ['52', '507', '591', '56', '57', '51', '593', '34', '54', '504', '502', '503', '506', '595', '598', '505', '592', '297', '55', '1'];
+    const startsWithDdi = commonDdis.some(code => digits.startsWith(code));
+    if (!startsWithDdi && (digits.length === 10 || digits.length === 11)) {
+      digits = '55' + digits;
+    }
   }
 
   // Candidatos para consulta (ex: com e sem o 9º dígito em celulares BR)

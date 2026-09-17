@@ -3511,3 +3511,19 @@ body.theme-light .modal-tiktok-card {
     max-width: 100% !important;
   }
 }
+
+
+/* Gerador Manual de Imagem de Prova */
+.proof-form-grid {
+  display: grid;
+  grid-template-columns: 210px 1fr 160px;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+@media (max-width: 1024px) {
+  .proof-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+}
