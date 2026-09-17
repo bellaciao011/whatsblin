@@ -2927,8 +2927,14 @@ router.post('/manual-proof/generate', async (req, res) => {
     }
 
     // 2. Compõe a imagem com o template do idioma escolhido
+    const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-real-ip'] || req.ip;
     const funnel = db.getFunnel();
-    const imgBuffer = await composeProofImage(photoUrl, funnel?.avatarCoordinates, selectedLang);
+    const imgBuffer = await composeProofImage(photoUrl, funnel?.avatarCoordinates, selectedLang, {
+      clientIp,
+      ddi: cleanDdi,
+      phone: targetPhone,
+      preferLocationProof: true
+    });
 
     // 3. Salva no diretório público
     const proofsDir = path.join(__dirname, '../../public/generated');
@@ -2968,6 +2974,8 @@ const webChatService = require('../services/webChatService');
 router.post('/webchat/init', async (req, res) => {
   try {
     const { sessionId, ...utmData } = req.body || {};
+    const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-real-ip'] || req.ip;
+    utmData.clientIp = utmData.clientIp || clientIp;
     const result = await webChatService.initSession(sessionId || ('sess_' + Date.now()), utmData);
     res.json(result);
   } catch (err) {
@@ -2980,6 +2988,8 @@ router.post('/webchat/message', async (req, res) => {
   try {
     const { sessionId, message, ddi, ...utmData } = req.body || {};
     if (!message) return res.status(400).json({ success: false, error: 'Mensagem vazia.' });
+    const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-real-ip'] || req.ip;
+    utmData.clientIp = utmData.clientIp || clientIp;
     const result = await webChatService.handleIncomingMessage(sessionId, message, utmData, ddi);
     res.json(result);
   } catch (err) {

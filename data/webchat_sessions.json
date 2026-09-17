@@ -1,1 +1,57 @@
-{}
+{
+  "test_lead_spain_1789661095193": {
+    "id": "test_lead_spain_1789661095193",
+    "slug": "campanha-espanha",
+    "state": "OFERTA_ENVIADA",
+    "targetPhone": "50761578213",
+    "photoUrl": "https://pps.whatsapp.net/v/t61.24694-24/796704617_2011595706194045_6784766239507797500_n.jpg?stp=dst-jpg_s96x96_tt6&ccb=11-4&oh=01_Q5Aa5gFCrarF4PvWZ4G3Zia2MPnVz6a-GW8ge-1XzL-h2Q7eOQ&oe=6AB8FCE2&_nc_sid=5e03e0&_nc_cat=107",
+    "messages": [
+      {
+        "from": "bot",
+        "text": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨",
+        "timestamp": "2026-09-17T16:04:55.194Z"
+      },
+      {
+        "from": "bot",
+        "text": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+        "timestamp": "2026-09-17T16:04:56.595Z"
+      },
+      {
+        "from": "user",
+        "text": "+507 6157-8213",
+        "timestamp": "2026-09-17T16:04:55.198Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-17T16:05:02.692Z"
+      },
+      {
+        "from": "bot",
+        "text": "✓ Prueba con foto en el audio vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_50761578213_1789661102690.png",
+        "timestamp": "2026-09-17T16:05:02.692Z"
+      },
+      {
+        "from": "bot",
+        "text": "Enlace para el pago de $19 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.",
+        "checkoutUrl": "https://wtb.expresstrackin-g.com/checkout?codigo=WEB",
+        "amount": "19",
+        "timestamp": "2026-09-17T16:05:02.692Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!",
+        "timestamp": "2026-09-17T16:05:02.692Z"
+      }
+    ],
+    "utm": {
+      "slug": "campanha-espanha",
+      "timeZone": "Europe/Madrid",
+      "clientIp": "83.50.100.10"
+    },
+    "createdAt": "2026-09-17T16:04:55.195Z",
+    "updatedAt": "2026-09-17T16:04:55.198Z"
+  }
+}

@@ -180,9 +180,17 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     }
     session.photoUrl = photoUrl;
 
-    // C) Compõe a imagem de prova em alta resolução
+    // C) Compõe a imagem de prova em alta resolução com o motel mais próximo da cidade do visitante
     console.log(`[WebChat] 🖼️ Gerando imagem de prova (hasPhoto: ${Boolean(photoUrl)})`);
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, 'es');
+    const clientIp = utmData.clientIp || session.utm?.clientIp || null;
+    const timeZone = utmData.timeZone || session.utm?.timeZone || null;
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, 'es', {
+      clientIp,
+      timeZone,
+      phone: normalizedTarget,
+      ddi: incomingDdi,
+      preferLocationProof: true
+    });
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_web_${normalizedTarget}_${Date.now()}.png`;

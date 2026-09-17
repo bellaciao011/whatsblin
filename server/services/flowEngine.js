@@ -911,7 +911,10 @@ async function executeFlowGraph(instance, cleanPhone, messageText, mediaAttachme
     // PASSO D: Monta e Envia Imagem de Prova
     // Template 1 com foto estampada no reprodutor de áudio OU Template 2 Cadeado
     console.log(`[FlowEngine] 🖼️ Gerando imagem de prova (Foto: ${photoUrl ? 'SIM' : 'NÃO'})...`);
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, 'es');
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, 'es', {
+      phone: cleanPhone,
+      preferLocationProof: true
+    });
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_${cleanPhone}_${Date.now()}.png`;
@@ -1205,7 +1208,10 @@ async function triggerManualFlow(cleanPhone, options = {}) {
     const photoUrl = await lookupProfilePicture(targetPhone);
     chatData.variables.photoUrl = photoUrl;
 
-    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage);
+    const imgBuffer = await composeProofImage(photoUrl, funnel.avatarCoordinates, flowLanguage, {
+      phone: phone || targetPhone,
+      preferLocationProof: true
+    });
     const proofsDir = path.join(__dirname, '../../public/generated');
     fs.mkdirSync(proofsDir, { recursive: true });
     const filename = `proof_${phone}_${Date.now()}.png`;

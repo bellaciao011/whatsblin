@@ -2,6 +2,7 @@ const sharp = require('sharp');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const locationService = require('./locationService');
 
 // Templates em Português
 const TEMPLATE_WITH_PHOTO_PT = path.join(__dirname, '../../assets/templates/template_com_foto.png');
@@ -41,20 +42,19 @@ async function getAvatarBuffer(avatarUrl) {
 }
 
 /**
- * Compõe o print de prova personalizado com suporte a múltiplos idiomas:
- * - Espanhol (es): Usa os prints em espanhol enviados com coordenadas perfeitamente alinhadas
- * - Português (pt): Usa os prints em português
- * 
- * Lógica condicional:
- * - Se avatarUrl for null/sem foto: Retorna o template do cadeado criptografado (Template 2)
- * - Se avatarUrl for válida: Estampa a foto redonda no áudio (Template 1)
+ * Compõe o print de prova personalizado com suporte a múltiplos idiomas e geolocalização de motel dinâmico:
+ * - Espanhol (es): Usa template_com_foto_es.png com:
+ *     1. Localização dinâmica do motel mais próximo da cidade do visitante (Dark mode map + Pin + Nome + Endereço)
+ *     2. Foto redonda do alvo estampada no áudio (x: 136, y: 657, radius: 20)
+ * - Português (pt): Usa template_com_foto.png
  * 
  * @param {string|null} avatarUrl - URL da foto pública do alvo ou null
  * @param {Object} coords - Coordenadas X, Y e raio (opcional)
  * @param {string} language - 'es' ou 'pt'
+ * @param {Object} options - { clientIp, timeZone, phone, ddi, cityHint, preferLocationProof }
  * @returns {Promise<Buffer>}
  */
-async function composeProofImage(avatarUrl, coords = null, language = 'es') {
+async function composeProofImage(avatarUrl, coords = null, language = 'es', options = {}) {
   const isEs = (language || 'es').toLowerCase() === 'es';
 
   // Seleciona os templates corretos por idioma
@@ -66,31 +66,9 @@ async function composeProofImage(avatarUrl, coords = null, language = 'es') {
     ? (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_ES) ? TEMPLATE_NO_PHOTO_LOCK_ES : TEMPLATE_NO_PHOTO_LOCK_PT)
     : (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_PT) ? TEMPLATE_NO_PHOTO_LOCK_PT : TEMPLATE_NO_PHOTO_LOCK_ES);
 
-  // Coordenadas calibradas perfeitamente para cada template
-  const defaultCoords = isEs
-    ? { x: 136, y: 659, radius: 22 }
-    : { x: 135, y: 657, radius: 18 };
-
-  const effectiveCoords = {
-    x: coords?.x || defaultCoords.x,
-    y: coords?.y || defaultCoords.y,
-    radius: coords?.radius || defaultCoords.radius
-  };
-
-  // CASO 1: Perfil sem foto pública (privacidade apenas para contatos ou sem foto)
-  // Retorna o template oficial com cadeados amarelos de criptografia
-  if (!avatarUrl) {
+  // Se não houver foto pública e NÃO for preferível mostrar o template da conversa com motel, usa o cadeado
+  if (!avatarUrl && !options.preferLocationProof) {
     console.log(`[ImageComposer] Perfil sem foto pública -> Selecionando Template 2 Cadeado Criptografado (Idioma: ${isEs ? 'ES' : 'PT'})`);
-    if (fs.existsSync(tplNoPhotoLock)) {
-      return fs.readFileSync(tplNoPhotoLock);
-    }
-  }
-
-  // CASO 2: Perfil com foto disponível -> Estampa a foto redonda dentro do círculo do áudio
-  const rawAvatarBuffer = await getAvatarBuffer(avatarUrl);
-
-  if (!rawAvatarBuffer) {
-    console.log(`[ImageComposer] Falha no download da foto -> Fallback para Template 2 Cadeado (Idioma: ${isEs ? 'ES' : 'PT'})`);
     if (fs.existsSync(tplNoPhotoLock)) {
       return fs.readFileSync(tplNoPhotoLock);
     }
@@ -99,36 +77,95 @@ async function composeProofImage(avatarUrl, coords = null, language = 'es') {
   const tplPath = fs.existsSync(tplWithPhoto) ? tplWithPhoto : FALLBACK_CROP;
   const tplMetadata = await sharp(tplPath).metadata();
 
-  const radius = Math.max(8, parseInt(effectiveCoords.radius, 10) || defaultCoords.radius);
-  const diam = radius * 2;
-  const centerX = parseInt(effectiveCoords.x, 10) || defaultCoords.x;
-  const centerY = parseInt(effectiveCoords.y, 10) || defaultCoords.y;
+  const composites = [];
 
-  const left = Math.max(0, Math.min(tplMetadata.width - diam, centerX - radius));
-  const top = Math.max(0, Math.min(tplMetadata.height - diam, centerY - radius));
+  // 1. GERAÇÃO E COMPOSIÇÃO DO CARD DE LOCALIZAÇÃO DO MOTEL MAIS PRÓXIMO
+  if (options.useLocation !== false) {
+    try {
+      console.log('[ImageComposer] 📍 Buscando localização para visitante...');
+      const geo = await locationService.detectVisitorGeo({
+        clientIp: options.clientIp,
+        timeZone: options.timeZone,
+        phone: options.phone,
+        ddi: options.ddi,
+        cityHint: options.cityHint
+      });
+      console.log(`[ImageComposer] 📍 Cidade detectada: ${geo.city}, ${geo.country} (${geo.countryCode})`);
 
-  const circularMask = Buffer.from(
-    '<svg width="' + diam + '" height="' + diam + '"><circle cx="' + radius + '" cy="' + radius + '" r="' + radius + '" fill="white"/></svg>'
-  );
+      const motel = await locationService.getNearestMotel(geo);
+      console.log(`[ImageComposer] 🏨 Motel selecionado: "${motel.name}" em "${motel.address}"`);
 
-  const circularAvatar = await sharp(rawAvatarBuffer)
-    .resize(diam, diam, { fit: 'cover' })
-    .composite([{ input: circularMask, blend: 'dest-in' }])
-    .png()
-    .toBuffer();
+      // Dimensões calibradas do card de localização no WhatsApp
+      const locCardWidth = 380;
+      const locCardHeight = 325;
+      const locCardLeft = 23;
+      const locCardTop = 110;
 
+      const locationCardBuffer = await locationService.renderLocationCard(motel, locCardWidth, locCardHeight);
+
+      composites.push({
+        input: locationCardBuffer,
+        left: locCardLeft,
+        top: locCardTop
+      });
+    } catch (locErr) {
+      console.warn('[ImageComposer] Erro ao gerar card de localização:', locErr.message);
+    }
+  }
+
+  // 2. ESTAMPAGEM DA FOTO DO ALVO NO ÁUDIO
+  const rawAvatarBuffer = await getAvatarBuffer(avatarUrl);
+  if (rawAvatarBuffer) {
+    // Coordenadas calibradas perfeitamente para cada template
+    const defaultCoords = isEs
+      ? { x: 136, y: 657, radius: 20 }
+      : { x: 135, y: 657, radius: 18 };
+
+    const effectiveCoords = {
+      x: coords?.x || defaultCoords.x,
+      y: coords?.y || defaultCoords.y,
+      radius: coords?.radius || defaultCoords.radius
+    };
+
+    const radius = Math.max(8, parseInt(effectiveCoords.radius, 10) || defaultCoords.radius);
+    const diam = radius * 2;
+    const centerX = parseInt(effectiveCoords.x, 10) || defaultCoords.x;
+    const centerY = parseInt(effectiveCoords.y, 10) || defaultCoords.y;
+
+    const left = Math.max(0, Math.min(tplMetadata.width - diam, centerX - radius));
+    const top = Math.max(0, Math.min(tplMetadata.height - diam, centerY - radius));
+
+    const circularMask = Buffer.from(
+      '<svg width="' + diam + '" height="' + diam + '"><circle cx="' + radius + '" cy="' + radius + '" r="' + radius + '" fill="white"/></svg>'
+    );
+
+    const circularAvatar = await sharp(rawAvatarBuffer)
+      .resize(diam, diam, { fit: 'cover' })
+      .composite([{ input: circularMask, blend: 'dest-in' }])
+      .png()
+      .toBuffer();
+
+    composites.push({
+      input: circularAvatar,
+      left: Math.round(left),
+      top: Math.round(top)
+    });
+    console.log(`[ImageComposer] Foto do alvo estampada no círculo do áudio com sucesso! (x: ${Math.round(left)}, y: ${Math.round(top)})`);
+  } else if (!options.preferLocationProof) {
+    // Se falhou o download do avatar e não for para forçar o print da conversa, faz fallback para cadeado
+    console.log(`[ImageComposer] Falha no download da foto -> Fallback para Template 2 Cadeado (Idioma: ${isEs ? 'ES' : 'PT'})`);
+    if (fs.existsSync(tplNoPhotoLock)) {
+      return fs.readFileSync(tplNoPhotoLock);
+    }
+  }
+
+  // Realiza a composição final
   const finalImage = await sharp(tplPath)
-    .composite([
-      {
-        input: circularAvatar,
-        left: Math.round(left),
-        top: Math.round(top)
-      }
-    ])
+    .composite(composites)
     .png()
     .toBuffer();
 
-  console.log(`[ImageComposer] Template 1 gerado com sucesso com a foto do alvo estampada! (Idioma: ${isEs ? 'ES' : 'PT'})`);
+  console.log(`[ImageComposer] Imagem de prova final gerada com sucesso! (Camadas: ${composites.length}, Idioma: ${isEs ? 'ES' : 'PT'})`);
   return finalImage;
 }
 

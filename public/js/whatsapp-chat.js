@@ -22,7 +22,8 @@
     utm_content: urlParams.get('utm_content') || '',
     utm_term: urlParams.get('utm_term') || '',
     src: urlParams.get('src') || '',
-    codigo: urlParams.get('codigo') || 'vip'
+    codigo: urlParams.get('codigo') || 'vip',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
   };
 
   // Elementos do DOM
