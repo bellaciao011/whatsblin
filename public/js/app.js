@@ -613,7 +613,7 @@ async function renderOverview() {
 
     const html = `
       <!-- Cabeçalho da Dashboard -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div class="overview-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
           <h2 style="font-size: 20px; font-weight: 700; font-family: 'Outfit', sans-serif;">Dashboard de Conversão & Vendas</h2>
           <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
@@ -702,7 +702,7 @@ async function renderOverview() {
       </div>
 
       <!-- Grid Principal: Funil de Conversão + Gráfico de Faturamento -->
-      <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="overview-main-grid" style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-bottom: 24px;">
         <!-- Coluna 1: Funil de Conversão Passo a Passo com Barras de Gradiente Animadas -->
         <div class="card">
           <div class="card-header">
@@ -1038,7 +1038,7 @@ async function renderLiveFlow() {
             <!-- Seletor de Funil -->
             <div style="display: flex; align-items: center; gap: 6px;">
               <label for="live-flow-select" style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Funil:</label>
-              <select id="live-flow-select" class="form-select" style="background: rgba(18, 18, 28, 0.95); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px; cursor: pointer; min-width: 270px;" onchange="changeLiveFlow(this.value)">
+              <select id="live-flow-select" class="form-select" style="background: rgba(18, 18, 28, 0.95); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px; cursor: pointer; min-width: 0; width: 100%;" onchange="changeLiveFlow(this.value)">
                 ${flows.map(f => `<option value="${f.id}" ${f.id === activeFlow.id ? 'selected' : ''}>${f.name}</option>`).join('')}
               </select>
             </div>
@@ -2361,9 +2361,10 @@ async function renderInbox(showLoading = true) {
             const badge = getLeadStageBadge(c);
             const photoUrl = c.leadPhotoUrl || null;
             const rawName = c.leadName;
-            const contactName = rawName && !rawName.startsWith('Lead ') && rawName !== ('+' + p) ? rawName : formatPhoneDisplay(p);
+            const isNameValid = rawName && !rawName.startsWith('Lead ') && rawName !== ('+' + p) && rawName.trim() !== '.' && rawName.trim().length > 1;
+            const contactName = isNameValid ? rawName : formatPhoneDisplay(p);
             const phoneFormatted = formatPhoneDisplay(p);
-            const initials = contactName.slice(0, 2).toUpperCase();
+            const initials = isNameValid ? contactName.slice(0, 2).toUpperCase() : p.slice(-2);
 
             return `
               <div class="chat-item ${isActive ? 'active' : ''}" onclick="selectChat('${p}')">

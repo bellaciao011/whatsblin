@@ -2666,43 +2666,61 @@ body.theme-light .modal-tiktok-card {
   display: none;
 }
 
+/* =========================================================================
+   SISTEMA DE DESIGN MOBILE PREMIUM (100% RESPONSIVO, SEM OVERFLOW HORIZONTAL)
+   Compatível com iPhone (Safari), Android (Chrome) e PWA
+   ========================================================================= */
+
+.mobile-header,
+.mobile-bottom-nav,
+.mobile-drawer-backdrop,
+.mobile-drawer,
+.mobile-chat-back-btn,
+.mobile-live-switcher {
+  display: none;
+}
+
 @media (max-width: 1024px) {
-  /* Layout Base do App */
+  /* 1. RESET E PREVENÇÃO TOTAL DE OVERFLOW */
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+  }
+
   html, body {
     overflow-x: hidden !important;
-    width: 100vw !important;
+    width: 100% !important;
     max-width: 100vw !important;
     min-height: 100vh !important;
     min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
 
   .app-container {
     flex-direction: column !important;
-    width: 100vw !important;
+    width: 100% !important;
+    max-width: 100vw !important;
     height: 100vh !important;
     height: 100dvh !important;
     overflow: hidden !important;
+    position: relative !important;
   }
 
   /* Oculta Sidebar e Top-bar de Desktop no Mobile */
-  .sidebar {
+  .sidebar, .top-bar, .desktop-only-action {
     display: none !important;
   }
 
-  .top-bar {
-    display: none !important;
-  }
-
-  /* Mobile Header Fixo no Topo */
+  /* 2. MOBILE HEADER NATIVO (FIXO NO TOPO COM SAFE AREA) */
   .mobile-header {
     display: flex !important;
     align-items: center;
     justify-content: space-between;
     height: calc(56px + env(safe-area-inset-top, 0px)) !important;
-    padding: env(safe-area-inset-top, 0px) 16px 0 16px !important;
-    background: rgba(13, 13, 20, 0.96) !important;
+    padding: env(safe-area-inset-top, 0px) 14px 0 14px !important;
+    background: rgba(13, 13, 20, 0.98) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     border-bottom: 1px solid var(--border-color) !important;
@@ -2710,50 +2728,58 @@ body.theme-light .modal-tiktok-card {
     top: 0;
     z-index: 90;
     flex-shrink: 0;
+    width: 100% !important;
+    max-width: 100vw !important;
   }
 
   .mobile-header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
   }
 
   .mobile-header-brand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-family: 'Outfit', sans-serif;
     font-weight: 800;
-    font-size: 16px;
+    font-size: 15px;
     color: #f8fafc;
     letter-spacing: -0.2px;
     cursor: pointer;
+    flex-shrink: 0;
   }
 
   .mobile-brand-bolt {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+    font-size: 13px;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
   }
 
   .mobile-chip-pill {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 8px;
+    gap: 4px;
+    padding: 3px 7px;
     border-radius: 20px;
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.3);
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
     color: #34d399;
     cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
   }
 
   .mobile-pulse-dot {
@@ -2763,18 +2789,20 @@ body.theme-light .modal-tiktok-card {
     background: #10b981;
     box-shadow: 0 0 8px #10b981;
     animation: pulse 2s infinite;
+    flex-shrink: 0;
   }
 
   .mobile-header-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    flex-shrink: 0;
   }
 
   .mobile-icon-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-color);
     color: #f8fafc;
@@ -2782,7 +2810,7 @@ body.theme-light .modal-tiktok-card {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     transition: all 0.15s ease;
   }
   .mobile-icon-btn:active {
@@ -2790,25 +2818,459 @@ body.theme-light .modal-tiktok-card {
     background: rgba(255, 255, 255, 0.12);
   }
 
-  /* Viewport Principal com Scroll Suave */
+  /* 3. VIEWPORT E CONTEÚDO PRINCIPAL (COM SCROLL FLUIDO) */
   .main-viewport {
     flex: 1 !important;
     height: calc(100vh - 56px - 60px) !important;
     height: calc(100dvh - 56px - 60px) !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
   }
 
   .view-content {
-    padding: 14px 12px 24px 12px !important;
+    padding: 14px 12px 76px 12px !important;
     max-width: 100vw !important;
+    width: 100% !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Viewports Edge-to-Edge para Telas de Aplicação (Chat e Ao Vivo) */
+  .main-viewport.inbox-active,
+  .main-viewport.live-flow-active {
+    overflow: hidden !important;
+  }
+
+  .view-content.inbox-view-active,
+  .view-content.live-flow-view-active {
+    padding: 0 !important;
+    height: calc(100vh - 56px - 60px) !important;
+    height: calc(100dvh - 56px - 60px) !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  /* 4. REGRAS RESPONSIVAS PARA CARDS E GRIDS */
+  /* Colapsa QUALQUER grid multi-coluna inline para coluna única no mobile */
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
 
-  /* Bottom Navigation Bar (Tab Bar Estilo App Nativo iOS / Android) */
+  .card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .card-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .card-title {
+    font-size: 15px !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Cabeçalhos de Páginas (Dashboard, Pixels, Domínios) */
+  .overview-header-row,
+  .view-content > div[style*="justify-content: space-between"]:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .overview-header-row > div:last-child,
+  .view-content > div[style*="justify-content: space-between"]:first-child > div:last-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .overview-header-row > div:last-child .btn,
+  .view-content > div[style*="justify-content: space-between"]:first-child > div:last-child .btn {
+    flex: 1 1 140px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* 5. DASHBOARD: 4 CARDS DE MÉTRICAS (GRID 2x2 ELEGANTE) */
+  .grid-stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+    width: 100% !important;
+  }
+
+  .stat-card {
+    padding: 10px 9px !important;
+    border-radius: 12px !important;
+    min-height: 78px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .stat-top-row {
+    margin-bottom: 6px !important;
+  }
+
+  .stat-icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+    border-radius: 7px !important;
+  }
+
+  .stat-trend-badge {
+    font-size: 9px !important;
+    padding: 1px 5px !important;
+  }
+
+  .stat-label {
+    font-size: 10px !important;
+    color: var(--text-muted) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .stat-value {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.3px !important;
+    margin-top: 2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .stat-footer-text {
+    font-size: 9px !important;
+    color: var(--text-muted) !important;
+    margin-top: 3px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .stat-sparkline-wrap {
+    display: none !important; /* Oculta sparklines no mobile para evitar overflow e manter visual clean */
+  }
+
+  /* 6. TELA AO VIVO / FLUXO (SCREENSHOT 1 CORRIGIDA COM SEGMENTED CONTROL) */
+  .live-flow-container {
+    height: calc(100vh - 56px - 60px) !important;
+    height: calc(100dvh - 56px - 60px) !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* Segmented Control iOS no Topo */
+  .mobile-live-switcher {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: rgba(13, 13, 20, 0.98) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 6px 10px !important;
+    gap: 8px !important;
+    z-index: 50 !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .live-switch-btn {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--border-color) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #94a3b8 !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .live-switch-btn.active {
+    background: rgba(16, 185, 129, 0.16) !important;
+    border-color: rgba(16, 185, 129, 0.45) !important;
+    color: #34d399 !important;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2) !important;
+  }
+
+  /* Topbar do Ao Vivo Reestruturada no Mobile */
+  .live-topbar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 8px 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    background: rgba(13, 13, 20, 0.94) !important;
+    backdrop-filter: blur(14px) !important;
+    z-index: 25 !important;
+  }
+
+  .live-topbar > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .live-topbar > div:first-child > div:first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+
+  #live-flow-select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 11.5px !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  .live-topbar > div:last-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .live-topbar > div:last-child > div:first-child {
+    flex: 1 !important;
+    justify-content: space-between !important;
+  }
+
+  /* Área do Canvas no Mobile */
+  .live-canvas-area {
+    width: 100% !important;
+    flex: 1 !important;
+    height: 100% !important;
+    display: block !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* Terminal Lateral de Eventos no Mobile */
+  .live-terminal-panel {
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+    flex: 1 !important;
+    border-left: none !important;
+    display: none !important;
+    overflow-y: auto !important;
+    background: rgba(13, 13, 20, 0.98) !important;
+  }
+
+  /* Modo Feed Ativo */
+  .live-flow-container.feed-mode .live-canvas-area,
+  .live-flow-container.feed-mode .live-topbar {
+    display: none !important;
+  }
+
+  .live-flow-container.feed-mode .live-terminal-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    height: calc(100vh - 56px - 60px - 44px) !important;
+    height: calc(100dvh - 56px - 60px - 44px) !important;
+  }
+
+  /* 7. CHATS / INBOX NATIVO (SCREENSHOT 2 CORRIGIDA) */
+  .inbox-container {
+    height: calc(100vh - 56px - 60px) !important;
+    height: calc(100dvh - 56px - 60px) !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+  }
+
+  .inbox-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border-right: none !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .inbox-search {
+    padding: 10px 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .chat-list {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 0 4px 60px 4px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .inbox-view {
+    display: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Quando uma conversa for selecionada no Mobile */
+  .inbox-container.chat-open .inbox-sidebar {
+    display: none !important;
+  }
+
+  .inbox-container.chat-open .inbox-view {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .chat-header {
+    height: 54px !important;
+    min-height: 54px !important;
+    padding: 0 10px !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: #182229 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .chat-header .chat-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    font-size: 13px !important;
+  }
+
+  .chat-contact-name {
+    max-width: 140px !important;
+    font-size: 13.5px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .mobile-chat-back-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--border-color) !important;
+    color: #f1f5f9 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    margin-right: 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .chat-messages {
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    padding: 10px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .chat-quick-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 6px 10px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+    scrollbar-width: none !important;
+    flex-wrap: nowrap !important;
+  }
+  .chat-quick-actions::-webkit-scrollbar { display: none !important; }
+  .chat-quick-actions > span { display: none !important; }
+
+  .quick-action-pill {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .chat-footer {
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    padding: 6px 10px 10px 10px !important;
+    background: #182229 !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 8. BOTTOM NAVIGATION BAR (TAB BAR NATIVA iOS/ANDROID) */
   .mobile-bottom-nav {
     display: flex !important;
     position: fixed !important;
@@ -2817,7 +3279,7 @@ body.theme-light .modal-tiktok-card {
     right: 0 !important;
     height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
     padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px)) 6px !important;
-    background: rgba(13, 13, 20, 0.97) !important;
+    background: rgba(13, 13, 20, 0.98) !important;
     backdrop-filter: blur(25px) !important;
     -webkit-backdrop-filter: blur(25px) !important;
     border-top: 1px solid var(--border-color) !important;
@@ -2839,16 +3301,14 @@ body.theme-light .modal-tiktok-card {
     font-weight: 600 !important;
     padding: 4px 8px !important;
     border-radius: 12px !important;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     position: relative !important;
-    min-width: 54px !important;
+    min-width: 52px !important;
     cursor: pointer !important;
   }
 
   .mobile-tab-icon {
-    font-size: 18px !important;
+    font-size: 17px !important;
     line-height: 1 !important;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
   }
 
   .mobile-tab-item.active {
@@ -2875,21 +3335,19 @@ body.theme-light .modal-tiktok-card {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6) !important;
   }
 
-  /* Drawer Lateral */
+  /* 9. DRAWER MENU MOBILE */
   .mobile-drawer-backdrop {
     display: block !important;
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0, 0, 0, 0.75) !important;
+    background: rgba(0, 0, 0, 0.65) !important;
     backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
     z-index: 200 !important;
     opacity: 0 !important;
     pointer-events: none !important;
-    transition: opacity 0.25s ease !important;
+    transition: opacity 0.3s ease !important;
   }
 
   .mobile-drawer-backdrop.open {
@@ -2940,7 +3398,6 @@ body.theme-light .modal-tiktok-card {
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
-    font-size: 15px !important;
   }
 
   .drawer-list {
@@ -2973,91 +3430,7 @@ body.theme-light .modal-tiktok-card {
     color: #34d399 !important;
   }
 
-  /* Cards de Estatísticas em Grid 2x2 no Mobile */
-  .grid-stats {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 8px !important;
-    margin-bottom: 14px !important;
-  }
-
-  .stat-card {
-    padding: 12px 10px !important;
-    border-radius: 14px !important;
-    min-height: 90px !important;
-  }
-
-  .stat-card-title {
-    font-size: 10.5px !important;
-    margin-bottom: 3px !important;
-    color: var(--text-muted) !important;
-  }
-
-  .stat-card-value {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.4px !important;
-  }
-
-  .stat-card-subtext {
-    font-size: 9.5px !important;
-    margin-top: 3px !important;
-  }
-
-  /* Inbox / Live Chat Nativo no Mobile */
-  .inbox-container {
-    height: calc(100vh - 56px - 60px) !important;
-    height: calc(100dvh - 56px - 60px) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    margin: -14px -12px !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-  }
-
-  /* Estado Inicial: lista de leads preenche a tela */
-  .inbox-sidebar {
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    border-right: none !important;
-    height: 100% !important;
-  }
-
-  .inbox-view {
-    display: none !important;
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-  }
-
-  /* Quando uma conversa for selecionada: esconde lista e mostra chat full screen */
-  .inbox-container.chat-open .inbox-sidebar {
-    display: none !important;
-  }
-
-  .inbox-container.chat-open .inbox-view {
-    display: flex !important;
-    width: 100vw !important;
-    height: 100% !important;
-  }
-
-  .mobile-chat-back-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    padding: 6px 10px !important;
-    border-radius: 8px !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid var(--border-color) !important;
-    color: #f1f5f9 !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    margin-right: 8px !important;
-  }
-
-  /* Modais Touch e Acomodação de Tela */
+  /* 10. MODAIS, INPUTS E BOTÕES TOUCH */
   .leona-modal {
     width: calc(100vw - 20px) !important;
     max-width: 440px !important;
@@ -3065,10 +3438,10 @@ body.theme-light .modal-tiktok-card {
     max-height: 88vh !important;
     overflow-y: auto !important;
     padding: 18px 16px !important;
+    border-radius: 16px !important;
   }
 
-  /* Input e Botões Otimizados para Toque */
-  .form-input {
+  .form-input, .form-select {
     font-size: 14px !important;
     min-height: 42px !important;
   }
@@ -3079,280 +3452,10 @@ body.theme-light .modal-tiktok-card {
     font-size: 13px !important;
   }
 
-  /* Ajustes das Tabelas com Rolagem Horizontal Suave */
   .table-responsive {
     width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     margin-bottom: 12px !important;
   }
-}
-
-
-/* Segmented Control Ao Vivo e Botões Responsivos */
-.mobile-live-switcher {
-  display: none;
-}
-.mobile-only-menu-item {
-  display: none;
-
-
-  /* =========================================================================
-     AJUSTES FINOS MOBILE: CHAT INBOX & FLUXO AO VIVO (100% NATIVO, SEM VOID)
-     ========================================================================= */
-  
-  /* Oculta botões de desktop no header do chat */
-  .desktop-only-action {
-    display: none !important;
-  }
-  .mobile-only-menu-item {
-    display: flex !important;
-  }
-
-  /* Viewports e Containers sem margem negativa nem overflow horizontal */
-  .main-viewport.inbox-active,
-  .main-viewport.live-flow-active,
-  .view-content.inbox-view-active,
-  .view-content.live-flow-view-active {
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    overflow: hidden !important;
-  }
-
-  /* Chat Inbox Edge-to-Edge no Mobile */
-  .inbox-container {
-    height: calc(100vh - 56px - 60px) !important;
-    height: calc(100dvh - 56px - 60px) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    overflow: hidden !important;
-  }
-
-  .inbox-container.chat-open .inbox-view {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .chat-header {
-    height: 56px !important;
-    min-height: 56px !important;
-    padding: 0 10px !important;
-    gap: 8px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    background: #182229 !important;
-  }
-
-  .chat-header .chat-avatar {
-    width: 38px !important;
-    height: 38px !important;
-    min-width: 38px !important;
-    font-size: 13px !important;
-  }
-
-  .chat-contact-name {
-    max-width: 135px !important;
-    font-size: 13.5px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-
-  .mobile-chat-back-btn {
-    padding: 5px 8px !important;
-    font-size: 11px !important;
-    margin-right: 4px !important;
-  }
-
-  /* Pílulas de Ação Rápida no Rodapé do Chat (Rolagem Touch Suave) */
-  .chat-quick-actions {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    padding: 6px 10px !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    box-sizing: border-box !important;
-    flex-shrink: 0 !important;
-    scrollbar-width: none !important;
-    flex-wrap: nowrap !important;
-  }
-  .chat-quick-actions::-webkit-scrollbar {
-    display: none !important;
-  }
-  .chat-quick-actions > span {
-    display: none !important;
-  }
-  .quick-action-pill {
-    flex-shrink: 0 !important;
-    white-space: nowrap !important;
-    font-size: 11px !important;
-    padding: 5px 10px !important;
-    border-radius: 12px !important;
-  }
-
-  .chat-messages {
-    width: 100% !important;
-    max-width: 100vw !important;
-    box-sizing: border-box !important;
-    padding: 10px 10px 10px 10px !important;
-  }
-
-  .chat-footer {
-    width: 100% !important;
-    max-width: 100vw !important;
-    box-sizing: border-box !important;
-    padding: 6px 10px !important;
-  }
-
-  /* =========================================================================
-     FLUXO AO VIVO NO MOBILE (SEM COLISÃO, SEGMENTED CONTROL)
-     ========================================================================= */
-  .live-flow-container {
-    height: calc(100vh - 56px - 60px) !important;
-    height: calc(100dvh - 56px - 60px) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    flex-direction: column !important;
-    position: relative !important;
-    overflow: hidden !important;
-  }
-
-  /* Segmented Control no Topo do Ao Vivo Mobile */
-  .mobile-live-switcher {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-around !important;
-    background: rgba(13, 13, 20, 0.98) !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    padding: 6px 8px !important;
-    gap: 6px !important;
-    z-index: 35 !important;
-    flex-shrink: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .live-switch-btn {
-    flex: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
-    padding: 8px 10px !important;
-    border-radius: 10px !important;
-    border: 1px solid var(--border-color) !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    color: #94a3b8 !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-  }
-
-  .live-switch-btn.active {
-    background: rgba(16, 185, 129, 0.15) !important;
-    border-color: rgba(16, 185, 129, 0.4) !important;
-    color: #34d399 !important;
-  }
-
-  /* Topbar compacta do Ao Vivo Mobile */
-  .live-topbar {
-    position: relative !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    border-radius: 0 !important;
-    border: none !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    padding: 8px 10px !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-    background: rgba(13, 13, 20, 0.94) !important;
-    backdrop-filter: blur(14px) !important;
-    z-index: 25 !important;
-  }
-
-  .live-topbar > div:first-child {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 6px !important;
-    width: 100% !important;
-  }
-
-  .live-topbar > div:first-child > div:first-child {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    width: 100% !important;
-  }
-
-  #live-flow-select {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    font-size: 11.5px !important;
-    padding: 6px 8px !important;
-    box-sizing: border-box !important;
-  }
-
-  .live-topbar > div:last-child {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    width: 100% !important;
-  }
-
-  /* Área do Canvas no Mobile */
-  .live-canvas-area {
-    width: 100% !important;
-    flex: 1 !important;
-    height: 100% !important;
-  }
-
-  /* Terminal Lateral de Eventos no Mobile */
-  .live-terminal-panel {
-    width: 100% !important;
-    max-width: 100vw !important;
-    height: 100% !important;
-    flex: 1 !important;
-    border-left: none !important;
-    display: none !important;
-    overflow-y: auto !important;
-  }
-
-  /* Alternância de Modo no Ao Vivo */
-  .live-flow-container.feed-mode .live-canvas-area,
-  .live-flow-container.feed-mode .live-topbar {
-    display: none !important;
-  }
-
-  .live-flow-container.feed-mode .live-terminal-panel {
-    display: flex !important;
-    flex: 1 !important;
-    height: calc(100vh - 56px - 60px - 44px) !important;
-    height: calc(100dvh - 56px - 60px - 44px) !important;
-  }
-
 }
