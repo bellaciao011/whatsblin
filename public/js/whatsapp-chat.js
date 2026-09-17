@@ -12,17 +12,64 @@
     localStorage.setItem('wa_chat_session_id', sessionId);
   }
 
-  // Captura UTMs da URL
+  // Captura e persiste TODAS as UTMs e parâmetros vindos do anúncio
   const urlParams = new URLSearchParams(window.location.search);
+  const currentParamsObj = {};
+  for (const [k, v] of urlParams.entries()) {
+    if (v) currentParamsObj[k] = v;
+  }
+
+  // Persiste no sessionStorage para nunca perder os parâmetros originais em reload
+  try {
+    const prevSaved = JSON.parse(sessionStorage.getItem('wa_ad_utms') || '{}');
+    const mergedParams = { ...prevSaved, ...currentParamsObj };
+    sessionStorage.setItem('wa_ad_utms', JSON.stringify(mergedParams));
+  } catch(e) {}
+
+  function getAllTrackedParams() {
+    let saved = {};
+    try {
+      saved = JSON.parse(sessionStorage.getItem('wa_ad_utms') || '{}');
+    } catch(e) {}
+    const current = {};
+    const params = new URLSearchParams(window.location.search);
+    for (const [k, v] of params.entries()) {
+      if (v) current[k] = v;
+    }
+    return { ...saved, ...current };
+  }
+
+  // Constrói a URL direta de checkout com TODAS as UTMs anexadas
+  function buildDirectCheckoutUrl(rawCheckoutUrl) {
+    try {
+      const targetUrl = new URL(rawCheckoutUrl || 'https://go.centerpag.com/PPU38CQG5EL');
+      const allParams = getAllTrackedParams();
+
+      // Passa todas as UTMs recebidas na página diretamente para o checkout
+      Object.keys(allParams).forEach(k => {
+        if (allParams[k] && !['sessionId', 'message', 'slug'].includes(k)) {
+          targetUrl.searchParams.set(k, allParams[k]);
+        }
+      });
+
+      // Compatibilidade de tracking com plataformas de checkout (CenterPag, etc.)
+      if (targetUrl.searchParams.has('utm_source') && !targetUrl.searchParams.has('src')) {
+        targetUrl.searchParams.set('src', targetUrl.searchParams.get('utm_source'));
+      }
+      if (!targetUrl.searchParams.has('sck') && targetUrl.searchParams.has('src')) {
+        targetUrl.searchParams.set('sck', targetUrl.searchParams.get('src'));
+      }
+
+      return targetUrl.toString();
+    } catch(err) {
+      console.warn('[WebChat] Erro ao formatar URL de checkout com UTMs:', err);
+      return rawCheckoutUrl;
+    }
+  }
+
   const utmData = {
     slug: window.location.pathname.replace(/^\/chat\//, '').replace(/^\/c\//, '') || 'campanha',
-    utm_source: urlParams.get('utm_source') || '',
-    utm_medium: urlParams.get('utm_medium') || '',
-    utm_campaign: urlParams.get('utm_campaign') || '',
-    utm_content: urlParams.get('utm_content') || '',
-    utm_term: urlParams.get('utm_term') || '',
-    src: urlParams.get('src') || '',
-    codigo: urlParams.get('codigo') || 'vip',
+    ...getAllTrackedParams(),
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
   };
 
@@ -165,13 +212,14 @@
     row.className = 'wa-message-row incoming';
 
     const formattedText = escapeHtml(text).replace(/\n/g, '<br>');
+    const finalCheckoutUrl = buildDirectCheckoutUrl(checkoutUrl);
 
     row.innerHTML = `
       <div class="wa-bubble incoming" style="border: 1px solid rgba(0, 168, 132, 0.35);">
         <div class="wa-msg-text">${formattedText}</div>
         <div class="wa-checkout-card">
-          <a href="${checkoutUrl}" target="_blank" class="wa-btn-checkout" onclick="trackCheckoutClick()">
-            <span>🔒 PAGAR $${amount} Y DESBLOQUEAR</span>
+          <a href="${finalCheckoutUrl}" target="_blank" class="wa-btn-checkout" onclick="trackCheckoutClick(this)">
+            <span>🔒 PAGAR ${amount} Y DESBLOQUEAR</span>
           </a>
           <div style="font-size: 11px; text-align: center; color: #667781; margin-top: 5px;">
             Acceso instantáneo después del pago
@@ -207,8 +255,13 @@
     }
   };
 
-  window.trackCheckoutClick = function() {
+  window.trackCheckoutClick = function(anchorEl) {
     try {
+      if (anchorEl) {
+        const curr = anchorEl.getAttribute('href');
+        const refreshed = buildDirectCheckoutUrl(curr);
+        anchorEl.setAttribute('href', refreshed);
+      }
       if (window.fbq) fbq('track', 'InitiateCheckout');
       if (window.ttq) ttq.track('InitiateCheckout');
     } catch(e) {}

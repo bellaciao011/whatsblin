@@ -8,6 +8,40 @@ const { eventBus } = require('./flowEngine');
 
 const SESSIONS_FILE = path.join(__dirname, '../../data/webchat_sessions.json');
 
+// Constrói URL direta do checkout passando 100% de todas as UTMs recebidas
+function buildDirectWebCheckoutUrl(baseUrl, incomingParams = {}) {
+  try {
+    const u = new URL(baseUrl || 'https://go.centerpag.com/PPU38CQG5EL');
+    Object.keys(incomingParams).forEach(k => {
+      const val = incomingParams[k];
+      if (val && typeof val === 'string' && !['sessionId', 'message', 'slug', 'timeZone', 'allParams'].includes(k)) {
+        u.searchParams.set(k, val);
+      }
+    });
+
+    // Se tiver allParams (objeto aninhado vindo do front), mescla também
+    if (incomingParams.allParams && typeof incomingParams.allParams === 'object') {
+      Object.keys(incomingParams.allParams).forEach(k => {
+        const val = incomingParams.allParams[k];
+        if (val && typeof val === 'string' && !['sessionId', 'message', 'slug', 'timeZone'].includes(k)) {
+          u.searchParams.set(k, val);
+        }
+      });
+    }
+
+    if (u.searchParams.has('utm_source') && !u.searchParams.has('src')) {
+      u.searchParams.set('src', u.searchParams.get('utm_source'));
+    }
+    if (!u.searchParams.has('sck') && u.searchParams.has('src')) {
+      u.searchParams.set('sck', u.searchParams.get('src'));
+    }
+
+    return u.toString();
+  } catch(e) {
+    return baseUrl;
+  }
+}
+
 function loadSessions() {
   try {
     if (fs.existsSync(SESSIONS_FILE)) {
@@ -208,9 +242,10 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
       delay: 2800
     });
 
-    // D) Constrói URL de checkout camuflada
+    // D) Constrói URL DIRETA do checkout preservando 100% de todas as UTMs que vieram do anúncio
     const rawCheckout = funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL';
-    const cloakedCheckout = buildSpanishCheckoutUrl(rawCheckout, utmData.codigo || session.utm?.codigo || 'web');
+    const combinedUtms = { ...(session.utm || {}), ...(utmData || {}) };
+    const directCheckout = buildDirectWebCheckoutUrl(rawCheckout, combinedUtms);
 
     const offerAmount = config.offerAmount || '19';
     const offerText = `Enlace para el pago de $${offerAmount} 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.`;
@@ -218,7 +253,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     replies.push({
       type: 'checkout',
       text: offerText,
-      checkoutUrl: cloakedCheckout,
+      checkoutUrl: directCheckout,
       amount: offerAmount,
       delay: 1800
     });
@@ -236,7 +271,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     // Salva mensagens no histórico
     session.messages.push({ from: 'bot', text: analyzingMsg, timestamp: new Date().toISOString() });
     session.messages.push({ from: 'bot', text: proofCaption, mediaType: 'image', mediaUrl: webProofUrl, timestamp: new Date().toISOString() });
-    session.messages.push({ from: 'bot', text: offerText, checkoutUrl: cloakedCheckout, amount: offerAmount, timestamp: new Date().toISOString() });
+    session.messages.push({ from: 'bot', text: offerText, checkoutUrl: directCheckout, amount: offerAmount, timestamp: new Date().toISOString() });
     session.messages.push({ from: 'bot', text: proofInstruction, timestamp: new Date().toISOString() });
 
     sessions[sessionId] = session;
@@ -260,7 +295,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
   console.log(`[WebChat] 🤖 Consultando GPT em espanhol para dúvida: "${rawMsg}" (Estado: ${session.state})`);
   const stageInfo = {
     value: config.offerAmount || '19',
-    checkoutUrl: buildSpanishCheckoutUrl(funnel.checkoutUrlEs || 'https://go.centerpag.com/PPU38CQG5EL', utmData.codigo || 'web')
+    checkoutUrl: buildDirectWebCheckoutUrl(funnel.checkoutUrlEs || 'https://go.centerpag.com/PPU38CQG5EL', utmData)
   };
 
   const aiReply = await aiService.classifyAndReply(

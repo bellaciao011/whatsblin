@@ -125,32 +125,31 @@ app.get(['/checkout', '/checkout/:codigo', '/chk/:codigo'], (req, res) => {
     // 3. Monta a URL de destino na CenterPag/PerfectPay com UTMs REAIS do anúncio + SCK do lead
     const u = new URL(baseUrl);
 
-    // UTMs Verdadeiras do Anúncio (para o Pixel da PerfectPay e Relatórios oficiais):
-    const realSource = attr?.utm_source || 'tiktok';
-    const realCampaign = attr?.utm_campaign || attr?.campanha_nome || cleanCode;
-    const realContent = attr?.utm_content || cleanCode;
-    const realMedium = attr?.utm_medium || 'cpc';
+    // UTMs: prioridade total aos parâmetros que vieram do anúncio (req.query)
+    const realSource = req.query.utm_source || attr?.utm_source || 'direct';
+    const realCampaign = req.query.utm_campaign || attr?.utm_campaign || attr?.campanha_nome || cleanCode;
+    const realContent = req.query.utm_content || attr?.utm_content || cleanCode;
+    const realMedium = req.query.utm_medium || attr?.utm_medium || 'cpc';
     const ttclid = req.query.ttclid || req.query.tt_clid || attr?.ttclid || null;
 
     u.searchParams.set('utm_source', realSource);
     u.searchParams.set('utm_campaign', realCampaign);
     u.searchParams.set('utm_content', realContent);
     u.searchParams.set('utm_medium', realMedium);
-    if (attr?.utm_term) u.searchParams.set('utm_term', attr.utm_term);
+    if (req.query.utm_term || attr?.utm_term) u.searchParams.set('utm_term', req.query.utm_term || attr.utm_term);
     if (ttclid) u.searchParams.set('ttclid', ttclid);
 
-    // Identificador único do Lead para o Webhook e Camuflagem de Upsell:
-    // O SCK e SRC são preservados pela PerfectPay e retornados no Webhook!
-    u.searchParams.set('src', cleanCode);
-    u.searchParams.set('sck', cleanCode);
+    // Identificador do Lead: respeita src e sck recebidos ou define cleanCode como fallback
+    u.searchParams.set('src', req.query.src || cleanCode);
+    u.searchParams.set('sck', req.query.sck || cleanCode);
     u.searchParams.set('code', cleanCode);
     u.searchParams.set('codigo', cleanCode);
     u.searchParams.set('cw_token', leadToken);
     u.searchParams.set('view', 'lead');
 
-    // 4. Preserva quaisquer outros parâmetros adicionais passados na query string
+    // 4. Preserva 100% de quaisquer outros parâmetros adicionais da query string
     Object.keys(req.query).forEach(k => {
-      if (!['codigo', 'code', 'c', 'ttclid', 'tt_clid'].includes(k) && !u.searchParams.has(k)) {
+      if (req.query[k] !== undefined && req.query[k] !== null && req.query[k] !== '') {
         u.searchParams.set(k, req.query[k]);
       }
     });
