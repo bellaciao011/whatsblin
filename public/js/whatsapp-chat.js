@@ -185,15 +185,18 @@
     scrollToBottom(true);
   }
 
-  function appendImageMessage(url, caption = '') {
+  function appendImageMessage(url, caption = '', base64Fallback = '') {
     const time = getFormattedTime();
     const row = document.createElement('div');
     row.className = 'wa-message-row incoming';
 
+    const initialSrc = url || base64Fallback;
+    const fallbackAttr = base64Fallback ? `data-fallback="${base64Fallback}"` : '';
+
     row.innerHTML = `
       <div class="wa-bubble incoming wa-image-bubble">
-        <div class="wa-proof-img-wrap" onclick="openWaModal('${url}')">
-          <img src="${url}" alt="Prueba de audio" class="wa-proof-img" loading="lazy" />
+        <div class="wa-proof-img-wrap" onclick="openWaModal(this.querySelector('img').src)">
+          <img src="${initialSrc}" ${fallbackAttr} onerror="if(this.dataset.fallback && this.src !== this.dataset.fallback){this.src=this.dataset.fallback;}" alt="Prueba de audio" class="wa-proof-img" loading="eager" />
         </div>
         ${caption ? `<div class="wa-image-caption">${escapeHtml(caption)}</div>` : ''}
         <div class="wa-msg-meta" style="padding-right: 4px;">
@@ -219,10 +222,10 @@
         <div class="wa-msg-text">${formattedText}</div>
         <div class="wa-checkout-card">
           <a href="${finalCheckoutUrl}" target="_blank" class="wa-btn-checkout" onclick="trackCheckoutClick(this)">
-            <span>🔒 PAGAR ${amount} Y DESBLOQUEAR</span>
+            <span>🔒 PAGAR TASA DE DESENCRIPTACIÓN ($${amount})</span>
           </a>
           <div style="font-size: 11px; text-align: center; color: #667781; margin-top: 5px;">
-            Acceso instantáneo después del pago
+            Desencriptación y acceso instantáneo tras la confirmación
           </div>
         </div>
         <div class="wa-msg-meta">
@@ -318,7 +321,7 @@
           appendTextMessage('incoming', item.text);
           playBeep('incoming');
         } else if (item.type === 'image') {
-          appendImageMessage(item.url, item.caption);
+          appendImageMessage(item.url, item.caption, item.base64);
           playBeep('incoming');
         } else if (item.type === 'checkout') {
           appendCheckoutCard(item.text, item.checkoutUrl, item.amount);

@@ -230,6 +230,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     const filename = `proof_web_${normalizedTarget}_${Date.now()}.png`;
     fs.writeFileSync(path.join(proofsDir, filename), imgBuffer);
     const webProofUrl = `/generated/${filename}`;
+    const base64Data = `data:image/png;base64,${imgBuffer.toString('base64')}`;
 
     const proofCaption = photoUrl
       ? '✓ Prueba con foto en el audio vinculada a este número'
@@ -238,6 +239,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     replies.push({
       type: 'image',
       url: webProofUrl,
+      base64: base64Data,
       caption: proofCaption,
       delay: 2800
     });
@@ -248,7 +250,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     const directCheckout = buildDirectWebCheckoutUrl(rawCheckout, combinedUtms);
 
     const offerAmount = config.offerAmount || '19';
-    const offerText = `Enlace para el pago de $${offerAmount} 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.`;
+    const offerText = `🔒 Tasa de desencriptación: $${offerAmount} 👇\n\nDatos del pago: Pago único y confidencial para desencriptar y liberar todos los audios, fotos y ubicaciones de inmediato.`;
 
     replies.push({
       type: 'checkout',
@@ -259,7 +261,7 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
     });
 
     // E) Instrução de envio de comprovante
-    const proofInstruction = '¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!';
+    const proofInstruction = '¡En cuanto pagues la tasa de desencriptación, envíame el comprobante por aquí para activar tu acceso de inmediato!';
     replies.push({
       type: 'text',
       text: proofInstruction,
