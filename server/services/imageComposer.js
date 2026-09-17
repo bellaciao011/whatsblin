@@ -12,6 +12,9 @@ const TEMPLATE_NO_PHOTO_LOCK_PT = path.join(__dirname, '../../assets/templates/t
 const TEMPLATE_WITH_PHOTO_ES = path.join(__dirname, '../../assets/templates/template_com_foto_es.png');
 const TEMPLATE_NO_PHOTO_LOCK_ES = path.join(__dirname, '../../assets/templates/template_sem_foto_cadeado_es.png');
 
+// Avatar de perfil protegido com cadeado (para quando o número não possuir foto pública)
+const LOCKED_PROFILE_AVATAR = path.join(__dirname, '../../assets/templates/avatar_locked_profile.png');
+
 const FALLBACK_CROP = path.join(__dirname, '../../assets/templates/print_screenshot_crop.png');
 
 async function getAvatarBuffer(avatarUrl) {
@@ -42,16 +45,16 @@ async function getAvatarBuffer(avatarUrl) {
 }
 
 /**
- * Compõe o print de prova personalizado com suporte a múltiplos idiomas e geolocalização de motel dinâmico:
- * - Espanhol (es): Usa template_com_foto_es.png com:
- *     1. Localização dinâmica do motel mais próximo da cidade do visitante (Dark mode map + Pin + Nome + Endereço)
- *     2. Foto redonda do alvo estampada no áudio (x: 136, y: 657, radius: 20)
- * - Português (pt): Usa template_com_foto.png
+ * Compõe o print de prova oficial da conversa com o motel mais próximo do visitante:
+ * 
+ * - Se o alvo possuir foto pública: estampa a foto redonda no áudio.
+ * - Se o alvo NÃO possuir foto pública (ou falhar): estampa o ícone oficial de perfil bloqueado com cadeado.
+ * - Em AMBOS os casos, envia a conversa oficial completa com o card dinâmico de localização do motel na cidade do visitante.
  * 
  * @param {string|null} avatarUrl - URL da foto pública do alvo ou null
  * @param {Object} coords - Coordenadas X, Y e raio (opcional)
  * @param {string} language - 'es' ou 'pt'
- * @param {Object} options - { clientIp, timeZone, phone, ddi, cityHint, preferLocationProof }
+ * @param {Object} options - { clientIp, timeZone, phone, ddi, cityHint, forceLockScreen }
  * @returns {Promise<Buffer>}
  */
 async function composeProofImage(avatarUrl, coords = null, language = 'es', options = {}) {
@@ -66,20 +69,21 @@ async function composeProofImage(avatarUrl, coords = null, language = 'es', opti
     ? (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_ES) ? TEMPLATE_NO_PHOTO_LOCK_ES : TEMPLATE_NO_PHOTO_LOCK_PT)
     : (fs.existsSync(TEMPLATE_NO_PHOTO_LOCK_PT) ? TEMPLATE_NO_PHOTO_LOCK_PT : TEMPLATE_NO_PHOTO_LOCK_ES);
 
-  // Se não houver foto pública e NÃO for preferível mostrar o template da conversa com motel, usa o cadeado
-  if (!avatarUrl && !options.preferLocationProof) {
-    console.log(`[ImageComposer] Perfil sem foto pública -> Selecionando Template 2 Cadeado Criptografado (Idioma: ${isEs ? 'ES' : 'PT'})`);
+  // Se explicitamente solicitado a tela antiga com todos os cadeados
+  if (options.forceLockScreen && !avatarUrl) {
+    console.log(`[ImageComposer] forceLockScreen ativo -> Selecionando Template antigo Cadeado Criptografado (Idioma: ${isEs ? 'ES' : 'PT'})`);
     if (fs.existsSync(tplNoPhotoLock)) {
       return fs.readFileSync(tplNoPhotoLock);
     }
   }
 
+  // Sempre utiliza o template principal da conversa com localização
   const tplPath = fs.existsSync(tplWithPhoto) ? tplWithPhoto : FALLBACK_CROP;
   const tplMetadata = await sharp(tplPath).metadata();
 
   const composites = [];
 
-  // 1. GERAÇÃO E COMPOSIÇÃO DO CARD DE LOCALIZAÇÃO DO MOTEL MAIS PRÓXIMO
+  // 1. GERAÇÃO E COMPOSIÇÃO DO CARD DE LOCALIZAÇÃO DO MOTEL MAIS PRÓXIMO DO VISITANTE
   if (options.useLocation !== false) {
     try {
       console.log('[ImageComposer] 📍 Buscando localização para visitante...');
@@ -113,10 +117,20 @@ async function composeProofImage(avatarUrl, coords = null, language = 'es', opti
     }
   }
 
-  // 2. ESTAMPAGEM DA FOTO DO ALVO NO ÁUDIO
-  const rawAvatarBuffer = await getAvatarBuffer(avatarUrl);
+  // 2. ESTAMPAGEM DO AVATAR NO ÁUDIO (FOTO DO ALVO OU AVATAR COM CADEADO)
+  let rawAvatarBuffer = await getAvatarBuffer(avatarUrl);
+  let isLockedAvatar = false;
+
+  if (!rawAvatarBuffer) {
+    console.log('[ImageComposer] 🔒 Foto do perfil não encontrada ou privada -> Utilizando avatar com cadeado no áudio!');
+    if (fs.existsSync(LOCKED_PROFILE_AVATAR)) {
+      rawAvatarBuffer = fs.readFileSync(LOCKED_PROFILE_AVATAR);
+      isLockedAvatar = true;
+    }
+  }
+
   if (rawAvatarBuffer) {
-    // Coordenadas calibradas perfeitamente para cada template
+    // Coordenadas calibradas perfeitamente para o template
     const defaultCoords = isEs
       ? { x: 136, y: 657, radius: 20 }
       : { x: 135, y: 657, radius: 18 };
@@ -150,13 +164,7 @@ async function composeProofImage(avatarUrl, coords = null, language = 'es', opti
       left: Math.round(left),
       top: Math.round(top)
     });
-    console.log(`[ImageComposer] Foto do alvo estampada no círculo do áudio com sucesso! (x: ${Math.round(left)}, y: ${Math.round(top)})`);
-  } else if (!options.preferLocationProof) {
-    // Se falhou o download do avatar e não for para forçar o print da conversa, faz fallback para cadeado
-    console.log(`[ImageComposer] Falha no download da foto -> Fallback para Template 2 Cadeado (Idioma: ${isEs ? 'ES' : 'PT'})`);
-    if (fs.existsSync(tplNoPhotoLock)) {
-      return fs.readFileSync(tplNoPhotoLock);
-    }
+    console.log(`[ImageComposer] ${isLockedAvatar ? '🔒 Avatar protegido com CADEADO' : '✓ Foto pública do alvo'} estampado no círculo do áudio com sucesso! (x: ${Math.round(left)}, y: ${Math.round(top)})`);
   }
 
   // Realiza a composição final
@@ -175,6 +183,7 @@ module.exports = {
   TEMPLATE_NO_PHOTO_LOCK_PT,
   TEMPLATE_WITH_PHOTO_ES,
   TEMPLATE_NO_PHOTO_LOCK_ES,
+  LOCKED_PROFILE_AVATAR,
   TEMPLATE_WITH_PHOTO: TEMPLATE_WITH_PHOTO_ES,
   TEMPLATE_NO_PHOTO_LOCK: TEMPLATE_NO_PHOTO_LOCK_ES
 };
