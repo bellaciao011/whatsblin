@@ -1,0 +1,99 @@
+{
+  "test_lead_123": {
+    "id": "test_lead_123",
+    "slug": "campanha",
+    "state": "OFERTA_ENVIADA",
+    "targetPhone": "61578213",
+    "photoUrl": "https://pps.whatsapp.net/v/t61.24694-24/796704617_2011595706194045_6784766239507797500_n.jpg?stp=dst-jpg_s96x96_tt6&ccb=11-4&oh=01_Q5Aa5gFCrarF4PvWZ4G3Zia2MPnVz6a-GW8ge-1XzL-h2Q7eOQ&oe=6AB8FCE2&_nc_sid=5e03e0&_nc_cat=107",
+    "messages": [
+      {
+        "from": "user",
+        "text": "Quiero investigar el 61578213 de Panama",
+        "timestamp": "2026-09-17T13:11:50.083Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-17T13:11:50.954Z"
+      },
+      {
+        "from": "bot",
+        "text": "✓ Prueba con foto en el audio vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_61578213_1789650710952.png",
+        "timestamp": "2026-09-17T13:11:50.955Z"
+      },
+      {
+        "from": "bot",
+        "text": "Enlace para el pago de $19 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.",
+        "checkoutUrl": "https://wtb.expresstrackin-g.com/checkout?codigo=TEST123",
+        "amount": "19",
+        "timestamp": "2026-09-17T13:11:50.955Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!",
+        "timestamp": "2026-09-17T13:11:50.955Z"
+      },
+      {
+        "from": "user",
+        "text": "Listo, ya pagué con tarjeta",
+        "timestamp": "2026-09-17T13:11:50.957Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡Excelente! 🎉 Gracias por tu pago. Ahora procederé a desbloquear tu acceso a los audios, fotos y conversaciones. Esto solo tomará unos momentos. \n\n¿Hay algo más en lo que pueda ayudarte mientras tanto? 😊",
+        "timestamp": "2026-09-17T13:11:53.491Z"
+      }
+    ],
+    "utm": {
+      "slug": "campanha",
+      "utm_source": "fb_ads"
+    },
+    "createdAt": "2026-09-17T13:11:11.138Z",
+    "updatedAt": "2026-09-17T13:11:50.957Z"
+  },
+  "lead_val_999": {
+    "id": "lead_val_999",
+    "slug": "campanha",
+    "state": "OFERTA_ENVIADA",
+    "targetPhone": "61578213",
+    "photoUrl": "https://pps.whatsapp.net/v/t61.24694-24/796704617_2011595706194045_6784766239507797500_n.jpg?stp=dst-jpg_s96x96_tt6&ccb=11-4&oh=01_Q5Aa5gFCrarF4PvWZ4G3Zia2MPnVz6a-GW8ge-1XzL-h2Q7eOQ&oe=6AB8FCE2&_nc_sid=5e03e0&_nc_cat=107",
+    "messages": [
+      {
+        "from": "user",
+        "text": "Hola quiero investigar el 61578213 de panama",
+        "timestamp": "2026-09-17T13:13:32.566Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-17T13:13:33.332Z"
+      },
+      {
+        "from": "bot",
+        "text": "✓ Prueba con foto en el audio vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_61578213_1789650813329.png",
+        "timestamp": "2026-09-17T13:13:33.332Z"
+      },
+      {
+        "from": "bot",
+        "text": "Enlace para el pago de $19 👇\n\nDatos del pago: 🔒 Pago 100% seguro, confidencial y encriptado.",
+        "checkoutUrl": "https://wtb.expresstrackin-g.com/checkout?codigo=VAL999",
+        "amount": "19",
+        "timestamp": "2026-09-17T13:13:33.332Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues, envíame el comprobante por aquí para desbloquear tu acceso de inmediato!",
+        "timestamp": "2026-09-17T13:13:33.332Z"
+      }
+    ],
+    "utm": {
+      "slug": "campanha"
+    },
+    "createdAt": "2026-09-17T13:13:32.563Z",
+    "updatedAt": "2026-09-17T13:13:32.566Z"
+  }
+}

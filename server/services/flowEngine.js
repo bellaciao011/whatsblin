@@ -585,38 +585,36 @@ function extractNewTargetPhone(text) {
   // Ignora se for comprovante ou comando entre colchetes
   if (clean.startsWith('[') && clean.endsWith(']')) return null;
 
-  // 1. Procura ocorrências de telefones brasileiros ou internacionais formatados
-  const phonePattern = /(?:\+?55\s?)?(?:\(?([1-9]{2})\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/g;
+  // 1. Procura ocorrências de telefones formatados (+507 6157-8213, +55 11 99999-8888, etc.)
+  const phonePattern = /(?:\+?\d{1,4}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,5}[\s-]?\d{4}/g;
   const matches = clean.match(phonePattern);
   if (matches) {
     for (const m of matches) {
       const digits = m.replace(/\D/g, '');
-      if (digits.length >= 10 && digits.length <= 13) {
+      if (digits.length >= 8 && digits.length <= 15) {
         return digits;
       }
     }
   }
 
-  // 2. Sequência contínua de dígitos em palavras (ex: "pesquisa 96981266512" ou "96981266512")
-  const words = clean.split(/[\s,;:]+/);
+  // 2. Sequência contínua de dígitos em palavras
+  const words = clean.split(/[\s,;:!?]+/);
   for (const w of words) {
     const d = w.replace(/\D/g, '');
-    if (d.length >= 10 && d.length <= 13) {
+    if (d.length >= 8 && d.length <= 15) {
       return d;
     }
   }
 
+  // 3. Fallback: dígitos totais
   const rawDigits = clean.replace(/\D/g, '');
-  if (rawDigits.length >= 10 && rawDigits.length <= 13) {
+  if (rawDigits.length >= 8 && rawDigits.length <= 15) {
     return rawDigits;
   }
 
   return null;
 }
 
-/**
- * Retorna as propriedades visuais da etiqueta automática conforme o estágio do lead no funil
- */
 function getStageTag(state, upsellStage) {
   const st = (state || 'NOVO').toUpperCase();
   const up = (upsellStage || 'stage_49').toLowerCase();
@@ -1218,6 +1216,7 @@ module.exports = {
   simulateTyping,
   getStageTag,
   extractNewTargetPhone,
+  buildSpanishCheckoutUrl,
   isLeadLocked,
   acquireLeadLock,
   releaseLeadLock,

@@ -2959,4 +2959,61 @@ router.post('/manual-proof/generate', async (req, res) => {
   }
 });
 
+
+// =========================================================================
+// ROTAS DO WEBCHAT (CHATBOT SIMULADOR DE WHATSAPP)
+// =========================================================================
+const webChatService = require('../services/webChatService');
+
+router.post('/webchat/init', async (req, res) => {
+  try {
+    const { sessionId, ...utmData } = req.body || {};
+    const result = await webChatService.initSession(sessionId || ('sess_' + Date.now()), utmData);
+    res.json(result);
+  } catch (err) {
+    console.error('[WebChat API Init Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/webchat/message', async (req, res) => {
+  try {
+    const { sessionId, message, ...utmData } = req.body || {};
+    if (!message) return res.status(400).json({ success: false, error: 'Mensagem vazia.' });
+    const result = await webChatService.handleIncomingMessage(sessionId, message, utmData);
+    res.json(result);
+  } catch (err) {
+    console.error('[WebChat API Message Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/webchat/sessions', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const sessions = webChatService.getAllSessions(limit);
+    res.json({ success: true, sessions });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/webchat/config', (req, res) => {
+  try {
+    const config = webChatService.getWebChatConfig();
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/webchat/config', (req, res) => {
+  try {
+    const updated = webChatService.updateConfig(req.body || {});
+    res.json({ success: true, config: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

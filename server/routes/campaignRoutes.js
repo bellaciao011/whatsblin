@@ -1,3 +1,6 @@
+const path = require('path');
+const fs = require('fs');
+const webChatService = require('../services/webChatService');
 const express = require('express');
 const router = express.Router();
 const db = require('../storage/db');
@@ -150,9 +153,15 @@ router.get('/:slug', (req, res) => {
     }
 
     // =========================================================================
-    // PRESSEL PRÓPRIA ULTRA-RÁPIDA (INTEGRADA AO SISTEMA)
-    // Redireciona para o WhatsApp em ~300ms com disparo de Pixel nativo
+    // MODO WEBCHAT SIMULADOR DE WHATSAPP (DIRETO NO NAVEGADOR)
+    // Ativado se o link for /chat/:slug, query ?mode=chat, campanha em modo webchat
+    // ou se o modo global do WebChat estiver ativado
     // =========================================================================
+    const webConfig = webChatService.getWebChatConfig();
+    const isWebChat = (req.query.mode === 'chat') ||
+                      (req.baseUrl === '/chat') ||
+                      (campaign.modo === 'webchat') ||
+                      (webConfig.campaignMode === 'webchat');
 
     // Busca pixels configurados para acionar PageView client-side e garantir os cookies _ttp e _fbp
     const tiktokPixels = (db.getTikTokPixels && db.getTikTokPixels()) || [];
@@ -183,7 +192,19 @@ router.get('/:slug', (req, res) => {
       } catch(e){}
     `).join('\n');
 
-        // Determina o idioma da pressel (ES ou PT)
+    if (isWebChat) {
+      console.log(`[Campaign Attribution] 💬 Abrindo Chatbot Web (WhatsApp Simulator) para campanha: "${campaign.nome || slug}"`);
+      const chatHtmlPath = path.join(__dirname, '../../public/whatsapp-chat.html');
+      if (fs.existsSync(chatHtmlPath)) {
+        let chatHtml = fs.readFileSync(chatHtmlPath, 'utf8');
+        const pixelInjection = `<script>\n${ttPixelScripts}\n${metaPixelScripts}\n</script>`;
+        chatHtml = chatHtml.replace('<!-- PIXEL_SCRIPTS_PLACEHOLDER -->', pixelInjection);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(chatHtml);
+      }
+    }
+
+    // Determina o idioma da pressel (ES ou PT)
     const rawLang = String(campaign.idioma || campaign.language || '').toLowerCase().trim();
     const isSpanish = rawLang === 'es' || (!rawLang && (
       (campaign.mensagem_template || '').toLowerCase().includes('hola') ||

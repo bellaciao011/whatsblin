@@ -422,6 +422,7 @@ function handleRoute() {
   const titles = {
     overview: '📊 Dashboard — Visão Geral & Conversão',
     'fluxo-ao-vivo': '🔴 Fluxo ao Vivo — Monitoramento em Tempo Real (Leads & Partículas)',
+    'fluxo-automatico': '🤖 Fluxo Automático — Chatbot Web (Simulador WhatsApp)',
     inbox: '💬 Chats ao vivo',
     kanban: '🗂️ Kanban de Atendimento',
     contacts: '👥 Contatos & Leads',
@@ -463,6 +464,7 @@ function handleRoute() {
 
   if (route === 'overview') renderOverview();
   else if (route === 'fluxo-ao-vivo') renderLiveFlow();
+  else if (route === 'fluxo-automatico') renderFluxoAutomatico();
   else if (route === 'inbox') renderInbox();
   else if (route === 'kanban') renderKanban();
   else if (route === 'contacts') renderContacts();
@@ -6311,5 +6313,331 @@ window.copyProofLink = function(url) {
     });
   } else {
     prompt('Copie o link abaixo:', url);
+  }
+};
+
+// =========================================================================
+// ABA FLUXO AUTOMÁTICO (CHATBOT WEB SIMULADOR DE WHATSAPP)
+// =========================================================================
+window.renderFluxoAutomatico = async function() {
+  const container = document.getElementById('view-container');
+  container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;"><div class="spinner" style="width: 24px; height: 24px; margin: 0 auto 12px auto;"></div>Carregando dados do Fluxo Automático...</div>';
+
+  try {
+    const [configRes, sessionsRes] = await Promise.all([
+      fetch('/api/webchat/config').then(r => r.json()).catch(() => ({ config: {} })),
+      fetch('/api/webchat/sessions?limit=50').then(r => r.json()).catch(() => ({ sessions: [] }))
+    ]);
+
+    const config = configRes.config || {};
+    const sessions = sessionsRes.sessions || [];
+
+    const host = window.location.origin;
+    const directChatUrl = `${host}/chat/campanha`;
+    const campaignLinkUrl = `${host}/c/campanha`;
+
+    container.innerHTML = `
+      <!-- Header Banner do Chatbot Web -->
+      <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(13, 13, 20, 0.95) 100%); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);">
+              🤖
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">Fluxo Automático (Chatbot Web)</h2>
+                <span class="badge" style="background: #10b981; color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 700;">🟢 Ativo</span>
+              </div>
+              <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 0 0;">
+                Simulador 100% idêntico ao WhatsApp direto no navegador. Seus leads conversam com a IA, recebem a prova com foto do alvo e o checkout de $19 automaticamente.
+              </p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="${directChatUrl}" target="_blank" class="btn btn-primary" style="background: #10b981; border: none; font-weight: 700; display: flex; align-items: center; gap: 8px; padding: 9px 16px;">
+              <span>🚀</span> <span>Abrir Chatbot Web</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid: Modo de Operação + Links Rápidos -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+        <!-- Card 1: Modo de Destino da Campanha -->
+        <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
+          <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+              <span>⚙️</span> <span>Modo de Operação do Link da Campanha</span>
+            </h3>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+            Escolha o destino dos leads que clicam nos anúncios do Meta/TikTok ((/c/:slug)):
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(16,185,129,0.08); border: 1px solid ${config.campaignMode === 'webchat' ? '#10b981' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
+              <input type="radio" name="campMode" value="webchat" ${config.campaignMode !== 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('webchat')" style="accent-color: #10b981; margin-top: 3px;">
+              <div>
+                <strong style="color: #34d399; font-size: 13.5px; display: block;">🌐 Chatbot no Navegador (Recomendado)</strong>
+                <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px;">Abre a tela do WhatsApp direto no navegador. Converte mesmo sem WhatsApp conectado e com zero atrito!</span>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(0,0,0,0.25); border: 1px solid ${config.campaignMode === 'whatsapp' ? '#a855f7' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
+              <input type="radio" name="campMode" value="whatsapp" ${config.campaignMode === 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('whatsapp')" style="accent-color: #a855f7; margin-top: 3px;">
+              <div>
+                <strong style="color: #e2e8f0; font-size: 13.5px; display: block;">📱 WhatsApp Físico (App Externo)</strong>
+                <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 2px;">Redireciona para o aplicativo WhatsApp do celular (wa.me).</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Card 2: Links de Divulgação -->
+        <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
+          <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+              <span>🔗</span> <span>Links de Divulgação & Testes</span>
+            </h3>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link Direto do Chatbot Web:</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" readonly value="${directChatUrl}" id="link-direct-chat" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #34d399; font-weight: 600;" />
+              <button type="button" class="btn btn-secondary" onclick="copyInputText('link-direct-chat')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link de Campanha (/c/:slug):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" readonly value="${campaignLinkUrl}" id="link-camp-slug" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #cbd5e1;" />
+              <button type="button" class="btn btn-secondary" onclick="copyInputText('link-camp-slug')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <a href="${directChatUrl}" target="_blank" class="btn btn-primary" style="flex: 1; text-align: center; justify-content: center; background: #8b5cf6; border: none; font-size: 13px; font-weight: 700;">
+              🧪 Testar Simulação Agora
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Personalização da Atendente -->
+      <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.08);">
+        <div class="card-header" style="padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+          <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+            <span>👩‍💼</span> <span>Personalização da Atendente & Oferta</span>
+          </h3>
+        </div>
+
+        <form id="form-webchat-config" onsubmit="event.preventDefault(); saveWebChatFullConfig();">
+          <div style="display: grid; grid-template-columns: 220px 1fr 140px; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Nome da Atendente:</label>
+              <input type="text" id="cfg-attendant-name" class="form-input" value="${config.attendantName || 'Maria Carvalho'}" required />
+            </div>
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">URL da Foto de Perfil da Atendente:</label>
+              <input type="url" id="cfg-attendant-avatar" class="form-input" value="${config.attendantAvatar || ''}" placeholder="https://..." />
+            </div>
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Valor Oferta ($):</label>
+              <input type="text" id="cfg-offer-amount" class="form-input" value="${config.offerAmount || '19'}" required />
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Mensagem de Boas-Vindas Inicial:</label>
+            <textarea id="cfg-welcome-msg" class="form-input" rows="2" style="width: 100%; resize: vertical;">${config.welcomeMessage || '¡Hola! 👋 Mucho gusto. ¿Cómo te llamas y qué número te gustaría investigar hoy?'}</textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button type="submit" id="btn-save-webchat-cfg" class="btn btn-primary" style="background: #10b981; border: none; font-weight: 700; padding: 8px 20px;">
+              💾 Salvar Configurações
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Card 4: Tabela de Leads & Conversas do Chatbot Web -->
+      <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
+        <div class="card-header" style="padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+              <span>💬</span> <span>Leads & Conversas no Chatbot Web (${sessions.length})</span>
+            </h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Histórico de interações em tempo real no simulador</div>
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="renderFluxoAutomatico()" style="font-size: 12px; padding: 6px 12px;">🔄 Atualizar</button>
+        </div>
+
+        ${sessions.length === 0 ? `
+          <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+            Nenhuma sessão registrada ainda. Abra o link do chatbot para testar!
+          </div>
+        ` : `
+          <div class="table-responsive">
+            <table class="table" style="width: 100%; font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Sessão / Lead</th>
+                  <th>Alvo Investigado</th>
+                  <th>Foto do Alvo</th>
+                  <th>Status</th>
+                  <th>Total Msgs</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sessions.map(s => {
+                  const dateStr = s.updatedAt ? new Date(s.updatedAt).toLocaleString('pt-BR') : '-';
+                  return `
+                    <tr>
+                      <td>${dateStr}</td>
+                      <td><strong>${s.id}</strong></td>
+                      <td>${s.targetPhone ? '+' + s.targetPhone : '<span style="color: #64748b;">Aguardando número</span>'}</td>
+                      <td>
+                        ${s.photoUrl ? `<img src="${s.photoUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #10b981;">` : '<span style="color: #64748b;">-</span>'}
+                      </td>
+                      <td>
+                        <span class="badge" style="background: ${s.state === 'OFERTA_ENVIADA' ? 'rgba(16,185,129,0.2)' : 'rgba(139,92,246,0.2)'}; color: ${s.state === 'OFERTA_ENVIADA' ? '#34d399' : '#c084fc'};">
+                          ${s.state}
+                        </span>
+                      </td>
+                      <td>${s.messages ? s.messages.length : 0}</td>
+                      <td>
+                        <button type="button" class="btn btn-secondary" onclick="viewWebChatHistory('${s.id}')" style="font-size: 11.5px; padding: 4px 10px;">
+                          👁️ Ver Chat
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+
+      <!-- Modal de Histórico do Chat Web -->
+      <div id="modal-webchat-history" class="wa-modal-backdrop" onclick="this.classList.remove('active')">
+        <div style="max-width: 500px; width: 92%; max-height: 80vh; background: #0b141a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+          <div style="background: #202c33; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <h4 style="margin: 0; color: #fff; font-size: 15px;">Histórico da Conversa</h4>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-webchat-history').classList.remove('active')" style="padding: 2px 8px; font-size: 12px;">✕</button>
+          </div>
+          <div id="webchat-history-body" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+      </div>
+    `;
+
+  } catch (err) {
+    console.error('[Render Fluxo Automatico Error]', err);
+    container.innerHTML = '<div style="color: #ef4444; padding: 40px; text-align: center;">Erro ao carregar dados do Fluxo Automático.</div>';
+  }
+};
+
+window.saveWebChatMode = async function(mode) {
+  try {
+    const res = await fetch('/api/webchat/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignMode: mode })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Modo de campanha alterado para: ${mode === 'webchat' ? 'Chatbot no Navegador' : 'WhatsApp Físico'}`, 'success');
+      renderFluxoAutomatico();
+    }
+  } catch (e) {
+    showToast('Erro ao salvar modo: ' + e.message, 'error');
+  }
+};
+
+window.saveWebChatFullConfig = async function() {
+  const name = document.getElementById('cfg-attendant-name')?.value;
+  const avatar = document.getElementById('cfg-attendant-avatar')?.value;
+  const amount = document.getElementById('cfg-offer-amount')?.value;
+  const welcome = document.getElementById('cfg-welcome-msg')?.value;
+  const btn = document.getElementById('btn-save-webchat-cfg');
+
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/webchat/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        attendantName: name,
+        attendantAvatar: avatar,
+        offerAmount: amount,
+        welcomeMessage: welcome
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✓ Configurações da atendente salvas com sucesso!', 'success');
+    }
+  } catch (e) {
+    showToast('Erro ao salvar configurações: ' + e.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.viewWebChatHistory = async function(sessionId) {
+  const modal = document.getElementById('modal-webchat-history');
+  const body = document.getElementById('webchat-history-body');
+  if (!modal || !body) return;
+
+  body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Carregando histórico...</div>';
+  modal.classList.add('active');
+
+  try {
+    const res = await fetch(`/api/webchat/sessions?limit=100`);
+    const data = await res.json();
+    const session = (data.sessions || []).find(s => s.id === sessionId);
+
+    if (!session || !session.messages || session.messages.length === 0) {
+      body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma mensagem registrada nesta sessão.</div>';
+      return;
+    }
+
+    body.innerHTML = session.messages.map(m => {
+      const isUser = m.from === 'user';
+      return `
+        <div style="display: flex; justify-content: ${isUser ? 'flex-end' : 'flex-start'};">
+          <div style="max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.4; background: ${isUser ? '#005c4b' : '#202c33'}; color: #fff;">
+            ${m.mediaType === 'image' ? `<img src="${m.mediaUrl}" style="max-width: 100%; border-radius: 6px; margin-bottom: 6px;">` : ''}
+            <div>${m.text || ''}</div>
+            ${m.checkoutUrl ? `<div style="margin-top: 6px;"><a href="${m.checkoutUrl}" target="_blank" style="color: #34d399; font-weight: 700;">👉 Link de Checkout ($${m.amount || '19'})</a></div>` : ''}
+            <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-align: right; margin-top: 3px;">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR') : ''}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (e) {
+    body.innerHTML = '<div style="color: #ef4444; padding: 20px;">Erro ao carregar histórico: ' + e.message + '</div>';
+  }
+};
+
+window.copyInputText = function(elementId) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(el.value).then(() => {
+        showToast('✓ Link copiado para a área de transferência!', 'success');
+      });
+    } else {
+      el.select();
+      document.execCommand('copy');
+      showToast('✓ Link copiado!', 'success');
+    }
   }
 };

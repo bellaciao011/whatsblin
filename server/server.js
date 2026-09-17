@@ -171,7 +171,7 @@ app.get(['/checkout', '/checkout/:codigo', '/chk/:codigo'], (req, res) => {
   }
 });
 
-app.use('/c', campaignRoutes);
+app.use(['/c', '/chat'], campaignRoutes);
 
 // Rota da Tela de Login (se já estiver autenticado, vai direto para o dashboard)
 app.get(['/login', '/login.html'], (req, res) => {
