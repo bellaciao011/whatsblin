@@ -3458,4 +3458,56 @@ body.theme-light .modal-tiktok-card {
     -webkit-overflow-scrolling: touch !important;
     margin-bottom: 12px !important;
   }
+
+  /* 8. MODAIS E PAINÉIS RESPONSIVOS NO MOBILE */
+  .node-modal-backdrop {
+    padding: 8px !important;
+  }
+  .node-modal-card {
+    width: 100% !important;
+    max-width: 100vw !important;
+    max-height: 94vh !important;
+    border-radius: 14px !important;
+    margin: 0 !important;
+  }
+  .node-modal-body {
+    grid-template-columns: 1fr !important;
+  }
+  .node-modal-left {
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 14px 12px !important;
+  }
+  .node-modal-right {
+    padding: 14px 12px !important;
+  }
+  .node-modal-footer {
+    padding: 10px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .modal-pixel-card,
+  .modal-integration-card,
+  .modal-tiktok-card,
+  .branch-modal-card,
+  .leona-modal {
+    width: 100% !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 16px 14px !important;
+    margin: 10px auto !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 9. REFINAMENTO DE CARDS E GRÁFICOS NO MOBILE */
+  .funnel-step-header {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .dash-chip-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  #salesChart {
+    max-width: 100% !important;
+  }
 }

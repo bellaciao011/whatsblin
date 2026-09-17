@@ -2303,7 +2303,7 @@ async function renderInbox(showLoading = true) {
       return { class: 'duvidas', label: 'Tirando Dúvidas (IA)', icon: '🤖' };
     }
     if (st === 'OFERTA_ENVIADA') {
-      return { class: 'oferta', label: 'Oferta R$49', icon: '💬' };
+      return { class: 'oferta', label: 'Oferta Enviada', icon: '💬' };
     }
     if (st === 'PROVA_ENVIADA') {
       return { class: 'prova', label: 'Prova Enviada', icon: '📸' };

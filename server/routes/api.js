@@ -2132,9 +2132,9 @@ router.get('/dashboard/stats', (req, res) => {
     { name: '1. Início (Boas-Vindas)', count: stepStarted, pct: '100%', drop: '0%', color: '#3b82f6' },
     { name: '2. Número Enviado', count: stepNumberProvided, pct: `${calcRate(stepNumberProvided, stepStarted)}%`, color: '#6366f1' },
     { name: '3. Prova Gerada', count: stepProofGenerated, pct: `${calcRate(stepProofGenerated, stepStarted)}%`, color: '#8b5cf6' },
-    { name: '4. Oferta R$ 49,90', count: stepOfferSent, pct: `${calcRate(stepOfferSent, stepStarted)}%`, color: '#ec4899' },
-    { name: '5. Pagou R$ 49,90', count: stepPaid49, pct: `${calcRate(stepPaid49, stepStarted)}%`, color: '#10b981' },
-    { name: '6. Upsell R$ 100', count: stepPaid100, pct: `${calcRate(stepPaid100, stepStarted)}%`, color: '#059669' },
+    { name: '4. Oferta Enviada', count: stepOfferSent, pct: `${calcRate(stepOfferSent, stepStarted)}%`, color: '#ec4899' },
+    { name: '5. Compra Aprovada', count: stepPaid49, pct: `${calcRate(stepPaid49, stepStarted)}%`, color: '#10b981' },
+    { name: '6. Upsell Aprovado', count: stepPaid100, pct: `${calcRate(stepPaid100, stepStarted)}%`, color: '#059669' },
     { name: '7. Upsell R$ 200', count: stepPaid200, pct: `${calcRate(stepPaid200, stepStarted)}%`, color: '#047857' },
     { name: '8. Acesso Master R$ 400', count: stepPaid400, pct: `${calcRate(stepPaid400, stepStarted)}%`, color: '#065f46' }
   ];
