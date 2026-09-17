@@ -1,18 +1,21 @@
 const axios = require('axios');
 const sharp = require('sharp');
+const opentype = require('opentype.js');
 const fs = require('fs');
 const path = require('path');
 
-// Carrega a fonte TrueType embutida em Base64 uma única vez para garantir
-// que NENHUM servidor Linux/Docker/Railway fique com caixas '□□□□□' por falta de fontes no sistema
+// Carrega a fonte TrueType uma única vez para renderizar os textos como VETORES PUROS (SVG <path>)
+// Isso elimina 100% o problema de caixas '□□□□□' no Linux/Docker/Railway
 const FONT_PATH = path.join(__dirname, '../../assets/fonts/Roboto-Medium.ttf');
-let FONT_BASE64 = '';
+let loadedFont = null;
 try {
   if (fs.existsSync(FONT_PATH)) {
-    FONT_BASE64 = fs.readFileSync(FONT_PATH).toString('base64');
+    const fontBuffer = fs.readFileSync(FONT_PATH);
+    loadedFont = opentype.parse(fontBuffer.buffer);
+    console.log('[LocationService] ✓ Fonte TrueType carregada para renderização vetorial pura!');
   }
 } catch (e) {
-  console.warn('[LocationService] Aviso: Não foi possível carregar fonte embutida:', e.message);
+  console.warn('[LocationService] Aviso ao carregar fonte para opentype:', e.message);
 }
 
 // 1. Mapeamento de Fuso Horário para Cidade / Coordenadas
@@ -65,7 +68,7 @@ const DDI_GEO_MAP = {
   '1': { city: 'Miami', country: 'Estados Unidos', countryCode: 'US', lat: 25.7617, lon: -80.1918 }
 };
 
-// 3. Lista Curada de Motéis de Alta Credibilidade (Backup Instantâneo)
+// 3. Lista Curada de Motéis de Alta Credibilidade
 const CURATED_MOTELS = {
   'ES': [
     { name: 'Motel Avenue Madrid', address: 'Avenida de Aragón, 362 - Madrid', lat: 40.4485, lon: -3.5850 },
@@ -217,8 +220,8 @@ async function getNearestMotel(geo) {
       const address = road + ', ' + houseNumber + ' - ' + city;
 
       const result = {
-        name: name.slice(0, 34),
-        address: address.slice(0, 46),
+        name: name.slice(0, 32),
+        address: address.slice(0, 44),
         city: city,
         country: geo.country,
         countryCode: geo.countryCode,
@@ -251,12 +254,10 @@ async function getNearestMotel(geo) {
 }
 
 /**
- * Busca tile do mapa sem watermark:
- * 1. Esri World Dark Gray Canvas (OFICIAL, GRATUITO, SEM MARCA D'ÁGUA)
- * 2. OpenStreetMap Oficial tratado em Dark Mode via Sharp
- * 3. Fallback SVG vetorial limpo
+ * Busca tile do mapa com ruas e nomes visíveis, sem NENHUMA marca d'água:
+ * Utiliza OpenStreetMap com zoom 16 tratado no tom Dark Mode do WhatsApp
  */
-async function getMapTile(lat, lon, zoom = 15) {
+async function getMapTile(lat, lon, zoom = 16) {
   const { x, y } = latLonToTile(lat, lon, zoom);
   const tileKey = zoom + '_' + x + '_' + y;
 
@@ -264,8 +265,31 @@ async function getMapTile(lat, lon, zoom = 15) {
     return tileCache.get(tileKey);
   }
 
-  // TENTATIVA 1: Esri ArcGIS World Dark Gray Base (Sem watermark, alta fidelidade dark)
-  // Notação Esri: tile/{level}/{row}/{col} -> tile/{zoom}/{y}/{x}
+  // TENTATIVA 1: OpenStreetMap zoom 16 com nomes de ruas e avenidas
+  const osmUrl = 'https://tile.openstreetmap.org/' + zoom + '/' + x + '/' + y + '.png';
+  try {
+    const osmRes = await axios.get(osmUrl, {
+      timeout: 3500,
+      responseType: 'arraybuffer',
+      headers: { 'User-Agent': 'WhatsAppSimulationEngine/2.0 (contact: admin@whatsblin.com)' }
+    });
+    if (osmRes.data && osmRes.data.length > 500) {
+      // Converte para o tema noturno do WhatsApp com ruas nítidas
+      const darkOsm = await sharp(osmRes.data)
+        .negate({ alpha: false })
+        .modulate({ brightness: 0.85, saturation: 0.3 })
+        .tint({ r: 24, g: 34, b: 45 })
+        .png()
+        .toBuffer();
+
+      tileCache.set(tileKey, darkOsm);
+      return darkOsm;
+    }
+  } catch (e) {
+    console.warn('[LocationService] OSM Dark fallback:', e.message);
+  }
+
+  // TENTATIVA 2: Esri ArcGIS World Dark Gray Base
   const esriUrl = 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/' + zoom + '/' + y + '/' + x;
   try {
     const esriRes = await axios.get(esriUrl, {
@@ -282,28 +306,6 @@ async function getMapTile(lat, lon, zoom = 15) {
     console.warn('[LocationService] Esri Dark fallback:', e.message);
   }
 
-  // TENTATIVA 2: OpenStreetMap Standard convertido em Dark Mode (sem watermark)
-  const osmUrl = 'https://tile.openstreetmap.org/' + zoom + '/' + x + '/' + y + '.png';
-  try {
-    const osmRes = await axios.get(osmUrl, {
-      timeout: 3500,
-      responseType: 'arraybuffer',
-      headers: { 'User-Agent': 'WhatsAppBotSimulation/1.0 (contact: admin@whatsblin.com)' }
-    });
-    if (osmRes.data && osmRes.data.length > 500) {
-      const darkOsm = await sharp(osmRes.data)
-        .modulate({ brightness: 0.8, saturation: 0.2 })
-        .negate({ alpha: false })
-        .tint({ r: 27, g: 38, b: 46 })
-        .png()
-        .toBuffer();
-      tileCache.set(tileKey, darkOsm);
-      return darkOsm;
-    }
-  } catch (e) {
-    console.warn('[LocationService] OSM Dark fallback:', e.message);
-  }
-
   // TENTATIVA 3: Fallback mapa vetorial SVG escuro estilo WhatsApp
   return Buffer.from(
     '<svg width="380" height="215" xmlns="http://www.w3.org/2000/svg">' +
@@ -317,69 +319,115 @@ async function getMapTile(lat, lon, zoom = 15) {
 }
 
 /**
- * Renderiza o Card de Localização completo (Mapa Dark Sem Watermark + Pin + Nome do Motel + Endereço com Fonte Embutida)
+ * Renderiza o Card de Localização completo:
+ * 1. Mapa Dark nítido com nomes de ruas reais (zoom 16)
+ * 2. Pin Vermelho do WhatsApp
+ * 3. Balão / Badge com o Nome do Motel destacado DIRETO NO MAPA
+ * 4. Rodapé escuro com Nome, Endereço, maps.google.com e horário convertidos em VETOR PURO (SVG <path>)
  */
 async function renderLocationCard(motel, width = 380, height = 325) {
   const mapHeight = 215;
   const footerHeight = height - mapHeight; // 110px
 
-  // 1. Busca tile do mapa sem nenhuma marca d'água
-  const zoom = 15;
-  const rawTileBuffer = await getMapTile(motel.lat, motel.lon, zoom);
+  const motelName = (motel.name || 'Motel').slice(0, 32);
+  const motelAddress = (motel.address || 'Calle Principal').slice(0, 44);
 
-  // Redimensiona mapa para cobrir width x mapHeight
+  // 1. Busca tile do mapa zoom 16 com ruas
+  const rawTileBuffer = await getMapTile(motel.lat, motel.lon, 16);
+
+  // Redimensiona mapa para width x mapHeight
   const resizedMap = await sharp(rawTileBuffer)
     .resize(width, mapHeight, { fit: 'cover' })
     .png()
     .toBuffer();
 
-  // 2. Pin do WhatsApp Vermelho com sombra e ponto central
-  const pinSvg =
-    '<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">' +
+  // 2. Monta o Badge com o Nome do Motel no Mapa + Pin Vermelho
+  let badgeSvgContent = '';
+  let badgeWidth = 160;
+  const badgeHeight = 30;
+
+  if (loadedFont) {
+    const badgeText = motelName.length > 22 ? motelName.slice(0, 20) + '...' : motelName;
+    const badgePath = loadedFont.getPath(badgeText, 22, 20, 11.5);
+    badgePath.fill = '#ffffff';
+
+    badgeWidth = Math.min(230, Math.max(120, badgeText.length * 7.5 + 36));
+    const badgeLeft = Math.round(width / 2 - badgeWidth / 2);
+    const badgeTop = Math.round(mapHeight / 2 - 72);
+
+    badgeSvgContent =
+      '<g filter="url(#shadow)">' +
+      '<rect x="' + badgeLeft + '" y="' + badgeTop + '" width="' + badgeWidth + '" height="' + badgeHeight + '" rx="8" ry="8" fill="#1f2c34" stroke="#00a884" stroke-width="1.5"/>' +
+      '<polygon points="' + (width / 2 - 6) + ',' + (badgeTop + 29) + ' ' + (width / 2 + 6) + ',' + (badgeTop + 29) + ' ' + (width / 2) + ',' + (badgeTop + 35) + '" fill="#1f2c34" stroke="#00a884" stroke-width="1.5"/>' +
+      '<line x1="' + (width / 2 - 5) + '" y1="' + (badgeTop + 29) + '" x2="' + (width / 2 + 5) + '" y2="' + (badgeTop + 29) + '" stroke="#1f2c34" stroke-width="2"/>' +
+      '<circle cx="' + (badgeLeft + 14) + '" cy="' + (badgeTop + 15) + '" r="' + 6.5 + '" fill="#00a884"/>' +
+      '<g transform="translate(' + (badgeLeft + 10) + ', ' + badgeTop + ')">' +
+      badgePath.toSVG() +
+      '</g>' +
+      '</g>';
+  }
+
+  const pinX = Math.round(width / 2 - 20);
+  const pinY = Math.round(mapHeight / 2 - 34);
+
+  const mapOverlaySvg =
+    '<svg width="' + width + '" height="' + mapHeight + '" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
-    '<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">' +
-    '<feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="black" flood-opacity="0.6"/>' +
+    '<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">' +
+    '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="black" flood-opacity="0.7"/>' +
     '</filter>' +
     '</defs>' +
-    '<ellipse cx="24" cy="45" rx="8" ry="3" fill="rgba(0,0,0,0.4)"/>' +
-    '<path d="M24 2 C15.16 2 8 9.16 8 18 C8 29.5 24 44 24 44 C24 44 40 29.5 40 18 C40 9.16 32.84 2 24 2 Z" fill="#ea4335" filter="url(#shadow)"/>' +
-    '<circle cx="24" cy="18" r="6.5" fill="#ffffff"/>' +
-    '<circle cx="24" cy="18" r="3" fill="#b31412"/>' +
+    badgeSvgContent +
+    '<g transform="translate(' + pinX + ', ' + pinY + ')" filter="url(#shadow)">' +
+    '<ellipse cx="20" cy="38" rx="7" ry="2.5" fill="rgba(0,0,0,0.5)"/>' +
+    '<path d="M20 2 C12.27 2 6 8.27 6 16 C6 26.5 20 38 20 38 C20 38 34 26.5 34 16 C34 8.27 27.73 2 20 2 Z" fill="#ea4335"/>' +
+    '<circle cx="20" cy="16" r="5.5" fill="#ffffff"/>' +
+    '<circle cx="20" cy="16" r="2.5" fill="#b31412"/>' +
+    '</g>' +
     '</svg>';
 
-  const pinX = Math.round(width / 2 - 24);
-  const pinY = Math.round(mapHeight / 2 - 40);
-
-  const mapWithPin = await sharp(resizedMap)
-    .composite([{ input: Buffer.from(pinSvg), left: pinX, top: pinY }])
+  const mapWithPinAndBadge = await sharp(resizedMap)
+    .composite([{ input: Buffer.from(mapOverlaySvg), left: 0, top: 0 }])
     .png()
     .toBuffer();
 
-  // 3. Rodapé com Fonte Embutida em Base64 (zero caixas '□□□□□')
-  const escapedName = (motel.name || 'Motel').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const escapedAddress = (motel.address || 'Calle Principal').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // 3. Rodapé com PURE VECTOR PATHS (Zero caixas □□□□□)
+  let footerSvg;
 
-  const fontStyle = FONT_BASE64
-    ? '@font-face { font-family: "WhatsAppFont"; src: url("data:font/truetype;charset=utf-8;base64,' + FONT_BASE64 + '") format("truetype"); }'
-    : '';
+  if (loadedFont) {
+    const titlePath = loadedFont.getPath(motelName, 16, 32, 15.5);
+    titlePath.fill = '#e9edef';
 
-  const footerSvg =
-    '<svg width="' + width + '" height="' + footerHeight + '" xmlns="http://www.w3.org/2000/svg">' +
-    '<defs>' +
-    '<style>' +
-    fontStyle +
-    '.motel-title { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 15px; font-weight: bold; fill: #e9edef; }' +
-    '.motel-addr { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 12px; fill: #8696a0; }' +
-    '.maps-link { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11.5px; font-weight: bold; fill: #53bdeb; }' +
-    '.time-label { font-family: "WhatsAppFont", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11px; fill: #8696a0; }' +
-    '</style>' +
-    '</defs>' +
-    '<rect width="100%" height="100%" fill="#1f2c34"/>' +
-    '<text x="16" y="32" class="motel-title">' + escapedName + '</text>' +
-    '<text x="16" y="56" class="motel-addr">' + escapedAddress + '</text>' +
-    '<text x="16" y="82" class="maps-link">maps.google.com</text>' +
-    '<text x="' + (width - 48) + '" y="82" class="time-label">16:09</text>' +
-    '</svg>';
+    const addrPath = loadedFont.getPath(motelAddress, 16, 56, 12);
+    addrPath.fill = '#8696a0';
+
+    const linkPath = loadedFont.getPath('maps.google.com', 16, 82, 11.5);
+    linkPath.fill = '#53bdeb';
+
+    const timePath = loadedFont.getPath('16:09', width - 48, 82, 11);
+    timePath.fill = '#8696a0';
+
+    footerSvg =
+      '<svg width="' + width + '" height="' + footerHeight + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect width="100%" height="100%" fill="#1f2c34"/>' +
+      titlePath.toSVG() +
+      addrPath.toSVG() +
+      linkPath.toSVG() +
+      timePath.toSVG() +
+      '</svg>';
+  } else {
+    // Fallback caso a fonte não tenha carregado
+    const escName = motelName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escAddr = motelAddress.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    footerSvg =
+      '<svg width="' + width + '" height="' + footerHeight + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect width="100%" height="100%" fill="#1f2c34"/>' +
+      '<text x="16" y="32" font-family="sans-serif" font-size="15.5" font-weight="bold" fill="#e9edef">' + escName + '</text>' +
+      '<text x="16" y="56" font-family="sans-serif" font-size="12" fill="#8696a0">' + escAddr + '</text>' +
+      '<text x="16" y="82" font-family="sans-serif" font-size="11.5" font-weight="bold" fill="#53bdeb">maps.google.com</text>' +
+      '<text x="' + (width - 48) + '" y="82" font-family="sans-serif" font-size="11" fill="#8696a0">16:09</text>' +
+      '</svg>';
+  }
 
   // 4. Monta o card inteiro com cantos arredondados (estilo balão do WhatsApp)
   const roundedMask = Buffer.from(
@@ -395,7 +443,7 @@ async function renderLocationCard(motel, width = 380, height = 325) {
     }
   })
   .composite([
-    { input: mapWithPin, left: 0, top: 0 },
+    { input: mapWithPinAndBadge, left: 0, top: 0 },
     { input: Buffer.from(footerSvg), left: 0, top: mapHeight }
   ])
   .png()
