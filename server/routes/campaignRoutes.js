@@ -10,7 +10,7 @@ const db = require('../storage/db');
  * Captura ttclid, fbclid, utms, cookie _ttp, gera código único de 6 dígitos
  * e redireciona de forma ultra-rápida (Pressel Interna Instantânea) para o WhatsApp!
  */
-router.get('/:slug', (req, res) => {
+router.get(['/', '/:slug'], (req, res) => {
   try {
     // 1. Verificação de Host Header (Multi-Domain Routing Seguro)
     const rawHost = req.headers.host || '';
@@ -35,7 +35,7 @@ router.get('/:slug', (req, res) => {
       }
     }
 
-    const slug = req.params.slug;
+    const slug = req.params.slug || req.query.slug || 'campanha';
     const campaigns = db.getTrafficCampaigns();
     let campaign = campaigns.find(c => c.slug === slug || c.id === slug);
 

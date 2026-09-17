@@ -44,22 +44,9 @@ app.use((req, res, next) => {
   // CASO 1: DOMÍNIO DO RAILWAY (whatsblin-production.up.railway.app)
   // Esse domínio é EXCLUSIVAMENTE o painel administrativo do SaaS.
   // Bloqueia rotas de campanha (/c/*) nele para que campanhas NUNCA usem o domínio do Railway.
+    // CASO 1: DOMÍNIO DO SISTEMA (ex: painel-leona.up.railway.app, localhost)
+  // Permite tanto a dashboard quanto links de teste/campanha (/c/* e /chat)
   if (isSystemHost) {
-    if (req.path.startsWith('/c/') && req.query.preview !== '1' && req.query.mode !== 'chat') {
-      return res.status(404).send(`
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head><meta charset="utf-8"><title>404 - Não Encontrado</title></head>
-        <body style="background:#0a0a0f;color:#94a3b8;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-          <div style="text-align:center;max-width:400px;padding:20px;">
-            <h2 style="color:#f87171;margin-bottom:10px;">Link Indisponível</h2>
-            <p>Os links de campanha são veiculados exclusivamente nos domínios próprios configurados.</p>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-    // Permite login, dashboard e APIs normais do SaaS
     return next();
   }
 
