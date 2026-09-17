@@ -1777,7 +1777,7 @@ router.delete('/pixels/:id', (req, res) => {
 });
 
 router.post('/pixels/test', async (req, res) => {
-  const { pixelId, accessToken, eventName, phone, value, currency, pageId, testEventCode } = req.body;
+  const { pixelId, accessToken, eventName, phone, value, currency, pageId, testEventCode, email } = req.body;
   if (!pixelId || !accessToken) {
     return res.status(400).json({ error: 'Pixel ID e Access Token são obrigatórios' });
   }
@@ -1791,6 +1791,7 @@ router.post('/pixels/test', async (req, res) => {
       {
         value: Number(value) || 49.90,
         currency: currency || 'BRL',
+        email: email || undefined,
         pageId: pageId || undefined,
         testEventCode: testEventCode || undefined
       }
@@ -2054,6 +2055,7 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
           {
             value: amount,
             currency: currency,
+            email: email || undefined,
             pageId: primaryPixel.pageId || undefined,
             testEventCode: primaryPixel.testEventCode || undefined
           }

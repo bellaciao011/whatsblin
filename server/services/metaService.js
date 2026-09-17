@@ -262,11 +262,25 @@ async function sendPixelConversion(pixelId, accessToken, eventName, leadPhone, o
     ph: hashedPhone ? [hashedPhone] : []
   };
 
-  if (options.pageId) {
-    userData.page_id = String(options.pageId).trim();
+  if (options.email) {
+    const cleanEmail = String(options.email).trim().toLowerCase();
+    if (cleanEmail) {
+      userData.em = [hashSha256(cleanEmail)];
+    }
   }
-  if (options.ctwaClid) {
-    userData.ctwa_clid = String(options.ctwaClid).trim();
+
+  // Se tiver ctwa_clid explícito (API Oficial Cloud da Meta), usa business_messaging.
+  // Para conexões WhatsApp Web / UAZAPI / Checkout direto, usa 'website' com URL para garantir 100% de entrega e atribuição por Advanced Matching (Telefone + E-mail).
+  const hasCtwaClid = !!(options.ctwaClid && String(options.ctwaClid).trim());
+  const actionSource = options.actionSource || (hasCtwaClid ? 'business_messaging' : 'website');
+
+  if (actionSource === 'business_messaging') {
+    if (options.pageId) {
+      userData.page_id = String(options.pageId).trim();
+    }
+    if (hasCtwaClid) {
+      userData.ctwa_clid = String(options.ctwaClid).trim();
+    }
   }
 
   const customData = {
@@ -278,12 +292,17 @@ async function sendPixelConversion(pixelId, accessToken, eventName, leadPhone, o
   const eventPayload = {
     event_name: eventName || 'Purchase',
     event_time: Math.floor(Date.now() / 1000),
-    action_source: 'business_messaging',
-    messaging_channel: 'whatsapp',
+    action_source: actionSource,
     user_data: userData,
     custom_data: customData,
     event_id: eventId
   };
+
+  if (actionSource === 'business_messaging') {
+    eventPayload.messaging_channel = 'whatsapp';
+  } else if (actionSource === 'website') {
+    eventPayload.event_source_url = options.eventSourceUrl || 'https://whatsblin-production.up.railway.app/';
+  }
 
   const requestBody = {
     data: [eventPayload]
