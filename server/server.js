@@ -66,7 +66,12 @@ app.use((req, res, next) => {
   // CASO 2: DOMÍNIOS DE ANÚNCIO (ex: wtb.expresstrackin-g.com, expresstrackin-g.com)
   // Esses domínios são EXCLUSIVAMENTE de tracking, redirect de checkout e WhatsApp.
   // O painel do SaaS, tela de login e rotas de administração NÃO EXISTEM aqui!
-  if (req.path.startsWith('/c/') || req.path.startsWith('/checkout') || req.path.startsWith('/chk')) {
+  if (req.path.startsWith('/c/') ||
+    req.path.startsWith('/chat') ||
+    req.path.startsWith('/api/webchat/') ||
+    req.path.startsWith('/css/whatsapp-chat.css') ||
+    req.path.startsWith('/js/whatsapp-chat.js') ||
+    req.path.startsWith('/whatsapp-chat.html') || req.path.startsWith('/checkout') || req.path.startsWith('/chk')) {
     return next(); // Executa o tracking ou o redirecionamento limpo para o checkout
   }
 
