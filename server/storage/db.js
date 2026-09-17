@@ -113,7 +113,14 @@ module.exports = {
   },
   saveChat: (phone, chatData) => {
     const chats = readJson('chats.json', {});
-    chats[phone] = { ...(chats[phone] || {}), ...chatData };
+    const existing = chats[phone] || {};
+    chats[phone] = { ...existing, ...chatData };
+    if (!Array.isArray(chats[phone].messages)) {
+      chats[phone].messages = existing.messages && Array.isArray(existing.messages) ? existing.messages : [];
+    }
+    if (!chats[phone].state) {
+      chats[phone].state = 'NOVO';
+    }
     writeJson('chats.json', chats);
     return chats[phone];
   },
@@ -153,6 +160,10 @@ module.exports = {
         lastMessageTime: messageData.timestamp || new Date().toISOString(),
         messages: []
       };
+    }
+    // GARANTIA ABSOLUTA: messages SEMPRE é um array
+    if (!Array.isArray(chats[phone].messages)) {
+      chats[phone].messages = [];
     }
     if (nextState) chats[phone].state = nextState;
     chats[phone].lastMessageTime = messageData.timestamp || new Date().toISOString();

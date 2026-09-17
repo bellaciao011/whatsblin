@@ -2,6 +2,7 @@ const db = require('../storage/db');
 const cryptoService = require('./cryptoService');
 const uazapiService = require('./uazapiService');
 const { processIncomingMessage, eventBus, isLeadLocked, isMessageAlreadyHandled, markMessageHandled, seenMessageIds } = require('./flowEngine');
+const { notifyChipDisconnected, clearChipDisconnectedCooldown } = require('./alertService');
 
 let isPolling = false;
 let pollTimer = null;
@@ -98,6 +99,7 @@ async function syncUazapiInstancesNow() {
               console.log(`[uazapi Poller] Instância ${inst.name || inst.id} reconectada no uazapi! Atualizando status local para 'connected'...`);
               inst.status = 'connected';
               inst.connectedAt = Date.now();
+              clearChipDisconnectedCooldown(inst.id);
               db.saveInstance(inst);
               eventBus.emit('instances_updated', { instanceId: inst.id, status: 'connected' });
             }
@@ -111,12 +113,7 @@ async function syncUazapiInstancesNow() {
               console.warn(`[uazapi Poller] ⚠️ Instância ${inst.name || inst.id} desconectada no celular/uazapi! Atualizando para 'disconnected'...`);
               inst.status = 'disconnected';
               db.saveInstance(inst);
-              eventBus.emit('chip_disconnected', {
-                instanceId: inst.id,
-                name: inst.name,
-                phone: inst.numero_conectado || inst.phoneNumber,
-                timestamp: new Date().toISOString()
-              });
+              notifyChipDisconnected(inst, 'poller_disconnected');
               eventBus.emit('connection_status', { instanceId: inst.id, status: 'disconnected' });
               eventBus.emit('instances_updated', { instanceId: inst.id, status: 'disconnected' });
             }
@@ -253,7 +250,9 @@ async function syncUazapiInstancesNow() {
 
         // Verifica se precisamos buscar mensagens desta conversa
         const existingCount = chat.messages ? chat.messages.length : 0;
+        const hasBotReplied = chat.messages && chat.messages.some(m => m.from === 'bot' || m.from === 'agent');
         const needsFetch = existingCount === 0 ||
+          !hasBotReplied ||
           (c.wa_unreadCount && c.wa_unreadCount > 0) ||
           (remoteTimestampMs > (chat.lastProcessedTimestamp + 1000));
 
@@ -315,11 +314,12 @@ async function syncUazapiInstancesNow() {
             anyUpdate = true;
           } else {
             // Mensagem de entrada do LEAD:
-            // FILTRO DE SEGURANÇA: Apenas ignora mensagens comprovadamente anteriores à conexão do chip
+            // FILTRO DE SEGURANÇA: Apenas ignora se já atendido e comprovadamente anterior
             const connTimestamp = inst.connectedAt || 0;
-            const isBeforeConnection = connTimestamp > 0 && msgTimestampMs < (connTimestamp - 60000);
+            const hasBotReplied = chat.messages && chat.messages.some(m => m.from === 'bot' || m.from === 'agent');
+            const isBeforeConnection = hasBotReplied && connTimestamp > 0 && msgTimestampMs < (connTimestamp - 60000);
             const msgAgeMs = Date.now() - msgTimestampMs;
-            const isTooOld = msgAgeMs > 600000; // 10 minutos máximo
+            const isTooOld = hasBotReplied && msgAgeMs > 86400000; // 24 horas para leads já atendidos
 
             if (isBeforeConnection || isTooOld) {
               seenMessageIds.add(msgId);

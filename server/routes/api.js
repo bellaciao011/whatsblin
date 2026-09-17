@@ -493,9 +493,11 @@ async function autoRestoreUazapiInstances(req = null) {
         let changed = false;
         const remStatus = rem.status || 'disconnected';
         if (existing.status !== remStatus) {
+          const wasConnected = existing.status === 'connected';
           existing.status = remStatus;
           if (remStatus === 'connected') {
             existing.connectedAt = Date.now();
+            clearChipDisconnectedCooldown(existing.id);
             console.log(`[Auto-Restore] ✓ Chip ${existing.name} conectou! connectedAt definido para ${existing.connectedAt}`);
             // Reseta watermark de todos os chats existentes para NUNCA disparar mensagens antigas
             const allC = db.getChats();
@@ -503,6 +505,11 @@ async function autoRestoreUazapiInstances(req = null) {
               c.lastProcessedTimestamp = Date.now();
             }
             db.saveChats(allC);
+          } else if (remStatus === 'disconnected' && wasConnected) {
+            // Notifica o celular IMEDIATAMENTE quando detecta que um chip ativo desconectou!
+            console.warn(`[Auto-Restore] ⚠️ Chip ${existing.name} desconectou remotamente na uazapi!`);
+            notifyChipDisconnected(existing, 'auto_restore_disconnected');
+            eventBus.emit('connection_status', { instanceId: existing.id, status: 'disconnected' });
           }
           changed = true;
         } else if (existing.status === 'connected' && !existing.connectedAt) {

@@ -54,9 +54,18 @@ function recordBotReply(cleanPhone) {
 }
 
 function isMessageAlreadyHandled(msgId, cleanPhone, text, timestampMs) {
+  // Se o lead ainda não recebeu NENHUMA resposta do bot, NUNCA bloquear!
+  if (cleanPhone) {
+    try {
+      const chat = db.getChat(cleanPhone);
+      const hasBotReplied = chat?.messages && chat.messages.some(m => m.from === 'bot' || m.from === 'agent');
+      if (!hasBotReplied) return false;
+    } catch (e) {}
+  }
+
   // Início de campanha/anúncio pelo lead nunca é bloqueado como duplicata
   const isStart = Boolean(
-    (text && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga)/i.test(text)) ||
+    (text && /(?:quiero\s*espiar|quero\s*espiar|espiar\s*un\s*n[uú]mero|iniciar\s*investigaci[oó]n|iniciar\s*rastreo|come[çc]ar\s*investiga|m[aá]s\s*informaci[oó]n|mais\s*informa[çc][oõ]es|informaci[oó]n\s*sobre\s*esto|hola|ol[aá]|buenas)/i.test(text)) ||
     (text && /\([A-Za-z0-9]{4,8}\)/.test(text)) ||
     (text && /c[oó]digo\s*:?\s*[A-Za-z0-9]{4,8}/i.test(text))
   );
@@ -896,7 +905,17 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
     const instance = instances.find(i => i.id === instanceId || i.instance_id === instanceId || i.name === instanceId) || instances[0] || { id: instanceId || 'inst_1' };
 
   // 0. Atualiza dados de contato do lead (Nome e Foto de Perfil)
-  const existingChat = db.getChat(cleanPhone) || {};
+  let existingChat = db.getChat(cleanPhone);
+  if (!existingChat) {
+    existingChat = {
+      leadPhone: cleanPhone,
+      leadName: (senderName && senderName.trim()) || `Lead ${cleanPhone}`,
+      instanceId: instance?.id || 'inst_1',
+      state: 'NOVO',
+      messages: []
+    };
+  }
+  if (!Array.isArray(existingChat.messages)) existingChat.messages = [];
   let chatNeedsSave = false;
 
   if (senderName && typeof senderName === 'string' && senderName.trim()) {

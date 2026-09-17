@@ -67,13 +67,20 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
     if (eventType === 'connection' || body.connected !== undefined || body.data?.connected !== undefined) {
       const connData = body.data || body.payload || body;
       const connStatus = (connData.status || connData.state || (connData.connected ? 'connected' : 'disconnected') || '').toLowerCase();
-      console.log(`[uazapi Webhook] Status de conexão da instância ${instLogName}: "${connStatus}"`);
+      console.log(`[uazapi Webhook] Status de conexão da instância ${instLogName}: "${connStatus}" (connected: ${connData.connected})`);
 
       if (instance) {
-        if (connStatus === 'connected' || connStatus === 'open' || connData.connected === true) {
+        const wasConnected = instance.status === 'connected';
+        const isConnecting = connStatus === 'connecting' || connStatus === 'qrcode' || connStatus === 'pairing' || connStatus === 'waiting' || connStatus === 'resetting';
+        const isNowConnected = connStatus === 'connected' || connStatus === 'open' || connData.connected === true;
+        const isExplicitDisconnect = (connStatus === 'disconnected' || connStatus === 'close' || connStatus === 'closed') && !isConnecting && !isNowConnected;
+
+        if (isNowConnected) {
           instance.status = 'connected';
           instance.connectedAt = Date.now();
           instance.assignedFlowId = 'fluxo-espiao-es';
+          clearChipDisconnectedCooldown(instance.id);
+
           const userPhone = connData.jid?.user || connData.user || connData.owner || connData.instance?.owner || (typeof connData.jid === 'string' ? connData.jid.split('@')[0].replace(/\D/g, '') : null);
           if (userPhone && String(userPhone).replace(/\D/g, '').length >= 8) {
             const cleanDigits = String(userPhone).replace(/\D/g, '');
@@ -83,16 +90,21 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
           db.saveInstance(instance);
           console.log(`[uazapi Webhook] ✓ Chip ${instance.name} conectado com connectedAt: ${instance.connectedAt}`);
           console.log(`[uazapi Webhook] ✓ Instância ${instance.name} marcada como CONECTADA (${instance.numero_conectado || 'sem número'})`);
-        } else if (connStatus === 'disconnected' || connStatus === 'close' || connStatus === 'closed' || connData.connected === false) {
+        } else if (isConnecting) {
+          // Em processo de conexão ou gerando QR Code: NUNCA disparar alerta de desconexão!
+          console.log(`[uazapi Webhook] ⏳ Instância ${instance.name} gerando QR code ou conectando (${connStatus}). Alerta suprimido.`);
+          instance.status = 'connecting';
+          db.saveInstance(instance);
+        } else if (isExplicitDisconnect) {
           instance.status = 'disconnected';
           db.saveInstance(instance);
           console.warn(`[uazapi Webhook] ⚠️ Instância ${instance.name} marcada como DESCONECTADA`);
-          eventBus.emit('chip_disconnected', {
-            instanceId: instance.id,
-            name: instance.name,
-            phone: instance.numero_conectado || instance.phoneNumber,
-            timestamp: new Date().toISOString()
-          });
+          // Apenas dispara notificação se o chip ESTAVA conectado anteriormente!
+          if (wasConnected) {
+            notifyChipDisconnected(instance, `webhook:${connStatus}`);
+          } else {
+            console.log(`[uazapi Webhook] Instância ${instance.name} já estava desconectada previamente. Notificação suprimida.`);
+          }
         }
         eventBus.emit('connection_status', { instanceId: instance.id, status: instance.status });
         eventBus.emit('instances_updated', { instanceId: instance.id, status: instance.status });
@@ -235,13 +247,19 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
 
       // 3. Filtro de Mensagens Anteriores à Conexão do Chip
       const msgTimeMs = msg.messageTimestamp ? (msg.messageTimestamp > 1000000000000 ? msg.messageTimestamp : msg.messageTimestamp * 1000) : Date.now();
-      if (instance?.connectedAt && msgTimeMs < (instance.connectedAt - 60000)) {
-        console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada (timestamp: ${msgTimeMs} < connectedAt - 60s: ${instance.connectedAt - 60000})`);
-        continue;
-      }
-      if (Date.now() - msgTimeMs > 600000) {
-        console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 10min) ignorada para não disparar automações atrasadas.`);
-        continue;
+      const existingChatCheck = db.getChat(cleanPhone);
+      const hasResponded = existingChatCheck?.messages && existingChatCheck.messages.some(m => m.from === 'bot' || m.from === 'agent');
+
+      // Se o lead NUNCA recebeu resposta do bot, NUNCA descartamos sua mensagem inicial!
+      if (hasResponded) {
+        if (instance?.connectedAt && msgTimeMs < (instance.connectedAt - 60000)) {
+          console.log(`[uazapi Webhook] ⏩ Mensagem anterior à conexão do chip ignorada para lead já atendido: ${cleanPhone}`);
+          continue;
+        }
+        if (Date.now() - msgTimeMs > 86400000) { // 24 horas
+          console.log(`[uazapi Webhook] ⏩ Mensagem antiga (> 24h) ignorada para lead já atendido: ${cleanPhone}`);
+          continue;
+        }
       }
 
       // Mensagens enviadas pelo próprio operador (aparelho físico do chip)

@@ -509,6 +509,17 @@ function initRealtimeEvents() {
           // Atualiza contadores
           updateBadges();
         } else if (payload.type === 'instances_updated' || payload.type === 'connection_status') {
+          if (payload.status === 'connected' || payload.data?.status === 'connected') {
+            window._lastDisconnectNotice = 0;
+            const pill = document.querySelector('.mobile-chip-pill');
+            const pillText = document.getElementById('mobile-chip-name');
+            if (pill && pillText) {
+              pill.style.background = 'rgba(16, 185, 129, 0.12)';
+              pill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+              pill.style.color = '#34d399';
+              pillText.textContent = 'CELULAR ROXO';
+            }
+          }
           if (state.currentView === 'instances') {
             renderInstances();
           }
@@ -531,6 +542,12 @@ function initRealtimeEvents() {
           if (state.currentView === 'inbox') renderInbox(false);
           if (state.currentView === 'tiktok') renderTikTokAttribution();
         } else if (payload.type === 'chip_disconnected') {
+          const now = Date.now();
+          if (window._lastDisconnectNotice && (now - window._lastDisconnectNotice) < 60000) {
+            console.log('[SSE] chip_disconnected repetido suprimido no frontend.');
+            return;
+          }
+          window._lastDisconnectNotice = now;
           playWarningSound();
           const chipData = payload.data || {};
           const chipName = chipData.name || 'WhatsApp';
