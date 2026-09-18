@@ -6498,6 +6498,7 @@ window.renderFluxoAutomatico = async function(forcedTab) {
 
     const config = configRes.config || {};
     const kanbanData = kanbanRes || {};
+    window.currentFluxoKanbanData = kanbanData;
     const metrics = kanbanData.metrics || { totalVisitors: 0, totalMessaged: 0, totalReachedCheckout: 0, totalOpenedCheckout: 0, totalPaid: 0, rateMessaged: '0.0', rateReachedCheckout: '0.0', rateOpenedCheckout: '0.0', rateFinalConversion: '0.0' };
     const counts = kanbanData.counts || { chegaram: 0, mandaram_mensagem: 0, foram_checkout: 0, abriram_checkout: 0, finalizado: 0 };
     const columns = kanbanData.columns || { chegaram: [], mandaram_mensagem: [], foram_checkout: [], abriram_checkout: [], finalizado: [] };
@@ -7031,50 +7032,148 @@ window.saveWebChatFullConfig = async function() {
 window.viewWebChatHistory = async function(sessionId) {
   const modal = document.getElementById('modal-webchat-history');
   const body = document.getElementById('webchat-history-body');
+  const titleEl = document.getElementById('history-modal-title');
+  const subEl = document.getElementById('history-modal-sub');
   if (!modal || !body) return;
 
-  body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Carregando histórico...</div>';
-  modal.classList.add('active');
-
-  try {
-    let messages = [];
-    if (sessionId.startsWith('wa_')) {
-      const phone = sessionId.replace('wa_', '');
-      const res = await fetch(`/api/chats/${phone}`);
-      const chatData = await res.json();
-      messages = chatData?.messages || [];
-      const titleEl = document.getElementById('history-modal-title');
-      if (titleEl) titleEl.textContent = `📱 WhatsApp: +${phone}`;
-    } else {
-      const res = await fetch(`/api/webchat/sessions?limit=200`);
-      const data = await res.json();
-      const session = (data.sessions || []).find(s => s.id === sessionId);
-      messages = session?.messages || [];
-      const titleEl = document.getElementById('history-modal-title');
-      if (titleEl) titleEl.textContent = `🌐 WebChat: ${session?.targetPhone ? '+' + session.targetPhone : session?.id}`;
+  // Busca dados do card armazenados em cache no Kanban
+  let leadCard = null;
+  if (window.currentFluxoKanbanData && window.currentFluxoKanbanData.columns) {
+    for (const col of Object.values(window.currentFluxoKanbanData.columns)) {
+      const found = (col || []).find(item => item.id === sessionId);
+      if (found) { leadCard = found; break; }
     }
+  }
 
-    if (!messages || messages.length === 0) {
-      body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma mensagem registrada nesta conversa.</div>';
+  const isWa = String(sessionId).startsWith('wa_');
+  const cleanPhone = String(leadCard?.leadPhone || (isWa ? sessionId.replace('wa_', '') : '')).replace(/\D/g, '');
+  const targetPhone = String(leadCard?.targetPhone || '').replace(/\D/g, '');
+  const displayPhone = cleanPhone ? ('+' + cleanPhone) : (targetPhone ? ('+' + targetPhone) : (leadCard?.id || sessionId));
+  
+  const country = typeof getLeadCountryInfo === 'function' && leadCard 
+    ? getLeadCountryInfo(leadCard) 
+    : (cleanPhone ? (typeof getCountryByPhone === 'function' ? getCountryByPhone(cleanPhone) : { flag: '🌐', name: 'Global' }) : { flag: '🌐', name: 'Global' });
+
+  if (titleEl) {
+    titleEl.innerHTML = `<span style="margin-right: 6px;">${country.flag}</span> ${isWa ? 'WhatsApp' : 'WebChat'}: ${displayPhone}`;
+  }
+  if (subEl) {
+    const campName = leadCard?.utm?.utm_campaign || leadCard?.slug || 'campanha';
+    const srcName = leadCard?.utm?.utm_source || leadCard?.utm?.src || (isWa ? 'whatsapp' : 'web');
+    subEl.innerHTML = `<span style="color: #c084fc;">🎯 ${campName}</span> • <span style="color: #34d399;">🌐 ${srcName}</span>`;
+  }
+
+  // Função auxiliar para formatar e renderizar balões de mensagem
+  const renderMessages = (messagesList) => {
+    if (!messagesList || messagesList.length === 0) {
+      body.innerHTML = `
+        <div style="text-align: center; color: #94a3b8; padding: 40px 20px;">
+          <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+          <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Nenhuma mensagem registrada</div>
+          <div style="font-size: 12px;">O lead chegou ao funil mas ainda não enviou mensagem.</div>
+        </div>
+      `;
       return;
     }
 
-    body.innerHTML = session.messages.map(m => {
-      const isUser = m.from === 'user';
+    body.innerHTML = messagesList.map(m => {
+      const isLead = m.from === 'user' || m.from === 'lead' || m.from === 'client' || m.fromMe === false;
+      const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const senderLabel = isLead ? '👤 Lead' : '👩‍💼 Atendente / Robô';
+      
+      const textFormatted = (m.text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+
+      const hasMedia = !!(m.mediaType === 'image' || m.mediaUrl || m.imageUrl);
+      const mediaSrc = m.mediaUrl || m.imageUrl || '';
+
       return `
-        <div style="display: flex; justify-content: ${isUser ? 'flex-end' : 'flex-start'};">
-          <div style="max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.4; background: ${isUser ? '#005c4b' : '#202c33'}; color: #fff;">
-            ${m.mediaType === 'image' ? `<img src="${m.mediaUrl}" style="max-width: 100%; border-radius: 6px; margin-bottom: 6px;">` : ''}
-            <div>${m.text || ''}</div>
-            ${m.checkoutUrl ? `<div style="margin-top: 6px;"><a href="${m.checkoutUrl}" target="_blank" style="color: #34d399; font-weight: 700;">👉 Link de Checkout ($${m.amount || '19'})</a></div>` : ''}
-            <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-align: right; margin-top: 3px;">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR') : ''}</div>
+        <div style="display: flex; flex-direction: column; align-items: ${isLead ? 'flex-end' : 'flex-start'}; margin-bottom: 8px; width: 100%;">
+          <div style="font-size: 10px; color: ${isLead ? '#34d399' : '#94a3b8'}; margin-bottom: 3px; padding: 0 4px; font-weight: 700;">
+            ${senderLabel}
+          </div>
+          <div style="max-width: 86%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; background: ${isLead ? '#005c4b' : '#202c33'}; color: #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3); word-break: break-word;">
+            ${hasMedia && mediaSrc ? `
+              <div style="margin-bottom: 8px;">
+                <a href="${mediaSrc}" target="_blank" rel="noopener noreferrer" title="Clique para ver foto ampliada">
+                  <img src="${mediaSrc}" alt="Foto gerada" style="max-width: 100%; max-height: 250px; border-radius: 8px; display: block; border: 1px solid rgba(255,255,255,0.12);" onerror="this.parentElement.style.display='none';">
+                </a>
+              </div>
+            ` : ''}
+            ${textFormatted ? `<div style="font-size: 13px;">${textFormatted}</div>` : ''}
+            ${m.checkoutUrl ? `
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.2);">
+                <a href="${m.checkoutUrl}" target="_blank" rel="noopener noreferrer" style="color: #34d399; font-weight: 800; text-decoration: underline; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px;">
+                  <span>👉</span> <span>Link de Checkout (${m.amount ? '$' + m.amount : 'Taxa de Desencriptação'})</span>
+                </a>
+              </div>
+            ` : ''}
+            <div style="font-size: 10px; color: rgba(255,255,255,0.45); text-align: right; margin-top: 4px;">${timeStr}</div>
           </div>
         </div>
       `;
     }).join('');
 
+    setTimeout(() => { body.scrollTop = body.scrollHeight; }, 50);
+  };
+
+  // Se já temos mensagens em memória no card, renderiza imediatamente para resposta instantânea!
+  if (leadCard && Array.isArray(leadCard.messages) && leadCard.messages.length > 0) {
+    renderMessages(leadCard.messages);
+  } else {
+    body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 30px;"><div class="spinner" style="width: 20px; height: 20px; margin: 0 auto 10px auto;"></div>Carregando histórico...</div>';
+  }
+  
+  modal.classList.add('active');
+
+  // Busca mensagens atualizadas da API
+  try {
+    let freshMessages = [];
+    if (isWa) {
+      const fetchPhone = cleanPhone || sessionId.replace('wa_', '');
+      const res = await fetch(`/api/chats/${fetchPhone}`);
+      if (res.ok) {
+        const chatData = await res.json();
+        freshMessages = chatData?.messages || [];
+      }
+    } else {
+      // Tenta rota direta da sessão
+      let sessionData = null;
+      try {
+        const directRes = await fetch(`/api/webchat/sessions/${encodeURIComponent(sessionId)}`);
+        if (directRes.ok) {
+          const directJson = await directRes.json();
+          sessionData = directJson.session;
+        }
+      } catch (_) {}
+
+      // Fallback para lista geral de sessões
+      if (!sessionData) {
+        const res = await fetch(`/api/webchat/sessions?limit=500`);
+        if (res.ok) {
+          const data = await res.json();
+          sessionData = (data.sessions || []).find(s => s.id === sessionId);
+        }
+      }
+
+      freshMessages = sessionData?.messages || [];
+    }
+
+    // Se encontrou mensagens atualizadas ou se a lista retornou, re-renderiza
+    if (freshMessages && freshMessages.length > 0) {
+      renderMessages(freshMessages);
+    } else if (!leadCard || !leadCard.messages || leadCard.messages.length === 0) {
+      renderMessages([]);
+    }
   } catch (e) {
-    body.innerHTML = '<div style="color: #ef4444; padding: 20px;">Erro ao carregar histórico: ' + e.message + '</div>';
+    console.error('[WebChat History Error]', e);
+    // Se deu erro mas já tinha renderizado do cache, não quebra a tela
+    if (!leadCard || !leadCard.messages || leadCard.messages.length === 0) {
+      body.innerHTML = '<div style="color: #ef4444; padding: 25px; text-align: center;">Erro ao carregar histórico: ' + e.message + '</div>';
+    }
   }
 };
 

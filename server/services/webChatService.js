@@ -573,7 +573,13 @@ function updateSessionState(sessionId, newState) {
   return { success: true, session };
 }
 
+function getSession(sessionId) {
+  const sessions = loadSessions();
+  return sessions[sessionId] || null;
+}
+
 module.exports = {
+  getSession,
   getWebChatConfig,
   initSession,
   handleIncomingMessage,

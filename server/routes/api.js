@@ -1084,8 +1084,16 @@ router.get('/chats', (req, res) => {
 });
 
 router.get('/chats/:phone', (req, res) => {
-  const chats = db.getChats();
-  const chat = chats[req.params.phone];
+  const chats = db.getChats ? db.getChats() : {};
+  const rawPhone = req.params.phone;
+  let chat = chats[rawPhone];
+  if (!chat) {
+    const cleanDigits = String(rawPhone).replace(/\D/g, '');
+    chat = chats[cleanDigits] || Object.values(chats).find(c => {
+      const cPhone = String(c.leadPhone || c.phone || '').replace(/\D/g, '');
+      return cPhone === cleanDigits || (cleanDigits.length >= 8 && cPhone.endsWith(cleanDigits));
+    });
+  }
   if (!chat) return res.status(404).json({ error: 'Chat não encontrado' });
   res.json(chat);
 });
@@ -2995,6 +3003,19 @@ router.post('/webchat/message', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[WebChat API Message Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/webchat/sessions/:id', (req, res) => {
+  try {
+    const session = webChatService.getSession ? webChatService.getSession(req.params.id) : null;
+    if (session) return res.json({ success: true, session });
+    const all = webChatService.getAllSessions ? webChatService.getAllSessions(1000) : [];
+    const found = all.find(s => s.id === req.params.id);
+    if (found) return res.json({ success: true, session: found });
+    return res.status(404).json({ success: false, error: 'Sessão não encontrada' });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
