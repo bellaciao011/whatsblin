@@ -90,6 +90,20 @@ app.use('/css', express.static(path.join(__dirname, '../public/css')));
 app.use('/js', express.static(path.join(__dirname, '../public/js')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/webhook', webhookRoutes);
+
+// Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
+app.post([
+  '/api/webhooks/payment',
+  '/api/webhooks/checkout',
+  '/api/webhooks/centerpag',
+  '/webhook/payment',
+  '/webhook/checkout',
+  '/webhook/centerpag'
+], (req, res) => {
+  const { handlePaymentWebhook } = require('./routes/api');
+  return handlePaymentWebhook(req, res, 'CenterPag/Universal');
+});
+
 app.use('/api/webhooks', uazapiWebhookRoutes);
 
 // =========================================================================

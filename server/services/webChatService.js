@@ -14,7 +14,7 @@ function buildDirectWebCheckoutUrl(baseUrl, incomingParams = {}) {
     const u = new URL(baseUrl || 'https://go.centerpag.com/PPU38CQG5EL');
     Object.keys(incomingParams).forEach(k => {
       const val = incomingParams[k];
-      if (val && typeof val === 'string' && !['sessionId', 'message', 'slug', 'timeZone', 'allParams'].includes(k)) {
+      if (val && typeof val === 'string' && !['message', 'slug', 'timeZone', 'allParams'].includes(k)) {
         u.searchParams.set(k, val);
       }
     });
@@ -23,7 +23,7 @@ function buildDirectWebCheckoutUrl(baseUrl, incomingParams = {}) {
     if (incomingParams.allParams && typeof incomingParams.allParams === 'object') {
       Object.keys(incomingParams.allParams).forEach(k => {
         const val = incomingParams.allParams[k];
-        if (val && typeof val === 'string' && !['sessionId', 'message', 'slug', 'timeZone'].includes(k)) {
+        if (val && typeof val === 'string' && !['message', 'slug', 'timeZone'].includes(k)) {
           u.searchParams.set(k, val);
         }
       });
@@ -32,7 +32,9 @@ function buildDirectWebCheckoutUrl(baseUrl, incomingParams = {}) {
     if (u.searchParams.has('utm_source') && !u.searchParams.has('src')) {
       u.searchParams.set('src', u.searchParams.get('utm_source'));
     }
-    if (!u.searchParams.has('sck') && u.searchParams.has('src')) {
+    if (!u.searchParams.has('sck') && u.searchParams.has('code')) {
+      u.searchParams.set('sck', u.searchParams.get('code'));
+    } else if (!u.searchParams.has('sck') && u.searchParams.has('src')) {
       u.searchParams.set('sck', u.searchParams.get('src'));
     }
 
@@ -250,9 +252,32 @@ async function handleIncomingMessage(sessionId, messageText, utmData = {}, selec
       delay: 2800
     });
 
-    // D) Constrói URL DIRETA do checkout preservando 100% de todas as UTMs que vieram do anúncio
+    // D) Gera código único do lead para desbloquear a página de Upsell Black (spysfunills.vercel.app/upsell1/)
+    let leadCode = session.code || session.codigo;
+    if (!leadCode) {
+      if (normalizedTarget && normalizedTarget.length >= 6) {
+        leadCode = normalizedTarget.slice(-6).toUpperCase();
+      } else {
+        leadCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      }
+      session.code = leadCode;
+    }
+    const leadToken = `cw_sec_${leadCode.toLowerCase()}_2026`;
+
+    // Constrói URL DIRETA do checkout com código de desbloqueio do Upsell Black + UTMs
     const rawCheckout = funnel.checkoutUrlEs || funnel.checkouts?.es?.frontUrl || 'https://go.centerpag.com/PPU38CQG5EL';
-    const combinedUtms = { ...(session.utm || {}), ...(utmData || {}) };
+    const combinedUtms = {
+      ...(session.utm || {}),
+      ...(utmData || {}),
+      code: leadCode,
+      codigo: leadCode,
+      cw_token: leadToken,
+      view: 'lead',
+      sck: leadCode,
+      src: (utmData && (utmData.src || utmData.utm_source)) || 'webchat',
+      custom_id: session.id,
+      sessionId: session.id
+    };
     const directCheckout = buildDirectWebCheckoutUrl(rawCheckout, combinedUtms);
 
     const offerAmount = config.offerAmount || '19';
@@ -586,6 +611,7 @@ function getSession(sessionId) {
 }
 
 module.exports = {
+  loadSessions,
   getSession,
   getWebChatConfig,
   initSession,

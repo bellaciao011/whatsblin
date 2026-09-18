@@ -3152,4 +3152,6 @@ router.post('/notifications/test', (req, res) => {
   }
 });
 
+router.handlePaymentWebhook = handlePaymentWebhook;
 module.exports = router;
+module.exports.handlePaymentWebhook = handlePaymentWebhook;
