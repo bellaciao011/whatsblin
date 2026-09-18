@@ -94,13 +94,25 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/webhook', webhookRoutes);
 
 // Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
-// Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
+// 1. Webhook Específico de Checkout Aberto / Abandono de Carrinho
+// NUNCA dispara evento de venda paga (Purchase) no Facebook! Apenas registra status CHECKOUT_ABERTO.
+app.all([
+  '/api/webhooks/checkout',
+  '/webhook/checkout'
+], (req, res) => {
+  const { handleCheckoutWebhook } = require('./routes/api');
+  if (typeof handleCheckoutWebhook === 'function') {
+    return handleCheckoutWebhook(req, res);
+  }
+  return res.json({ success: true, message: 'Checkout recebido (sem disparo de venda).' });
+});
+
+// 2. Webhook EXCLUSIVO de VENDAS REALMENTE PAGAS (CenterPag, Kirvano, Kiwify, PerfectPay)
+// Apenas pagamentos 100% aprovados e confirmados disparam Purchase para a Meta/Facebook.
 app.all([
   '/api/webhooks/payment',
-  '/api/webhooks/checkout',
   '/api/webhooks/centerpag',
   '/webhook/payment',
-  '/webhook/checkout',
   '/webhook/centerpag'
 ], (req, res) => {
   const { handlePaymentWebhook } = require('./routes/api');

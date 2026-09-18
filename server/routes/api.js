@@ -1846,6 +1846,56 @@ router.get('/pixels/logs', (req, res) => {
 // =========================================================================
 // PROCESSADOR UNIVERSAL DE WEBHOOK DE PAGAMENTO (CENTERPAG, KIRVANO, ETC.)
 // =========================================================================
+
+/**
+ * Webhook para eventos de abertura de checkout / abandono
+ * NUNCA DISPARA EVENTO PURCHASE NO FACEBOOK OU TIKTOK!
+ */
+function handleCheckoutWebhook(req, res) {
+  try {
+    const body = req.body || {};
+    const query = req.query || {};
+    const payload = body.data || body.order || body.payload || body;
+    console.log('[Webhook Checkout] Evento de checkout recebido (NÃO É VENDA):', JSON.stringify(body));
+
+    const candidateParams = [
+      body.custom_id,
+      body.sessionId,
+      body.session_id,
+      body.metadata?.custom_id,
+      body.metadata?.sessionId,
+      payload.custom_id,
+      payload.sessionId,
+      query.custom_id,
+      query.sessionId,
+      body.code,
+      body.codigo,
+      body.sck,
+      payload.code,
+      payload.codigo,
+      query.code,
+      query.codigo
+    ].filter(Boolean);
+
+    let targetId = null;
+    for (const val of candidateParams) {
+      const s = String(val).trim();
+      if (s.startsWith('wa_lead_') || s.startsWith('sess_') || s.startsWith('lead_')) {
+        targetId = s;
+        break;
+      }
+    }
+
+    if (targetId && webChatService.updateSessionState) {
+      webChatService.updateSessionState(targetId, 'CHECKOUT_ABERTO');
+    }
+
+    return res.json({ success: true, message: 'Evento de checkout registrado no funil sem disparo de venda paga.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
   try {
     const body = req.body || {};
@@ -1993,24 +2043,54 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
     const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 19.00;
     const currency = body.currency_enum_key || payload.currency || body.currency || (amount <= 40 ? 'USD' : 'BRL');
 
-    // 7. Extrai status e evento de aprovação
-    const rawStatusEnum = body.sale_status_enum || payload.sale_status_enum;
-    const status = (body.sale_status_enum_key || body.sale_status || body.status || payload.status || body.event || payload.event || body.order_status || 'approved').toLowerCase();
+    // 7. Extrai status e evento com RIGOR ABSOLUTO
+    const rawStatusEnum = body.sale_status_enum !== undefined ? String(body.sale_status_enum) : (payload.sale_status_enum !== undefined ? String(payload.sale_status_enum) : '');
+    const rawStatus = (body.sale_status_enum_key || body.sale_status || body.status || payload.status || body.order_status || payload.order_status || '').toLowerCase().trim();
+    const rawEvent = (body.event || payload.event || '').toLowerCase().trim();
+    const combinedStatus = `${rawStatus} ${rawEvent}`.trim();
 
-    const isApproved = String(rawStatusEnum) === '2' || 
-                       status === 'approved' || 
-                       status === 'paid' || 
-                       status === 'pago' || 
-                       status === 'conclud' || 
-                       status === 'completed' || 
-                       status === 'success' ||
-                       status.includes('approv') || 
-                       status.includes('paid') || 
-                       status.includes('pago') || 
-                       status.includes('conclud') || 
-                       status.includes('success') ||
-                       req.body?.test === true ||
-                       req.query?.test === 'true';
+    // Eventos que representam abertura de checkout, carrinho ou pagamento pendente (NUNCA SÃO VENDA APROVADA)
+    const isCheckoutOrPending = 
+      combinedStatus.includes('checkout') ||
+      combinedStatus.includes('abandon') ||
+      combinedStatus.includes('carrinho') ||
+      combinedStatus.includes('wait') ||
+      combinedStatus.includes('aguard') ||
+      combinedStatus.includes('pend') ||
+      combinedStatus.includes('iniciado') ||
+      combinedStatus.includes('created') ||
+      combinedStatus.includes('criado') ||
+      combinedStatus.includes('cancel') ||
+      combinedStatus.includes('refus') ||
+      combinedStatus.includes('recus') ||
+      combinedStatus.includes('chargeback') ||
+      combinedStatus.includes('refund');
+
+    // Validação estrita: apenas eventos e status 100% aprovados/pagos são aceitos
+    const isExplicitlyPaid = 
+      rawStatusEnum === '2' ||
+      rawStatus === 'approved' ||
+      rawStatus === 'paid' ||
+      rawStatus === 'pago' ||
+      rawStatus === 'completed' ||
+      rawStatus === 'concluida' ||
+      rawStatus === 'concluido' ||
+      rawEvent === 'order_approved' ||
+      rawEvent === 'order.paid' ||
+      rawEvent === 'sale_approved' ||
+      rawEvent === 'transaction_paid' ||
+      rawEvent === 'payment_approved';
+
+    const isApproved = isExplicitlyPaid && !isCheckoutOrPending;
+
+    if (!isApproved) {
+      console.log(`[Webhook ${gatewayName}] ⛔ Evento NÃO É VENDA PAGA (Status: "${rawStatus}", Evento: "${rawEvent}", Enum: "${rawStatusEnum}"). Bloqueando qualquer envio de Purchase para Facebook/Meta.`);
+      return res.json({
+        success: true,
+        message: 'Evento não-financeiro recebido (sem disparo de venda para Facebook/Meta)',
+        status: rawStatus || rawEvent || 'unprocessed'
+      });
+    }
 
     const orderId = body.code || payload.id || body.order_id || body.id || `ord_${Date.now()}`;
 
@@ -3296,5 +3376,7 @@ router.post('/notifications/test', (req, res) => {
 });
 
 router.handlePaymentWebhook = handlePaymentWebhook;
+router.handleCheckoutWebhook = handleCheckoutWebhook;
+module.exports.handleCheckoutWebhook = handleCheckoutWebhook;
 module.exports = router;
 module.exports.handlePaymentWebhook = handlePaymentWebhook;
