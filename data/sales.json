@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "sale_1789704058015_608",
+    "timestamp": "2026-09-18T04:00:58.015Z",
+    "phone": "985224661",
+    "email": "vale22san@hotmail.es",
+    "amount": 19,
+    "currency": "USD",
+    "status": "aprovado",
+    "platform": "CenterPag",
+    "orderId": "PPCPMTB5HK96LMJG6F",
+    "productName": "App Watch AI - Monitor"
+  }
+]

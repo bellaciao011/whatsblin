@@ -196,10 +196,9 @@ async function requestNotificationPermission() {
   if (Notification.permission === 'granted') {
     getAudioContext();
     playLeadSound();
-    showToast('🔔 Notificações no celular ATIVAS! Enviando alerta de teste...', 'success');
-    showPushNotification('🔔 Notificações Ativas no Celular! 🎯', 'Você receberá alertas sonoros e notificações sempre que um novo lead entrar ou avançar no funil!');
+    showToast('🔔 Notificações no celular ATIVAS!', 'success');
+    showPushNotification('🔔 Notificações Ativas! 🎯', 'Você receberá alertas sonoros e notificações sempre que um novo lead ou venda entrar!');
     updateNotificationButton();
-    fetch('/api/notifications/test', { method: 'POST' }).catch(() => {});
     return true;
   }
   try {
@@ -606,10 +605,17 @@ function initRealtimeEvents() {
         } else if (payload.type === 'new_lead') {
           playLeadSound();
           const leadData = payload.data || {};
-          const msg = `+1 Novo Lead: ${leadData.codigo || ''} (${leadData.campaign || 'TikTok Ads'})`;
-          showPushNotification('+1 Novo Lead no WhatsApp! 🎯', msg);
-          showToast(`🎯 ${msg}`, 'success');
+          const isWeb = leadData.type === 'web' || !leadData.isWhatsApp;
+          const title = isWeb ? '🌐 Novo Lead no Chatbot!' : '📱 Novo Lead no WhatsApp!';
+          const phoneStr = leadData.phone ? ('+' + leadData.phone) : (leadData.codigo ? ('Código ' + leadData.codigo) : 'Novo visitante');
+          const campStr = leadData.campaign && leadData.campaign !== 'Geral' ? (' | ' + leadData.campaign) : '';
+          const msg = `${phoneStr}${campStr}`;
+          showPushNotification(title, msg);
+          showToast(`🎯 ${title}: ${msg}`, 'success');
           updateBadges();
+          if (state.currentView === 'fluxo-automatico' || state.currentView === 'kanban-fluxo') {
+            if (typeof window.renderFluxoAutomatico === 'function') window.renderFluxoAutomatico();
+          }
           if (state.currentView === 'inbox') renderInbox(false);
         } else if (payload.type === 'new_sale') {
           playSaleSound();
@@ -652,9 +658,16 @@ function initRealtimeEvents() {
     };
 
     state.eventSource.onerror = () => {
-      if (state.eventSource && state.eventSource.readyState === EventSource.CLOSED) {
-        state.eventSource.close();
+      if (state.eventSource) {
+        try { state.eventSource.close(); } catch(e) {}
         state.eventSource = null;
+      }
+      if (!window._sseReconnectTimeout) {
+        window._sseReconnectTimeout = setTimeout(() => {
+          window._sseReconnectTimeout = null;
+          console.log('[SSE Mobile] Reconectando stream de alertas...');
+          initRealtimeEvents();
+        }, 3000);
       }
     };
   } catch (err) {
@@ -738,7 +751,7 @@ async function renderOverview() {
           </div>
           <div>
             <div class="stat-label">Faturamento Total</div>
-            <div class="stat-value" id="kpi-val-revenue" style="color: #10b981;">R$ 0,00</div>
+            <div class="stat-value" id="kpi-val-revenue" style="color: #10b981;">$ 0.00 USD</div>
             <div class="stat-footer-text">
               <span>✅</span> <span>${kpis.salesCount || 0} pedidos aprovados</span>
             </div>
@@ -957,7 +970,7 @@ async function renderOverview() {
         <div style="display: flex; flex-direction: column; gap: 24px;">
           <div class="card">
             <div class="card-header">
-              <h3 class="card-title">📊 Faturamento Diário (R$)</h3>
+              <h3 class="card-title">📊 Faturamento Diário ($ USD)</h3>
             </div>
             <div style="height: 200px; position: relative;">
               <canvas id="salesChart"></canvas>
@@ -1086,7 +1099,10 @@ async function renderOverview() {
     document.getElementById('view-container').innerHTML = html;
 
     // Dispara as Micro-animações de Contagem (Count-Up)
-    animateCountUp('kpi-val-revenue', Number(kpis.totalRevenue || 0), 850, 'R$ ', '', 2);
+    const isBrl = kpis.currency === 'BRL';
+    const currPrefix = isBrl ? 'R$ ' : '$ ';
+    const currSuffix = isBrl ? '' : ' USD';
+    animateCountUp('kpi-val-revenue', Number(kpis.totalRevenue || 0), 850, currPrefix, currSuffix, 2);
     animateCountUp('kpi-val-conversion', parseFloat(kpis.globalConversionRate || 0), 850, '', '%', 1);
     animateCountUp('kpi-val-leads', Number(kpis.totalLeads || 0), 850, '', '', 0);
     animateCountUp('kpi-val-ticket', Number(kpis.averageTicket || 0), 850, 'R$ ', '', 2);
@@ -7232,17 +7248,37 @@ window.copyInputText = function(elementId) {
   }
 };
 
-// Background Poller para garantir recebimento de alertas de novos leads no celular
+// Background Poller para garantir recebimento de alertas de novos leads e vendas no celular
 window._lastNotifiedLeadTime = Date.now();
+window._lastNotifiedSaleTime = Date.now();
 
-setInterval(async () => {
+async function checkLatestNotifications() {
   try {
     const res = await fetch('/api/notifications/latest');
     const data = await res.json();
-    if (data.success && data.latestTime && data.latestTime > window._lastNotifiedLeadTime) {
+    if (!data.success) return;
+
+    // 1. Alerta de Venda Aprovada no celular
+    if (data.latestSaleTime && data.latestSaleTime > window._lastNotifiedSaleTime) {
+      window._lastNotifiedSaleTime = data.latestSaleTime;
+      const sale = data.latestSale || {};
+      playSaleSound();
+      const saleTitle = `🎉 VENDA APROVADA! +${sale.amount || 19} ${sale.currency || 'USD'} 💰`;
+      const saleBody = `Cliente: ${sale.phone ? '+' + sale.phone : (sale.email || 'Acesso Liberado')}`;
+      showPushNotification(saleTitle, saleBody);
+      showToast(saleTitle, 'success');
+      updateBadges();
+      if (state.currentView === 'overview') renderOverview();
+      if (state.currentView === 'fluxo-automatico' || state.currentView === 'kanban-fluxo') {
+        if (typeof window.renderFluxoAutomatico === 'function') window.renderFluxoAutomatico();
+      }
+    }
+
+    // 2. Alerta de Novo Lead no celular
+    if (data.latestTime && data.latestTime > window._lastNotifiedLeadTime) {
       window._lastNotifiedLeadTime = data.latestTime;
       const lead = data.latestLead || {};
-      const flagInfo = getCountryByPhone(lead.phone);
+      const flagInfo = (typeof getCountryByPhone === 'function' && lead.phone) ? getCountryByPhone(lead.phone) : { flag: '🌐' };
       const title = lead.type === 'web' ? '🌐 Novo Lead no Chatbot!' : '📱 Novo Lead no WhatsApp!';
       const body = `${flagInfo.flag} Alvo: ${lead.phone ? '+' + lead.phone : 'Novo Lead'} | Campanha: ${lead.campaign || 'Geral'}`;
 
@@ -7252,22 +7288,21 @@ setInterval(async () => {
       updateBadges();
 
       if (state.currentView === 'fluxo-automatico' || state.currentView === 'kanban-fluxo') {
-        renderFluxoAutomatico();
+        if (typeof window.renderFluxoAutomatico === 'function') window.renderFluxoAutomatico();
       }
     }
   } catch(e) {}
-}, 9000);
+}
 
-// Ao desbloquear o celular ou retornar à aba, verifica imediatamente
+setInterval(checkLatestNotifications, 8000);
+
+// Ao desbloquear o celular ou retornar à aba, reconecta o SSE e verifica imediatamente
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     getAudioContext();
-    fetch('/api/notifications/latest').then(r => r.json()).then(data => {
-      if (data.success && data.latestTime && data.latestTime > window._lastNotifiedLeadTime) {
-        window._lastNotifiedLeadTime = data.latestTime;
-        playLeadSound();
-        showPushNotification('🎯 Novos Leads Recebidos!', 'Há novas interações aguardando no seu painel!');
-      }
-    }).catch(() => {});
+    if (!state.eventSource || state.eventSource.readyState === EventSource.CLOSED) {
+      initRealtimeEvents();
+    }
+    checkLatestNotifications();
   }
 });

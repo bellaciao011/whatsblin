@@ -111,16 +111,7 @@ router.get(['/', '/:slug'], (req, res) => {
       pressel_url: campaign.url_destino || campaign.presell_url || ''
     });
 
-    try {
-      const { eventBus } = require('../services/flowEngine');
-      eventBus.emit('new_lead', {
-        codigo,
-        platform,
-        campaign: campaign.nome || campaign.name || slug,
-        ttclid: ttclid || null,
-        timestamp: new Date().toISOString()
-      });
-    } catch(e) {}
+    // Cliques em links de campanha apenas registram atribuição (não geram alerta falso de lead)
     console.log(`[Universal Campaign Attribution] 🚀 Clique registrado (${platform.toUpperCase()}) na campanha "${campaign.nome || campaign.name}" (${slug}) | Código: ${codigo} | ttclid: ${ttclid || '-'} | fbclid: ${fbclid || '-'}`);
 
     // Monta a mensagem e a URL do WhatsApp de destino

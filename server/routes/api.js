@@ -2290,6 +2290,7 @@ router.get('/dashboard/stats', (req, res) => {
   res.json({
     kpis: {
       totalRevenue: totalRevenue.toFixed(2),
+      currency: (approvedSales[0]?.currency) || 'USD',
       salesCount: approvedSales.length,
       averageTicket: averageTicket.toFixed(2),
       totalLeads,
@@ -3218,6 +3219,7 @@ router.get('/notifications/latest', (req, res) => {
   try {
     const chats = db.getChats ? db.getChats() : {};
     const sessions = db.getWebChatSessions ? db.getWebChatSessions() : {};
+    const sales = db.getSales ? db.getSales() : [];
 
     let latestTime = 0;
     let latestLead = null;
@@ -3253,7 +3255,24 @@ router.get('/notifications/latest', (req, res) => {
       }
     });
 
-    res.json({ success: true, latestTime, latestLead });
+    let latestSaleTime = 0;
+    let latestSale = null;
+    sales.filter(s => s.status === 'aprovado').forEach(s => {
+      const st = new Date(s.timestamp || 0).getTime();
+      if (st > latestSaleTime) {
+        latestSaleTime = st;
+        latestSale = {
+          id: s.orderId || s.id,
+          amount: s.amount,
+          currency: s.currency || 'USD',
+          phone: s.phone,
+          email: s.email,
+          time: s.timestamp
+        };
+      }
+    });
+
+    res.json({ success: true, latestTime, latestLead, latestSaleTime, latestSale });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
