@@ -58,6 +58,8 @@ app.use((req, res, next) => {
     req.path.startsWith('/c/') ||
     req.path.startsWith('/chat') ||
     req.path.startsWith('/api/webchat/') ||
+    req.path.startsWith('/api/webhooks/') ||
+    req.path.startsWith('/webhook/') ||
     req.path.startsWith('/generated/') ||
     req.path.startsWith('/images/') ||
     req.path.startsWith('/css/') ||
@@ -92,7 +94,8 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/webhook', webhookRoutes);
 
 // Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
-app.post([
+// Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
+app.all([
   '/api/webhooks/payment',
   '/api/webhooks/checkout',
   '/api/webhooks/centerpag',

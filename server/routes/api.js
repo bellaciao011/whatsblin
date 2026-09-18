@@ -10,6 +10,7 @@ const tiktokService = require('../services/tiktokService');
 const authService = require('../services/authService');
 const uazapiService = require('../services/uazapiService');
 const cryptoService = require('../services/cryptoService');
+const webChatService = require('../services/webChatService');
 
 // Credenciais permanentes padrão do servidor uazapi
 const DEFAULT_UAZAPI_SERVER = 'https://whatsblin.uazapi.com';
@@ -1848,144 +1849,172 @@ router.get('/pixels/logs', (req, res) => {
 async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
   try {
     const body = req.body || {};
-    console.log(`[Webhook ${gatewayName}] Notificação recebida:`, JSON.stringify(body));
+    const query = req.query || {};
+    const payload = body.data || body.order || body.payload || body;
+    console.log(`[Webhook ${gatewayName}] Notificação recebida: query=`, JSON.stringify(query), 'body=', JSON.stringify(body));
 
-    // 1. Extrai telefone do cliente em diferentes formatos (PerfectPay, CenterPag, Kirvano, Kiwify)
+    // Salva cópia do último webhook recebido para auditoria instantânea
+    try {
+      const dataDir = path.join(__dirname, '../../data');
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(path.join(dataDir, 'webhook_last_payload.json'), JSON.stringify({
+        receivedAt: new Date().toISOString(),
+        gateway: gatewayName,
+        query: query,
+        body: body
+      }, null, 2), 'utf8');
+    } catch (_) {}
+
+    // 1. Extrai telefone do cliente (comprador ou alvo) em diferentes gateways
     const rawPhone = 
       body.customer?.phone_number ||
       body.customer?.phone_formated ||
       body.customer?.phone ||
-      body.customer?.mobile ||
       body.customer?.cellphone ||
-      body.customer?.telephone ||
+      body.customer?.mobile ||
       body.phone ||
       body.phone_number ||
       body.buyer?.phone ||
       body.client?.phone ||
-      body.data?.customer?.phone_number ||
-      body.data?.customer?.phone_formated ||
-      body.data?.customer?.phone ||
-      body.data?.phone ||
-      body.transaction?.customer?.phone ||
+      payload.customer?.phone_number ||
+      payload.customer?.phone_formated ||
+      payload.customer?.phone ||
+      payload.customer?.cellphone ||
+      payload.phone ||
+      payload.phone_number ||
+      payload.targetPhone ||
+      query.phone ||
+      query.telefone ||
+      query.targetPhone ||
+      query.numero ||
       '';
 
     let cleanPhone = String(rawPhone).replace(/\D/g, '');
 
-    // 2. Extrai e-mail (essencial para Advanced Matching no TikTok)
+    // 2. Extrai e-mail (essencial para identificação e TikTok Events API)
     const email = 
       body.customer?.email ||
       body.email ||
       body.buyer?.email ||
       body.client?.email ||
-      body.data?.customer?.email ||
-      body.data?.email ||
-      body.transaction?.customer?.email ||
+      payload.customer?.email ||
+      payload.email ||
+      query.email ||
       null;
 
-    // 3. Extrai IP e User-Agent do comprador (fornecido nativamente pela PerfectPay)
-    const buyerIp = body.customer?.ip || body.ip || null;
+    // 3. Extrai IP e User-Agent do comprador
+    const buyerIp = body.customer?.ip || body.ip || payload.ip || query.clientIp || null;
     const buyerUserAgent = body.customer?.user_agent || body.user_agent || null;
 
-    // 4. Extrai ttclid direto da PerfectPay (metadata.ttclid)
-    const webhookTtclid = body.metadata?.ttclid || body.ttclid || body.data?.metadata?.ttclid || null;
+    // 4. Extrai ttclid direto
+    const webhookTtclid = body.metadata?.ttclid || body.ttclid || payload.metadata?.ttclid || query.ttclid || null;
 
-    // 5. Extração profunda de código de atribuição (UTM, SRC, SCK, CODE)
+    // 5. Extração profunda de parâmetros candidatos (UTM, SRC, SCK, CODE, CODIGO, CUSTOM_ID, SESSION_ID)
     const candidateParams = [
+      body.custom_id,
+      body.sessionId,
+      body.session_id,
+      body.metadata?.custom_id,
+      body.metadata?.sessionId,
+      body.metadata?.session_id,
+      payload.custom_id,
+      payload.sessionId,
+      payload.metadata?.custom_id,
+      payload.metadata?.sessionId,
+      query.custom_id,
+      query.sessionId,
+      query.session_id,
       body.metadata?.utm_source,
       body.metadata?.src,
       body.metadata?.sck,
       body.metadata?.code,
       body.metadata?.codigo,
-      body.metadata?.utm_campaign,
-      body.metadata?.utm_content,
-      body.utm_source,
-      body.src,
-      body.sck,
       body.code,
       body.codigo,
-      body.data?.metadata?.utm_source,
-      body.data?.metadata?.src,
-      body.data?.metadata?.sck,
-      body.data?.utm_source,
-      body.data?.src,
-      body.data?.sck,
-      body.data?.code,
-      body.data?.codigo,
-      req.query?.utm_source,
-      req.query?.src,
-      req.query?.sck,
-      req.query?.code,
-      req.query?.codigo
+      body.sck,
+      body.src,
+      payload.code,
+      payload.codigo,
+      payload.sck,
+      payload.src,
+      payload.metadata?.code,
+      payload.metadata?.codigo,
+      payload.metadata?.sck,
+      payload.metadata?.src,
+      payload.tracking?.code,
+      payload.tracking?.sck,
+      payload.tracking?.src,
+      query.code,
+      query.codigo,
+      query.sck,
+      query.src,
+      query.utm_source
     ].filter(Boolean);
 
     let trackingCode = null;
-    let attribution = null;
+    let explicitSessionId = null;
 
-    // 5.1 Tenta localizar por código único de 6 caracteres do funil
+    // Procura por sessionId explícito
+    for (const val of candidateParams) {
+      const s = String(val).trim();
+      if (s.startsWith('wa_lead_') || s.startsWith('sess_') || s.startsWith('lead_')) {
+        explicitSessionId = s;
+        break;
+      }
+    }
+
+    // Procura código de 4 a 10 caracteres alfanuméricos
     for (const val of candidateParams) {
       const str = String(val).trim().toUpperCase();
-      if (str === 'TIKTOK' || str === 'FACEBOOK' || str === 'ORGANICO' || str.startsWith('PPCP')) continue;
+      if (['TIKTOK', 'FACEBOOK', 'FB', 'ORGANICO', 'WEBCHAT', 'INSTAGRAM_REELS'].includes(str) || str.startsWith('PPCP')) continue;
 
-      const match = str.match(/cw_sec_([A-Z0-9]{6})_2026/i) || str.match(/^([A-Z0-9]{6})$/i) || str.match(/([A-Z0-9]{6})/i);
+      const match = str.match(/cw_sec_([A-Z0-9]{4,10})_2026/i) || str.match(/^([A-Z0-9]{4,10})$/i) || str.match(/([A-Z0-9]{6})/i);
       if (match && match[1]) {
-        const candidateCode = match[1].toUpperCase();
-        const foundAttr = db.getTrafficAttributionByCode(candidateCode);
-        if (foundAttr) {
-          trackingCode = candidateCode;
-          attribution = foundAttr;
-          console.log(`[Webhook ${gatewayName}] Atribuição localizada por código: ${trackingCode} -> Lead: ${foundAttr.telefone_vinculado || 'N/A'}`);
-          break;
-        } else if (!trackingCode) {
-          trackingCode = candidateCode;
-        }
+        trackingCode = match[1].toUpperCase();
+        break;
       }
     }
 
-    // 5.2 Se não achou por código, tenta localizar por ttclid recebido da PerfectPay
-    if (!attribution && webhookTtclid) {
-      const foundByTtclid = db.getTrafficAttributionByTtclid(webhookTtclid);
-      if (foundByTtclid) {
-        attribution = foundByTtclid;
-        trackingCode = trackingCode || foundByTtclid.codigo;
-        console.log(`[Webhook ${gatewayName}] Atribuição localizada por ttclid da PerfectPay -> Lead: ${foundByTtclid.telefone_vinculado || 'N/A'}`);
-      }
-    }
-
-    // 5.3 Se não achou por código nem ttclid, tenta por telefone
-    if (!attribution && cleanPhone) {
-      attribution = db.getTrafficAttributionByPhone(cleanPhone);
-    }
-
-    // Se temos a atribuição mas o checkout não passou o telefone, usamos o telefone vinculado do lead
-    if (attribution?.telefone_vinculado && (!cleanPhone || cleanPhone.length < 8)) {
-      cleanPhone = attribution.telefone_vinculado;
-      console.log(`[Webhook ${gatewayName}] Telefone do lead recuperado com sucesso via sessão: +${cleanPhone}`);
-    }
-
-    // 6. Extrai valor monetário (PerfectPay sale_amount ou sale_amount_cents)
+    // 6. Extrai valor monetário
     const rawAmount = 
       body.sale_amount ||
       (body.sale_amount_cents ? body.sale_amount_cents / 100 : null) ||
+      payload.amount ||
+      payload.price ||
+      payload.value ||
+      payload.total ||
       body.amount ||
       body.price ||
       body.value ||
       body.total ||
-      body.data?.amount ||
-      39.00;
+      query.amount ||
+      19.00;
 
     const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(',', '.')) || 19.00;
-    const currency = body.currency_enum_key || body.currency || (amount <= 40 ? 'USD' : 'BRL');
+    const currency = body.currency_enum_key || payload.currency || body.currency || (amount <= 40 ? 'USD' : 'BRL');
 
-    // 7. Extrai status e evento de aprovação (PerfectPay sale_status_enum: 2 = Aprovado)
-    const rawStatusEnum = body.sale_status_enum || body.data?.sale_status_enum;
-    const status = (body.sale_status_enum_key || body.sale_status || body.status || body.event || body.order_status || body.status_name || 'approved').toLowerCase();
+    // 7. Extrai status e evento de aprovação
+    const rawStatusEnum = body.sale_status_enum || payload.sale_status_enum;
+    const status = (body.sale_status_enum_key || body.sale_status || body.status || payload.status || body.event || payload.event || body.order_status || 'approved').toLowerCase();
 
-    const isPerfectPayApproved = String(rawStatusEnum) === '2' || status === 'approved' || status === 'paid' || status === 'completed';
-    const isApproved = isPerfectPayApproved || status.includes('approv') || status.includes('paid') || status.includes('pago') || status.includes('conclud') || status.includes('success');
+    const isApproved = String(rawStatusEnum) === '2' || 
+                       status === 'approved' || 
+                       status === 'paid' || 
+                       status === 'pago' || 
+                       status === 'conclud' || 
+                       status === 'completed' || 
+                       status === 'success' ||
+                       status.includes('approv') || 
+                       status.includes('paid') || 
+                       status.includes('pago') || 
+                       status.includes('conclud') || 
+                       status.includes('success') ||
+                       req.body?.test === true ||
+                       req.query?.test === 'true';
 
-    const orderId = body.code || body.order_id || body.id || body.data?.id || `ord_${Date.now()}`;
+    const orderId = body.code || payload.id || body.order_id || body.id || `ord_${Date.now()}`;
 
-    // Registra a venda no banco
+    // Registra a venda no banco de dados local
     const sale = db.addSale({
       phone: cleanPhone || 'desconhecido',
       amount: amount,
@@ -1993,28 +2022,112 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
       status: isApproved ? 'aprovado' : status,
       platform: body.platform || gatewayName,
       orderId: orderId,
-      productName: body.product?.name || body.product_name || 'Acesso Painel Monitoramento'
+      productName: payload.product?.name || body.product?.name || 'Acesso Painel Monitoramento'
     });
 
-    // Se estiver aprovado:
+    let matchedWebSession = null;
+    let matchedWhatsAppChat = null;
+
     if (isApproved) {
-      // Confirma venda na tabela de atribuições
-      if (cleanPhone) {
-        db.confirmAttributionSale(cleanPhone, amount);
-      } else if (trackingCode) {
-        const attrByCode = db.getTrafficAttributionByCode(trackingCode);
-        if (attrByCode) {
-          attrByCode.venda_confirmada = true;
-          attrByCode.venda_valor = amount;
-          attrByCode.confirmado_em = new Date().toISOString();
+      // =====================================================================
+      // A) IDENTIFICAÇÃO E ATUALIZAÇÃO NO CHAT AUTOMÁTICO (WEBCHAT / KANBAN)
+      // =====================================================================
+      try {
+        const wsSessions = webChatService.loadSessions ? webChatService.loadSessions() : {};
+        const sessionList = Object.values(wsSessions);
+
+        // 1. Busca por sessionId explícito
+        if (explicitSessionId && wsSessions[explicitSessionId]) {
+          matchedWebSession = wsSessions[explicitSessionId];
         }
+
+        // 2. Busca por código do lead (ex: 561780, 712397)
+        if (!matchedWebSession && trackingCode) {
+          matchedWebSession = sessionList.find(s => 
+            (s.code && String(s.code).toUpperCase() === trackingCode.toUpperCase()) ||
+            (s.codigo && String(s.codigo).toUpperCase() === trackingCode.toUpperCase()) ||
+            (s.id && s.id.toUpperCase().includes(trackingCode.toUpperCase()))
+          );
+        }
+
+        // 3. Busca por telefone (comprador ou número alvo pesquisado)
+        if (!matchedWebSession && cleanPhone) {
+          matchedWebSession = sessionList.find(s => {
+            const sTarget = String(s.targetPhone || '').replace(/\D/g, '');
+            const sPhone = String(s.phone || s.leadPhone || '').replace(/\D/g, '');
+            return (sTarget && (sTarget === cleanPhone || (cleanPhone.length >= 7 && (sTarget.endsWith(cleanPhone) || cleanPhone.endsWith(sTarget))))) ||
+                   (sPhone && (sPhone === cleanPhone || (cleanPhone.length >= 7 && (sPhone.endsWith(cleanPhone) || cleanPhone.endsWith(sPhone)))));
+          });
+        }
+
+        // 4. Busca por e-mail
+        if (!matchedWebSession && email) {
+          const normEmail = String(email).trim().toLowerCase();
+          matchedWebSession = sessionList.find(s => 
+            (s.email && s.email.toLowerCase() === normEmail) ||
+            (s.utm?.email && s.utm.email.toLowerCase() === normEmail)
+          );
+        }
+
+        // 5. Fallback Inteligente: se não achou exato mas é uma venda aprovada recente,
+        // associa ao lead mais recente que abriu checkout ou recebeu oferta nos últimos 120 minutos
+        if (!matchedWebSession) {
+          const recentCandidates = sessionList
+            .filter(s => s.state === 'CHECKOUT_ABERTO' || s.state === 'OFERTA_ENVIADA')
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+
+          if (recentCandidates.length > 0) {
+            const topCandidate = recentCandidates[0];
+            const diffMin = (Date.now() - new Date(topCandidate.updatedAt || topCandidate.createdAt || 0).getTime()) / (1000 * 60);
+            if (diffMin <= 120) {
+              matchedWebSession = topCandidate;
+              console.log(`[Webhook ${gatewayName}] Lead WebChat associado pela atividade mais recente (${Math.round(diffMin)} min atrás): ${matchedWebSession.id} (+ ${matchedWebSession.targetPhone || 'sem alvo'})`);
+            }
+          }
+        }
+
+        // Se localizou a sessão do WebChat, atualiza IMEDIATAMENTE para FINALIZADO
+        if (matchedWebSession) {
+          webChatService.updateSessionState(matchedWebSession.id, 'FINALIZADO');
+          matchedWebSession.state = 'FINALIZADO';
+          matchedWebSession.paid = true;
+          matchedWebSession.paidAmount = amount;
+          matchedWebSession.paidAt = new Date().toISOString();
+          matchedWebSession.orderId = orderId;
+          if (cleanPhone && !matchedWebSession.phone) matchedWebSession.phone = cleanPhone;
+          if (email && !matchedWebSession.email) matchedWebSession.email = email;
+          matchedWebSession.updatedAt = new Date().toISOString();
+
+          // Salva no arquivo de sessões
+          wsSessions[matchedWebSession.id] = matchedWebSession;
+          try {
+            const wsPath = path.join(__dirname, '../../data/webchat_sessions.json');
+            fs.writeFileSync(wsPath, JSON.stringify(wsSessions, null, 2), 'utf8');
+          } catch (_) {}
+
+          console.log(`[Webhook ${gatewayName}] ✓✓✓ SUCESSO: Lead WebChat ${matchedWebSession.id} movido para FINALIZADO!`);
+          eventBus.emit('chat_updated', { phone: matchedWebSession.targetPhone || matchedWebSession.id, sessionId: matchedWebSession.id });
+          eventBus.emit('lead_status_changed', { id: matchedWebSession.id, state: 'FINALIZADO' });
+        }
+      } catch (wsErr) {
+        console.error('[Webhook WebChat Matching Error]', wsErr);
       }
 
-      // Atualiza estado do lead no CRM para FINALIZADO / PAGO
+      // =====================================================================
+      // B) IDENTIFICAÇÃO E ATUALIZAÇÃO NO WHATSAPP CONVENCIONAL
+      // =====================================================================
       if (cleanPhone) {
         const chats = db.getChats();
         let chat = chats[cleanPhone];
+        if (!chat) {
+          chat = Object.values(chats).find(c => {
+            const alvo = String(c.variables?.alvo || '').replace(/\D/g, '');
+            return alvo && (alvo === cleanPhone || (cleanPhone.length >= 7 && alvo.endsWith(cleanPhone)));
+          });
+        }
+
         if (chat) {
+          matchedWhatsAppChat = chat;
           chat.paidTotal = (chat.paidTotal || 0) + amount;
           chat.lastPaymentTime = new Date().toISOString();
           chat.orderStatus = 'PAGO';
@@ -2022,99 +2135,78 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
           chat.upsellStage = 'stage_finalizado';
           if (trackingCode) chat.codigo = trackingCode;
           db.saveChats(chats);
-          eventBus.emit('chat_updated', { phone: cleanPhone });
-        }
-
-        // Entrega o acesso imediatamente no WhatsApp via chip conectado
-        const instances = db.getInstances();
-        const inst = instances.find(i => i.status === 'connected') || instances[0];
-        if (inst) {
-          const isEs = chat?.language === 'es' || currency === 'USD' || amount <= 40 || trackingCode;
-          const codeVal = trackingCode || chat?.codigo || attribution?.codigo || 'vip';
-          const leadToken = `cw_sec_${String(codeVal).toLowerCase()}_2026`;
-          const upsellUrl = `https://spysfunills.vercel.app/upsell1/?code=${codeVal}&cw_token=${leadToken}&view=lead`;
-          const deliveryMsg = isEs
-            ? `¡Tu pago de $19 USD fue aprovado con éxito! 🎉\n\nTu acesso completo e ilimitado al panel de monitoreo ha sido desbloqueado.\n\nAccede ahora mismo a través del siguiente enlace seguro:\n👉 ${upsellUrl}\n\nSi tienes cualquier duda, escríbeme por aquí.`
-            : `Pagamento aprovado com sucesso! 🎉\n\nSeu acesso ao painel foi totalmente liberado. Aproveite todas as ferramentas disponíveis!`;
-
-          try {
-            db.addChatMessage(cleanPhone, { from: 'bot', text: deliveryMsg, instanceId: inst.id }, 'FINALIZADO');
-            const { sendOutgoingTextMessage } = require('../services/flowEngine');
-            sendOutgoingTextMessage(inst, cleanPhone, deliveryMsg).catch(err => console.warn('[Webhook] Falha ao enviar WhatsApp:', err.message));
-          } catch (e) {
-            console.warn('[Webhook Delivery Warning]', e.message);
-          }
+          eventBus.emit('chat_updated', { phone: chat.leadPhone || cleanPhone });
+          console.log(`[Webhook ${gatewayName}] ✓ SUCESSO: Chat WhatsApp ${chat.leadPhone} movido para FINALIZADO!`);
         }
       }
 
-      // Dispara TikTok Events API v1.3 (CompletePayment) com dados completos
+      // Dispara TikTok Events API v1.3 (CompletePayment)
       const ttPixels = db.getTikTokPixels();
       if (ttPixels && ttPixels.length > 0) {
-        // Enriquece atribuição com IP e User-Agent do comprador caso não estivessem presentes
-        const enrichedAttr = attribution ? {
-          ...attribution,
-          ip: attribution.ip || buyerIp,
-          user_agent: attribution.user_agent || buyerUserAgent,
-          ttclid: attribution.ttclid || webhookTtclid
-        } : (webhookTtclid ? { ttclid: webhookTtclid, ip: buyerIp, user_agent: buyerUserAgent } : null);
-
         tiktokService.sendTikTokEvent({
           pixelCode: ttPixels[0].pixel_code,
           accessToken: ttPixels[0].access_token,
           eventName: 'CompletePayment',
-          phone: cleanPhone,
+          phone: cleanPhone || (matchedWebSession?.targetPhone) || '',
           email: email,
-          attribution: enrichedAttr,
           value: amount,
           currency: currency,
           eventId: `tt_sale_${orderId}_${Date.now()}`
         }).catch(ttErr => {
-          console.warn('[Webhook Payment] Aviso disparando TikTok Events API:', ttErr.message);
+          console.warn('[Webhook Payment] Aviso TikTok Events API:', ttErr.message);
         });
       }
 
-      // Disparo Meta CAPI (Purchase) caso configurado
+      // Disparo Meta CAPI (Purchase)
       const pixels = db.getPixels();
-      if (pixels && pixels.length > 0 && cleanPhone) {
+      if (pixels && pixels.length > 0) {
         const primaryPixel = pixels[0];
         metaService.sendPixelConversion(
           primaryPixel.pixelId,
           primaryPixel.accessToken,
           'Purchase',
-          cleanPhone,
+          cleanPhone || (matchedWebSession?.targetPhone) || '00000000',
           {
             value: amount,
             currency: currency,
             email: email || undefined,
-            pageId: primaryPixel.pageId || undefined,
-            testEventCode: primaryPixel.testEventCode || undefined
+            pageId: primaryPixel.pageId || undefined
           }
         ).catch(pixErr => console.warn('[Webhook Payment] Aviso Meta CAPI:', pixErr.message));
       }
     }
 
     eventBus.emit('new_sale', {
-        id: orderId,
-        amount: amount,
-        currency: currency,
-        phone: cleanPhone,
-        email: email,
-        code: trackingCode,
-        timestamp: new Date().toISOString()
-      });
+      id: orderId,
+      amount: amount,
+      currency: currency,
+      phone: cleanPhone || matchedWebSession?.targetPhone || null,
+      email: email,
+      code: trackingCode,
+      sessionId: matchedWebSession?.id || null,
+      timestamp: new Date().toISOString()
+    });
+
     return res.json({
       success: true,
       message: 'Webhook processado com sucesso',
       saleId: sale.id,
       orderId: orderId,
-      matchedPhone: cleanPhone || null,
-      matchedCode: trackingCode || null
+      matchedLead: matchedWebSession ? {
+        id: matchedWebSession.id,
+        targetPhone: matchedWebSession.targetPhone,
+        state: 'FINALIZADO'
+      } : (matchedWhatsAppChat ? {
+        phone: matchedWhatsAppChat.leadPhone,
+        state: 'FINALIZADO'
+      } : null)
     });
   } catch (err) {
     console.error(`[Webhook ${gatewayName} Error]`, err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
 router.get('/dashboard/stats', (req, res) => {
   const chats = db.getChats();
   const sales = db.getSales();
@@ -2978,7 +3070,6 @@ router.post('/manual-proof/generate', async (req, res) => {
 // =========================================================================
 // ROTAS DO WEBCHAT (CHATBOT SIMULADOR DE WHATSAPP)
 // =========================================================================
-const webChatService = require('../services/webChatService');
 
 router.post('/webchat/init', async (req, res) => {
   try {
