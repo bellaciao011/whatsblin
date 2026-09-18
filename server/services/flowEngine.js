@@ -1129,7 +1129,19 @@ async function processIncomingMessage(instanceId, leadPhone, messageText, mediaA
   });
   eventBus.emit('new_message', { phone: cleanPhone, message: newMessage });
 
-  // 2. Executa o fluxo visual oficial configurado especificamente para este chip
+  // 2. Verifica se a instância está em modo Apenas Consulta de Foto ou se fluxo está desativado
+    const currentSettings = db.getSettings ? db.getSettings() : {};
+    const isLookupOnly = instance?.onlyPhotoLookup === true ||
+                         instance?.disableFlow === true ||
+                         instance?.assignedFlowId === 'none' ||
+                         currentSettings?.disableWhatsAppFlow === true;
+
+    if (isLookupOnly) {
+      console.log(`[FlowEngine] 🛡️ Chip "${instance?.name || 'UAZAPI'}" em modo APENAS CONSULTA DE FOTO. Disparo de fluxo no WhatsApp BLOQUEADO para +${cleanPhone}.`);
+      return;
+    }
+
+    // Executa o fluxo visual oficial configurado especificamente para este chip
     try {
       await executeFlowGraph(instance, cleanPhone, messageText, mediaAttachment);
     } catch (err) {

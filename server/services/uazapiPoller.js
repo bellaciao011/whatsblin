@@ -365,6 +365,13 @@ async function syncUazapiInstancesNow() {
                 db.saveChats(cc);
               }
 
+              // Verifica modo de proteção apenas consulta de foto
+              const currentSettings = db.getSettings ? db.getSettings() : {};
+              if (inst.onlyPhotoLookup || inst.disableFlow || inst.assignedFlowId === 'none' || currentSettings.disableWhatsAppFlow) {
+                console.log(`[uazapi Poller] 🛡️ Chip "${inst.name}" em modo Apenas Consulta de Foto. Mensagem de +${cleanPhone} não disparará fluxo.`);
+                continue;
+              }
+
               // Executa o motor de automação e IA em tempo real com quebra de objeções
               const mediaAttachment = mediaUrl ? { url: mediaUrl, type: m.messageType || 'image' } : null;
               await processIncomingMessage(

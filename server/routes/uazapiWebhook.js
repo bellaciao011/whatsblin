@@ -78,7 +78,11 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
         if (isNowConnected) {
           instance.status = 'connected';
           instance.connectedAt = Date.now();
-          instance.assignedFlowId = 'fluxo-espiao-es';
+          if (!instance.onlyPhotoLookup && !instance.disableFlow) {
+            instance.assignedFlowId = 'fluxo-espiao-es';
+          } else {
+            instance.assignedFlowId = 'none';
+          }
           clearChipDisconnectedCooldown(instance.id);
 
           const userPhone = connData.jid?.user || connData.user || connData.owner || connData.instance?.owner || (typeof connData.jid === 'string' ? connData.jid.split('@')[0].replace(/\D/g, '') : null);
@@ -289,6 +293,19 @@ router.post(['/uazapi', '/uazapi/*', '/', '/*'], async (req, res) => {
 
       // Encaminha para o motor de fluxo existente do WhatsHub Pro
       if (instance) {
+        const settings = db.getSettings ? db.getSettings() : {};
+        if (instance.onlyPhotoLookup || instance.disableFlow || instance.assignedFlowId === 'none' || settings.disableWhatsAppFlow) {
+          console.log(`[uazapi Webhook] 🛡️ Chip "${instLogName}" em modo Apenas Consulta de Foto. Mensagem de +${cleanPhone} não disparará fluxo.`);
+          db.addChatMessage(cleanPhone, {
+            id: msgId,
+            timestamp: new Date().toISOString(),
+            from: 'lead',
+            text: textBody,
+            instanceId: instance.id
+          });
+          continue;
+        }
+
         const chatBefore = db.getChat(cleanPhone);
         if (chatBefore) {
           chatBefore.lastProcessedTimestamp = Math.max(chatBefore.lastProcessedTimestamp || 0, msgTimeMs, Date.now());

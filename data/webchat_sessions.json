@@ -57,7 +57,7 @@
   "test_no_photo_1789662227487": {
     "id": "test_no_photo_1789662227487",
     "slug": "campanha",
-    "state": "OFERTA_ENVIADA",
+    "state": "CHECKOUT_ABERTO",
     "targetPhone": "34910000000",
     "photoUrl": null,
     "messages": [
@@ -106,6 +106,67 @@
       "clientIp": "83.50.100.10"
     },
     "createdAt": "2026-09-17T16:23:47.490Z",
-    "updatedAt": "2026-09-17T16:23:47.493Z"
+    "updatedAt": "2026-09-18T01:12:53.702Z",
+    "checkoutOpened": true,
+    "checkoutOpenedAt": "2026-09-18T01:12:53.702Z"
+  },
+  "lead_test_kanban_1789694223394": {
+    "id": "lead_test_kanban_1789694223394",
+    "slug": "campanha-teste-kanban",
+    "state": "FINALIZADO",
+    "targetPhone": "50761578213",
+    "photoUrl": "https://pps.whatsapp.net/v/t61.24694-24/796704617_2011595706194045_6784766239507797500_n.jpg?stp=dst-jpg_s96x96_tt6&ccb=11-4&oh=01_Q5Aa5gFCrarF4PvWZ4G3Zia2MPnVz6a-GW8ge-1XzL-h2Q7eOQ&oe=6AB8FCE2&_nc_sid=5e03e0&_nc_cat=107",
+    "messages": [
+      {
+        "from": "bot",
+        "text": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨",
+        "timestamp": "2026-09-18T01:17:03.396Z"
+      },
+      {
+        "from": "bot",
+        "text": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+        "timestamp": "2026-09-18T01:17:04.796Z"
+      },
+      {
+        "from": "user",
+        "text": "+50761578213",
+        "timestamp": "2026-09-18T01:17:03.427Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-18T01:17:07.360Z"
+      },
+      {
+        "from": "bot",
+        "text": "✓ Prueba con foto en el audio vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_50761578213_1789694227358.png",
+        "timestamp": "2026-09-18T01:17:07.360Z"
+      },
+      {
+        "from": "bot",
+        "text": "🔒 Tasa de desencriptación: $19 👇\n\nDatos del pago: Pago único y confidencial para desencriptar y liberar todos los audios, fotos y ubicaciones de inmediato.",
+        "checkoutUrl": "https://go.centerpag.com/PPU38CQG5EL?utm_source=tiktok_ads&utm_campaign=espiao_es_01&src=tiktok_ads&sck=tiktok_ads",
+        "amount": "19",
+        "timestamp": "2026-09-18T01:17:07.360Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues la tasa de desencriptación, envíame el comprobante por aquí para activar tu acceso de inmediato!",
+        "timestamp": "2026-09-18T01:17:07.360Z"
+      }
+    ],
+    "utm": {
+      "slug": "campanha-teste-kanban",
+      "utm_source": "tiktok_ads",
+      "utm_campaign": "espiao_es_01"
+    },
+    "createdAt": "2026-09-18T01:17:03.396Z",
+    "updatedAt": "2026-09-18T01:17:07.403Z",
+    "checkoutOpened": true,
+    "checkoutOpenedAt": "2026-09-18T01:17:07.384Z",
+    "paid": true,
+    "paidAt": "2026-09-18T01:17:07.403Z"
   }
 }

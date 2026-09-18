@@ -339,10 +339,182 @@ function updateConfig(newConfig = {}) {
   return getWebChatConfig();
 }
 
+
+/**
+ * Registra eventos em tempo real do WebChat (ex: clique no botão de checkout)
+ */
+function registerEvent(sessionId, eventType, eventData = {}) {
+  const sessions = loadSessions();
+  const session = sessions[sessionId];
+  if (!session) return { success: false, error: 'Sessão não encontrada' };
+
+  if (eventType === 'checkout_click') {
+    session.checkoutOpened = true;
+    session.checkoutOpenedAt = new Date().toISOString();
+    if (session.state === 'OFERTA_ENVIADA' || session.state === 'NEGOCIACAO') {
+      session.state = 'CHECKOUT_ABERTO';
+    }
+  }
+
+  session.updatedAt = new Date().toISOString();
+  sessions[sessionId] = session;
+  saveSessions(sessions);
+  console.log(`[WebChat Event] ⚡ Evento registrado para sessão ${sessionId}: ${eventType}`);
+  return { success: true, session };
+}
+
+/**
+ * Retorna dados estruturados e métricas para o Kanban dedicado do Fluxo Automático
+ */
+function getWebChatKanbanData(filters = {}) {
+  const sessions = loadSessions();
+  const allList = Object.values(sessions).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+
+  // Extrai todas as campanhas e origens para os filtros da Dashboard
+  const campaignSet = new Set();
+  const sourceSet = new Set();
+
+  allList.forEach(s => {
+    if (s.slug) campaignSet.add(s.slug);
+    if (s.utm?.utm_campaign) campaignSet.add(s.utm.utm_campaign);
+    const src = s.utm?.utm_source || s.utm?.src;
+    if (src) sourceSet.add(src);
+  });
+
+  const period = filters.period || 'all';
+  const campaign = (filters.campaign || 'all').toLowerCase();
+  const source = (filters.source || 'all').toLowerCase();
+  const search = (filters.search || '').toLowerCase().trim();
+
+  const filtered = allList.filter(s => {
+    const timeMs = new Date(s.createdAt || s.updatedAt || 0).getTime();
+
+    // Filtro de período
+    if (period === 'today' && timeMs < startOfToday) return false;
+    if (period === 'yesterday' && (timeMs < startOfYesterday || timeMs >= startOfToday)) return false;
+    if (period === '7days' && timeMs < sevenDaysAgo) return false;
+    if (period === '30days' && timeMs < thirtyDaysAgo) return false;
+
+    // Filtro de campanha / slug
+    if (campaign !== 'all') {
+      const sSlug = (s.slug || '').toLowerCase();
+      const sCamp = (s.utm?.utm_campaign || '').toLowerCase();
+      if (sSlug !== campaign && sCamp !== campaign) return false;
+    }
+
+    // Filtro de origem / UTM Source
+    if (source !== 'all') {
+      const sSrc = (s.utm?.utm_source || s.utm?.src || '').toLowerCase();
+      if (sSrc !== source) return false;
+    }
+
+    // Busca textual por telefone ou ID
+    if (search) {
+      const matchId = (s.id || '').toLowerCase().includes(search);
+      const matchPhone = (s.targetPhone || '').toLowerCase().includes(search);
+      const matchSlug = (s.slug || '').toLowerCase().includes(search);
+      if (!matchId && !matchPhone && !matchSlug) return false;
+    }
+
+    return true;
+  });
+
+  // Distribui as sessões nas 5 colunas do funil do Chatbot Web
+  const columns = {
+    chegaram: [],
+    mandaram_mensagem: [],
+    foram_checkout: [],
+    abriram_checkout: [],
+    finalizado: []
+  };
+
+  filtered.forEach(s => {
+    if (s.state === 'FINALIZADO') {
+      columns.finalizado.push(s);
+    } else if (s.state === 'CHECKOUT_ABERTO' || s.checkoutOpened) {
+      columns.abriram_checkout.push(s);
+    } else if (s.state === 'OFERTA_ENVIADA' || s.state === 'NEGOCIACAO') {
+      columns.foram_checkout.push(s);
+    } else if (s.state === 'ANALISANDO' || s.targetPhone) {
+      columns.mandaram_mensagem.push(s);
+    } else {
+      columns.chegaram.push(s);
+    }
+  });
+
+  // Métricas Consolidadas do Funil
+  const totalVisitors = filtered.length;
+  const totalMessaged = filtered.filter(s => s.targetPhone || ['ANALISANDO', 'OFERTA_ENVIADA', 'NEGOCIACAO', 'CHECKOUT_ABERTO', 'FINALIZADO'].includes(s.state)).length;
+  const totalReachedCheckout = filtered.filter(s => ['OFERTA_ENVIADA', 'NEGOCIACAO', 'CHECKOUT_ABERTO', 'FINALIZADO'].includes(s.state)).length;
+  const totalOpenedCheckout = filtered.filter(s => s.checkoutOpened || ['CHECKOUT_ABERTO', 'FINALIZADO'].includes(s.state)).length;
+  const totalPaid = columns.finalizado.length;
+
+  const metrics = {
+    totalVisitors,
+    totalMessaged,
+    totalReachedCheckout,
+    totalOpenedCheckout,
+    totalPaid,
+    rateMessaged: totalVisitors > 0 ? ((totalMessaged / totalVisitors) * 100).toFixed(1) : '0.0',
+    rateReachedCheckout: totalVisitors > 0 ? ((totalReachedCheckout / totalVisitors) * 100).toFixed(1) : '0.0',
+    rateOpenedCheckout: totalReachedCheckout > 0 ? ((totalOpenedCheckout / totalReachedCheckout) * 100).toFixed(1) : '0.0',
+    rateFinalConversion: totalVisitors > 0 ? ((totalPaid / totalVisitors) * 100).toFixed(1) : '0.0'
+  };
+
+  return {
+    success: true,
+    metrics,
+    columns,
+    counts: {
+      chegaram: columns.chegaram.length,
+      mandaram_mensagem: columns.mandaram_mensagem.length,
+      foram_checkout: columns.foram_checkout.length,
+      abriram_checkout: columns.abriram_checkout.length,
+      finalizado: columns.finalizado.length
+    },
+    campaigns: Array.from(campaignSet),
+    sources: Array.from(sourceSet),
+    totalFiltered: filtered.length
+  };
+}
+
+
+/**
+ * Atualiza manualmente o estado de uma sessão (ex: via Kanban para 'FINALIZADO')
+ */
+function updateSessionState(sessionId, newState) {
+  const sessions = loadSessions();
+  const session = sessions[sessionId];
+  if (!session) return { success: false, error: 'Sessão não encontrada' };
+
+  session.state = newState;
+  if (newState === 'FINALIZADO') {
+    session.paid = true;
+    session.paidAt = new Date().toISOString();
+  } else if (newState === 'CHECKOUT_ABERTO') {
+    session.checkoutOpened = true;
+    session.checkoutOpenedAt = session.checkoutOpenedAt || new Date().toISOString();
+  }
+  session.updatedAt = new Date().toISOString();
+  sessions[sessionId] = session;
+  saveSessions(sessions);
+  console.log(`[WebChat State] Status da sessão ${sessionId} alterado para ${newState}`);
+  return { success: true, session };
+}
+
 module.exports = {
   getWebChatConfig,
   initSession,
   handleIncomingMessage,
   getAllSessions,
-  updateConfig
+  updateConfig,
+  registerEvent,
+  getWebChatKanbanData,
+  updateSessionState
 };

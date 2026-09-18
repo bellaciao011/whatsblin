@@ -3026,4 +3026,44 @@ router.post('/webchat/config', (req, res) => {
   }
 });
 
+// Endpoint para registrar eventos do WebChat (ex: clique no checkout)
+router.post('/webchat/event', async (req, res) => {
+  try {
+    const { sessionId, eventType, event, ...eventData } = req.body || {};
+    const type = eventType || event || 'checkout_click';
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId é obrigatório' });
+    }
+    const result = webChatService.registerEvent(sessionId, type, eventData);
+    res.json(result);
+  } catch (err) {
+    console.error('[WebChat Event Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint para obter métricas, colunas e filtros do Kanban dedicado do Fluxo Automático
+router.get('/webchat/kanban', (req, res) => {
+  try {
+    const data = webChatService.getWebChatKanbanData(req.query);
+    res.json(data);
+  } catch (err) {
+    console.error('[WebChat Kanban Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint para atualizar estado manual de uma sessão no Kanban
+router.patch('/webchat/sessions/:id/status', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { state } = req.body;
+    if (!state) return res.status(400).json({ success: false, error: 'state é obrigatório' });
+    const result = webChatService.updateSessionState(id, state);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

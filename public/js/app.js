@@ -423,6 +423,7 @@ function handleRoute() {
     overview: '📊 Dashboard — Visão Geral & Conversão',
     'fluxo-ao-vivo': '🔴 Fluxo ao Vivo — Monitoramento em Tempo Real (Leads & Partículas)',
     'fluxo-automatico': '🤖 Fluxo Automático — Chatbot Web (Simulador WhatsApp)',
+    'kanban-fluxo': '🗂️ Kanban do Fluxo Automático — Funil do Chatbot Web',
     inbox: '💬 Chats ao vivo',
     kanban: '🗂️ Kanban de Atendimento',
     contacts: '👥 Contatos & Leads',
@@ -465,6 +466,7 @@ function handleRoute() {
   if (route === 'overview') renderOverview();
   else if (route === 'fluxo-ao-vivo') renderLiveFlow();
   else if (route === 'fluxo-automatico') renderFluxoAutomatico();
+  else if (route === 'kanban-fluxo') renderKanbanFluxo();
   else if (route === 'inbox') renderInbox();
   else if (route === 'kanban') renderKanban();
   else if (route === 'contacts') renderContacts();
@@ -2291,22 +2293,30 @@ async function renderInstances() {
                   </span>
                 </div>
 
-                <!-- Vínculo Estrito de Fluxo (Multilíngue) -->
-                <div style="margin-bottom: 14px; padding: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm);">
+                <!-- Vínculo Estrito de Fluxo (Multilíngue) & Proteção Apenas Consulta de Foto -->
+                <div style="margin-bottom: 14px; padding: 12px; background: ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)'}; border: 1px solid ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.25)'}; border-radius: var(--radius-sm);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <label style="font-size: 11.5px; font-weight: 700; color: #93c5fd; display: flex; align-items: center; gap: 5px;">
-                      <span>🎯 Fluxo de Mensagens:</span>
+                    <label style="font-size: 11.5px; font-weight: 700; color: ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? '#34d399' : '#93c5fd'}; display: flex; align-items: center; gap: 5px;">
+                      <span>${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? '🛡️ Modo de Operação:' : '🎯 Fluxo de Mensagens:'}</span>
                     </label>
-                    <span style="font-size: 10.5px; color: #34d399; font-weight: 600; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">
-                      🔒 Ativo & Vinculado
+                    <span style="font-size: 10px; color: ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? '#34d399' : '#38bdf8'}; font-weight: 700; background: ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.15)'}; padding: 2px 7px; border-radius: 5px; border: 1px solid ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'rgba(16,185,129,0.4)' : 'transparent'};">
+                      ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? '🛡️ APENAS CONSULTA DE FOTO' : '🔒 FLUXO ATIVO'}
                     </span>
                   </div>
-                  <select class="form-input" style="font-size: 12.5px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: rgba(59,130,246,0.4); background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
-                    <option value="fluxo-espiao-es" selected>🇪🇸 Funil Oficial - Mavrol Empresarial (Español)</option>
+                  <select class="form-input" style="font-size: 12px; padding: 7px 10px; font-weight: 600; cursor: pointer; border-color: ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'rgba(16,185,129,0.5)' : 'rgba(59,130,246,0.4)'}; background: var(--bg-card); color: #fff; width: 100%;" onchange="updateChipFlow('${i.id}', this.value)">
+                    <option value="none" ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? 'selected' : ''}>🛡️ Apenas Consulta de Foto (NÃO dispara mensagens no WhatsApp)</option>
+                    <option value="fluxo-espiao-es" ${(!i.onlyPhotoLookup && i.assignedFlowId === 'fluxo-espiao-es') ? 'selected' : ''}>🇪🇸 Funil Oficial - Mavrol Empresarial (Español)</option>
                   </select>
-                  <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
-                    As conversas deste número acionam <strong>exclusivamente</strong> este fluxo para evitar qualquer mistura.
-                  </div>
+                  ${(i.onlyPhotoLookup || i.assignedFlowId === 'none') ? `
+                    <div style="font-size: 11px; color: #34d399; margin-top: 6px; line-height: 1.35; display: flex; align-items: flex-start; gap: 6px; background: rgba(16,185,129,0.1); padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.25);">
+                      <span>🛡️</span>
+                      <span><strong>Modo Silencioso Ativo:</strong> Este chip serve estritamente para buscar fotos de perfil de alvos na API do WhatsApp. Qualquer fluxo automático ou disparo para este número está <strong>100% bloqueado</strong>.</span>
+                    </div>
+                  ` : `
+                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.3;">
+                      As conversas deste número acionam o funil oficial selecionado.
+                    </div>
+                  `}
                 </div>
                 
                 <div style="font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); margin-bottom: 16px;">
@@ -6319,26 +6329,116 @@ window.copyProofLink = function(url) {
 // =========================================================================
 // ABA FLUXO AUTOMÁTICO (CHATBOT WEB SIMULADOR DE WHATSAPP)
 // =========================================================================
-window.renderFluxoAutomatico = async function() {
+// Estado global dos filtros do Kanban do Fluxo Automático
+window.fluxoKanbanFilters = window.fluxoKanbanFilters || {
+  period: 'all',
+  campaign: 'all',
+  source: 'all',
+  search: ''
+};
+window.fluxoAutoTab = window.fluxoAutoTab || 'kanban';
+
+window.renderKanbanFluxo = function() {
+  window.fluxoAutoTab = 'kanban';
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.switchFluxoAutoTab = function(tab) {
+  window.fluxoAutoTab = tab;
+  window.renderFluxoAutomatico(tab);
+};
+
+window.setFluxoPeriodFilter = function(period) {
+  window.fluxoKanbanFilters.period = period;
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.setFluxoCampaignFilter = function(campaign) {
+  window.fluxoKanbanFilters.campaign = campaign;
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.setFluxoSourceFilter = function(source) {
+  window.fluxoKanbanFilters.source = source;
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.setFluxoSearchFilter = function(search) {
+  window.fluxoKanbanFilters.search = search;
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.resetFluxoFilters = function() {
+  window.fluxoKanbanFilters = { period: 'all', campaign: 'all', source: 'all', search: '' };
+  window.renderFluxoAutomatico('kanban');
+};
+
+window.markWebChatSessionStatus = async function(sessionId, newStatus) {
+  try {
+    const res = await fetch(`/api/webchat/sessions/${sessionId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: newStatus })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Lead atualizado para: ${newStatus}`, 'success');
+      window.renderFluxoAutomatico('kanban');
+    } else {
+      showToast('Erro ao atualizar lead: ' + (data.error || 'Erro desconhecido'), 'error');
+    }
+  } catch(e) {
+    showToast('Erro na requisição: ' + e.message, 'error');
+  }
+};
+
+window.renderFluxoAutomatico = async function(forcedTab) {
+  if (forcedTab) window.fluxoAutoTab = forcedTab;
+  const activeTab = window.fluxoAutoTab || 'kanban';
   const container = document.getElementById('view-container');
   container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;"><div class="spinner" style="width: 24px; height: 24px; margin: 0 auto 12px auto;"></div>Carregando dados do Fluxo Automático...</div>';
 
   try {
-    const [configRes, sessionsRes] = await Promise.all([
+    const filters = window.fluxoKanbanFilters;
+    const queryStr = new URLSearchParams({
+      period: filters.period || 'all',
+      campaign: filters.campaign || 'all',
+      source: filters.source || 'all',
+      search: filters.search || ''
+    }).toString();
+
+    const [configRes, kanbanRes] = await Promise.all([
       fetch('/api/webchat/config').then(r => r.json()).catch(() => ({ config: {} })),
-      fetch('/api/webchat/sessions?limit=50').then(r => r.json()).catch(() => ({ sessions: [] }))
+      fetch(`/api/webchat/kanban?${queryStr}`).then(r => r.json()).catch(() => ({ success: false, columns: {}, metrics: {}, counts: {} }))
     ]);
 
     const config = configRes.config || {};
-    const sessions = sessionsRes.sessions || [];
+    const kanbanData = kanbanRes || {};
+    const metrics = kanbanData.metrics || { totalVisitors: 0, totalMessaged: 0, totalReachedCheckout: 0, totalOpenedCheckout: 0, totalPaid: 0, rateMessaged: '0.0', rateReachedCheckout: '0.0', rateOpenedCheckout: '0.0', rateFinalConversion: '0.0' };
+    const counts = kanbanData.counts || { chegaram: 0, mandaram_mensagem: 0, foram_checkout: 0, abriram_checkout: 0, finalizado: 0 };
+    const columns = kanbanData.columns || { chegaram: [], mandaram_mensagem: [], foram_checkout: [], abriram_checkout: [], finalizado: [] };
+    const campaigns = kanbanData.campaigns || [];
+    const sources = kanbanData.sources || [];
 
     const host = window.location.origin;
     const directChatUrl = `${host}/chat/campanha`;
     const campaignLinkUrl = `${host}/c/campanha`;
 
+    const formatRelativeTime = (iso) => {
+      if (!iso) return '-';
+      const diff = Date.now() - new Date(iso).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'Agora mesmo';
+      if (mins < 60) return `Há ${mins}m`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `Há ${hours}h`;
+      const days = Math.floor(hours / 24);
+      return `Há ${days}d`;
+    };
+
     container.innerHTML = `
       <!-- Header Banner do Chatbot Web -->
-      <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(13, 13, 20, 0.95) 100%); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);">
+      <div class="card" style="margin-bottom: 20px; border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(13, 13, 20, 0.95) 100%); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
           <div style="display: flex; align-items: center; gap: 14px;">
             <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);">
@@ -6346,11 +6446,11 @@ window.renderFluxoAutomatico = async function() {
             </div>
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">Fluxo Automático (Chatbot Web)</h2>
+                <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">Fluxo Automático & Kanban (Chatbot Web)</h2>
                 <span class="badge" style="background: #10b981; color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 700;">🟢 Ativo</span>
               </div>
               <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 0 0;">
-                Simulador 100% idêntico ao WhatsApp direto no navegador. Seus leads conversam com a IA, recebem a prova com foto do alvo e o checkout de $19 automaticamente.
+                Acompanhe em tempo real os leads do funil automático: quantos chegaram, quantos mandaram mensagem, quantos receberam e abriram o checkout.
               </p>
             </div>
           </div>
@@ -6358,180 +6458,343 @@ window.renderFluxoAutomatico = async function() {
             <a href="${directChatUrl}" target="_blank" class="btn btn-primary" style="background: #10b981; border: none; font-weight: 700; display: flex; align-items: center; gap: 8px; padding: 9px 16px;">
               <span>🚀</span> <span>Abrir Chatbot Web</span>
             </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Grid: Modo de Operação + Links Rápidos -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <!-- Card 1: Modo de Destino da Campanha -->
-        <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
-          <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-              <span>⚙️</span> <span>Modo de Operação do Link da Campanha</span>
-            </h3>
-          </div>
-          <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
-            Escolha o destino dos leads que clicam nos anúncios do Meta/TikTok ((/c/:slug)):
-          </p>
-
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(16,185,129,0.08); border: 1px solid ${config.campaignMode === 'webchat' ? '#10b981' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
-              <input type="radio" name="campMode" value="webchat" ${config.campaignMode !== 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('webchat')" style="accent-color: #10b981; margin-top: 3px;">
-              <div>
-                <strong style="color: #34d399; font-size: 13.5px; display: block;">🌐 Chatbot no Navegador (Recomendado)</strong>
-                <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px;">Abre a tela do WhatsApp direto no navegador. Converte mesmo sem WhatsApp conectado e com zero atrito!</span>
-              </div>
-            </label>
-
-            <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(0,0,0,0.25); border: 1px solid ${config.campaignMode === 'whatsapp' ? '#a855f7' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
-              <input type="radio" name="campMode" value="whatsapp" ${config.campaignMode === 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('whatsapp')" style="accent-color: #a855f7; margin-top: 3px;">
-              <div>
-                <strong style="color: #e2e8f0; font-size: 13.5px; display: block;">📱 WhatsApp Físico (App Externo)</strong>
-                <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 2px;">Redireciona para o aplicativo WhatsApp do celular (wa.me).</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Card 2: Links de Divulgação -->
-        <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
-          <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-              <span>🔗</span> <span>Links de Divulgação & Testes</span>
-            </h3>
-          </div>
-
-          <div style="margin-bottom: 14px;">
-            <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link Direto do Chatbot Web:</label>
-            <div style="display: flex; gap: 8px;">
-              <input type="text" readonly value="${directChatUrl}" id="link-direct-chat" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #34d399; font-weight: 600;" />
-              <button type="button" class="btn btn-secondary" onclick="copyInputText('link-direct-chat')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
-            </div>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link de Campanha (/c/:slug):</label>
-            <div style="display: flex; gap: 8px;">
-              <input type="text" readonly value="${campaignLinkUrl}" id="link-camp-slug" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #cbd5e1;" />
-              <button type="button" class="btn btn-secondary" onclick="copyInputText('link-camp-slug')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
-            </div>
-          </div>
-
-          <div style="display: flex; gap: 10px;">
-            <a href="${directChatUrl}" target="_blank" class="btn btn-primary" style="flex: 1; text-align: center; justify-content: center; background: #8b5cf6; border: none; font-size: 13px; font-weight: 700;">
-              🧪 Testar Simulação Agora
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 3: Personalização da Atendente -->
-      <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.08);">
-        <div class="card-header" style="padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
-          <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-            <span>👩‍💼</span> <span>Personalização da Atendente & Oferta</span>
-          </h3>
-        </div>
-
-        <form id="form-webchat-config" onsubmit="event.preventDefault(); saveWebChatFullConfig();">
-          <div style="display: grid; grid-template-columns: 220px 1fr 140px; gap: 16px; margin-bottom: 16px;">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Nome da Atendente:</label>
-              <input type="text" id="cfg-attendant-name" class="form-input" value="${config.attendantName || 'Maria Carvalho'}" required />
-            </div>
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">URL da Foto de Perfil da Atendente:</label>
-              <input type="url" id="cfg-attendant-avatar" class="form-input" value="${config.attendantAvatar || ''}" placeholder="https://..." />
-            </div>
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Valor Oferta ($):</label>
-              <input type="text" id="cfg-offer-amount" class="form-input" value="${config.offerAmount || '19'}" required />
-            </div>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Mensagem de Boas-Vindas Inicial:</label>
-            <textarea id="cfg-welcome-msg" class="form-input" rows="2" style="width: 100%; resize: vertical;">${config.welcomeMessage || '¡Hola! 👋 Mucho gusto. ¿Cómo te llamas y qué número te gustaría investigar hoy?'}</textarea>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end;">
-            <button type="submit" id="btn-save-webchat-cfg" class="btn btn-primary" style="background: #10b981; border: none; font-weight: 700; padding: 8px 20px;">
-              💾 Salvar Configurações
+            <button type="button" class="btn btn-secondary" onclick="renderFluxoAutomatico()" style="padding: 9px 14px; font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span>🔄</span> <span>Atualizar Dados</span>
             </button>
           </div>
-        </form>
-      </div>
-
-      <!-- Card 4: Tabela de Leads & Conversas do Chatbot Web -->
-      <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
-        <div class="card-header" style="padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
-          <div>
-            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-              <span>💬</span> <span>Leads & Conversas no Chatbot Web (${sessions.length})</span>
-            </h3>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Histórico de interações em tempo real no simulador</div>
-          </div>
-          <button type="button" class="btn btn-secondary" onclick="renderFluxoAutomatico()" style="font-size: 12px; padding: 6px 12px;">🔄 Atualizar</button>
         </div>
 
-        ${sessions.length === 0 ? `
-          <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
-            Nenhuma sessão registrada ainda. Abra o link do chatbot para testar!
-          </div>
-        ` : `
-          <div class="table-responsive">
-            <table class="table" style="width: 100%; font-size: 13px;">
-              <thead>
-                <tr>
-                  <th>Data/Hora</th>
-                  <th>Sessão / Lead</th>
-                  <th>Alvo Investigado</th>
-                  <th>Foto do Alvo</th>
-                  <th>Status</th>
-                  <th>Total Msgs</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${sessions.map(s => {
-                  const dateStr = s.updatedAt ? new Date(s.updatedAt).toLocaleString('pt-BR') : '-';
-                  return `
-                    <tr>
-                      <td>${dateStr}</td>
-                      <td><strong>${s.id}</strong></td>
-                      <td>${s.targetPhone ? '+' + s.targetPhone : '<span style="color: #64748b;">Aguardando número</span>'}</td>
-                      <td>
-                        ${s.photoUrl ? `<img src="${s.photoUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #10b981;">` : '<span style="color: #64748b;">-</span>'}
-                      </td>
-                      <td>
-                        <span class="badge" style="background: ${s.state === 'OFERTA_ENVIADA' ? 'rgba(16,185,129,0.2)' : 'rgba(139,92,246,0.2)'}; color: ${s.state === 'OFERTA_ENVIADA' ? '#34d399' : '#c084fc'};">
-                          ${s.state}
-                        </span>
-                      </td>
-                      <td>${s.messages ? s.messages.length : 0}</td>
-                      <td>
-                        <button type="button" class="btn btn-secondary" onclick="viewWebChatHistory('${s.id}')" style="font-size: 11.5px; padding: 4px 10px;">
-                          👁️ Ver Chat
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `}
+        <!-- Seletor de Abas: Kanban vs Configurações -->
+        <div style="display: flex; gap: 10px; margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+          <button type="button" class="btn ${activeTab === 'kanban' ? 'btn-primary' : 'btn-secondary'}" onclick="switchFluxoAutoTab('kanban')" style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; ${activeTab === 'kanban' ? 'background: #38bdf8; border-color: #38bdf8; color: #020617;' : ''}">
+            <span>🗂️</span> <span>Kanban & Funil do Fluxo</span>
+            <span class="badge" style="background: ${activeTab === 'kanban' ? '#0f172a' : 'rgba(255,255,255,0.1)'}; color: #fff; font-size: 11px; padding: 2px 7px;">${kanbanData.totalFiltered || 0}</span>
+          </button>
+          <button type="button" class="btn ${activeTab === 'config' ? 'btn-primary' : 'btn-secondary'}" onclick="switchFluxoAutoTab('config')" style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; ${activeTab === 'config' ? 'background: #10b981; border-color: #10b981;' : ''}">
+            <span>⚙️</span> <span>Links de Campanha & Atendente</span>
+          </button>
+        </div>
       </div>
+
+      ${activeTab === 'kanban' ? `
+        <!-- KPI METRICS BAR (FUNIL COMPLETO) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
+          <!-- 1. Chegaram -->
+          <div class="card" style="margin: 0; padding: 16px; background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">1. Chegaram</span>
+              <span style="font-size: 18px;">🌐</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #f8fafc; margin: 8px 0 4px 0;">${metrics.totalVisitors}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: #64748b;">Visitantes no Chat</span>
+              <span class="badge" style="background: rgba(100, 116, 139, 0.2); color: #cbd5e1; font-weight: 700;">100% topo</span>
+            </div>
+          </div>
+
+          <!-- 2. Mandaram Mensagem -->
+          <div class="card" style="margin: 0; padding: 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">2. Mandaram Msg</span>
+              <span style="font-size: 18px;">💬</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #38bdf8; margin: 8px 0 4px 0;">${metrics.totalMessaged}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: #94a3b8;">Enviaram o alvo</span>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;">${metrics.rateMessaged}% retenção</span>
+            </div>
+          </div>
+
+          <!-- 3. Foram até o Checkout -->
+          <div class="card" style="margin: 0; padding: 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span style="font-size: 12px; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px;">3. Foram ao Checkout</span>
+              <span style="font-size: 18px;">⚡</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #fbbf24; margin: 8px 0 4px 0;">${metrics.totalReachedCheckout}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: #94a3b8;">Receberam a Prova</span>
+              <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-weight: 700;">${metrics.rateReachedCheckout}% do total</span>
+            </div>
+          </div>
+
+          <!-- 4. Abriram o Checkout -->
+          <div class="card" style="margin: 0; padding: 16px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.5px;">4. Abriram Checkout</span>
+              <span style="font-size: 18px;">🛒</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #c084fc; margin: 8px 0 4px 0;">${metrics.totalOpenedCheckout}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: #94a3b8;">Clicaram na Taxa</span>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-weight: 700;">${metrics.rateOpenedCheckout}% dos que viram</span>
+            </div>
+          </div>
+
+          <!-- 5. Finalizado / Vendas -->
+          <div class="card" style="margin: 0; padding: 16px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.5px;">5. Finalizado</span>
+              <span style="font-size: 18px;">✅</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: #34d399; margin: 8px 0 4px 0;">${metrics.totalPaid}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: #94a3b8;">Conversão Total</span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 700;">${metrics.rateFinalConversion}% final</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FILTROS DINÂMICOS DO FLUXO AUTOMÁTICO -->
+        <div class="card" style="margin-bottom: 20px; padding: 14px 18px; border: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.6);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <!-- Filtro de Período -->
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-size: 12px; font-weight: 700; color: #94a3b8; margin-right: 4px;">📅 Período:</span>
+              <button type="button" class="btn ${filters.period === 'today' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('today')" style="padding: 5px 10px; font-size: 12px; ${filters.period === 'today' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">Hoje</button>
+              <button type="button" class="btn ${filters.period === 'yesterday' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('yesterday')" style="padding: 5px 10px; font-size: 12px; ${filters.period === 'yesterday' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">Ontem</button>
+              <button type="button" class="btn ${filters.period === '7days' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('7days')" style="padding: 5px 10px; font-size: 12px; ${filters.period === '7days' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">7 Dias</button>
+              <button type="button" class="btn ${filters.period === '30days' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('30days')" style="padding: 5px 10px; font-size: 12px; ${filters.period === '30days' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">30 Dias</button>
+              <button type="button" class="btn ${filters.period === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('all')" style="padding: 5px 10px; font-size: 12px; ${filters.period === 'all' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">Todos</button>
+            </div>
+
+            <!-- Filtros de Campanha, Origem e Busca -->
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+              <!-- Dropdown de Campanhas -->
+              <div style="min-width: 140px;">
+                <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoCampaignFilter(this.value)">
+                  <option value="all" ${filters.campaign === 'all' ? 'selected' : ''}>🏷️ Todas as Campanhas</option>
+                  ${campaigns.map(c => `<option value="${c}" ${filters.campaign === c.toLowerCase() ? 'selected' : ''}>${c}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Dropdown de Origem UTM -->
+              <div style="min-width: 130px;">
+                <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoSourceFilter(this.value)">
+                  <option value="all" ${filters.source === 'all' ? 'selected' : ''}>🌐 Todas as Origens</option>
+                  ${sources.map(s => `<option value="${s}" ${filters.source === s.toLowerCase() ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Busca de Lead -->
+              <div style="position: relative; min-width: 180px;">
+                <input type="text" class="form-input" placeholder="🔍 Buscar telefone ou ID..." value="${filters.search || ''}" oninput="setFluxoSearchFilter(this.value)" style="font-size: 12px; padding: 6px 10px 6px 28px;" />
+                <span style="position: absolute; left: 8px; top: 7px; font-size: 12px; color: #64748b;">🔍</span>
+              </div>
+
+              <!-- Botão Resetar Filtros -->
+              ${(filters.period !== 'all' || filters.campaign !== 'all' || filters.source !== 'all' || filters.search) ? `
+                <button type="button" class="btn btn-secondary" onclick="resetFluxoFilters()" style="padding: 6px 10px; font-size: 11.5px; color: #f87171;">
+                  ✕ Limpar
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- QUADRO KANBAN (5 COLUNAS DO FLUXO AUTOMÁTICO) -->
+        <div class="kanban-board" style="display: grid; grid-template-columns: repeat(5, minmax(260px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 24px;">
+
+          <!-- COLUNA 1: CHEGARAM -->
+          <div class="kanban-col" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 12px; display: flex; flex-direction: column;">
+            <div class="kanban-col-header" style="padding: 12px 14px; border-bottom: 2px solid #64748b; background: rgba(100, 116, 139, 0.1); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span>🌐</span>
+                <strong style="color: #cbd5e1; font-size: 13.5px;">1. Chegaram</strong>
+              </div>
+              <span class="badge" style="background: #64748b; color: #fff; font-size: 11.5px; font-weight: 700; padding: 2px 7px;">${counts.chegaram}</span>
+            </div>
+            <div class="kanban-cards-list" style="padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 360px);">
+              ${columns.chegaram.length === 0 ? `
+                <div style="text-align: center; color: #64748b; font-size: 12px; padding: 20px 10px;">Nenhum visitante aguardando nesta coluna.</div>
+              ` : columns.chegaram.map(s => renderKanbanLeadCard(s, 'chegaram', formatRelativeTime)).join('')}
+            </div>
+          </div>
+
+          <!-- COLUNA 2: MANDARAM MENSAGEM -->
+          <div class="kanban-col" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; display: flex; flex-direction: column;">
+            <div class="kanban-col-header" style="padding: 12px 14px; border-bottom: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.1); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span>💬</span>
+                <strong style="color: #38bdf8; font-size: 13.5px;">2. Mandaram Msg</strong>
+              </div>
+              <span class="badge" style="background: #38bdf8; color: #020617; font-size: 11.5px; font-weight: 800; padding: 2px 7px;">${counts.mandaram_mensagem}</span>
+            </div>
+            <div class="kanban-cards-list" style="padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 360px);">
+              ${columns.mandaram_mensagem.length === 0 ? `
+                <div style="text-align: center; color: #64748b; font-size: 12px; padding: 20px 10px;">Nenhum lead nesta etapa.</div>
+              ` : columns.mandaram_mensagem.map(s => renderKanbanLeadCard(s, 'mandaram_mensagem', formatRelativeTime)).join('')}
+            </div>
+          </div>
+
+          <!-- COLUNA 3: FORAM ATÉ O CHECKOUT (RECEBERAM PROVA) -->
+          <div class="kanban-col" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; display: flex; flex-direction: column;">
+            <div class="kanban-col-header" style="padding: 12px 14px; border-bottom: 2px solid #fbbf24; background: rgba(245, 158, 11, 0.1); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span>⚡</span>
+                <strong style="color: #fbbf24; font-size: 13.5px;">3. Foram Checkout</strong>
+              </div>
+              <span class="badge" style="background: #fbbf24; color: #020617; font-size: 11.5px; font-weight: 800; padding: 2px 7px;">${counts.foram_checkout}</span>
+            </div>
+            <div class="kanban-cards-list" style="padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 360px);">
+              ${columns.foram_checkout.length === 0 ? `
+                <div style="text-align: center; color: #64748b; font-size: 12px; padding: 20px 10px;">Nenhum lead com prova pendente.</div>
+              ` : columns.foram_checkout.map(s => renderKanbanLeadCard(s, 'foram_checkout', formatRelativeTime)).join('')}
+            </div>
+          </div>
+
+          <!-- COLUNA 4: ABRIRAM O CHECKOUT (CLICARAM NO BOTÃO) -->
+          <div class="kanban-col" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; display: flex; flex-direction: column;">
+            <div class="kanban-col-header" style="padding: 12px 14px; border-bottom: 2px solid #c084fc; background: rgba(168, 85, 247, 0.1); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span>🛒</span>
+                <strong style="color: #c084fc; font-size: 13.5px;">4. Abriram Checkout</strong>
+              </div>
+              <span class="badge" style="background: #c084fc; color: #020617; font-size: 11.5px; font-weight: 800; padding: 2px 7px;">${counts.abriram_checkout}</span>
+            </div>
+            <div class="kanban-cards-list" style="padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 360px);">
+              ${columns.abriram_checkout.length === 0 ? `
+                <div style="text-align: center; color: #64748b; font-size: 12px; padding: 20px 10px;">Nenhum clique em checkout registrado.</div>
+              ` : columns.abriram_checkout.map(s => renderKanbanLeadCard(s, 'abriram_checkout', formatRelativeTime)).join('')}
+            </div>
+          </div>
+
+          <!-- COLUNA 5: FINALIZADO / COMPRA APROVADA -->
+          <div class="kanban-col" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; display: flex; flex-direction: column;">
+            <div class="kanban-col-header" style="padding: 12px 14px; border-bottom: 2px solid #10b981; background: rgba(16, 185, 129, 0.12); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span>✅</span>
+                <strong style="color: #34d399; font-size: 13.5px;">5. Finalizado</strong>
+              </div>
+              <span class="badge" style="background: #10b981; color: #fff; font-size: 11.5px; font-weight: 800; padding: 2px 7px;">${counts.finalizado}</span>
+            </div>
+            <div class="kanban-cards-list" style="padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 360px);">
+              ${columns.finalizado.length === 0 ? `
+                <div style="text-align: center; color: #64748b; font-size: 12px; padding: 20px 10px;">Nenhum lead finalizado ainda.</div>
+              ` : columns.finalizado.map(s => renderKanbanLeadCard(s, 'finalizado', formatRelativeTime)).join('')}
+            </div>
+          </div>
+
+        </div>
+      ` : `
+        <!-- ABA DE CONFIGURAÇÕES & LINKS DA CAMPANHA -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+          <!-- Card 1: Modo de Destino da Campanha -->
+          <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
+            <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+                <span>⚙️</span> <span>Modo de Operação do Link da Campanha</span>
+              </h3>
+            </div>
+            <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+              Escolha o destino dos leads que clicam nos anúncios do Meta/TikTok (/c/:slug):
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(16,185,129,0.08); border: 1px solid ${config.campaignMode === 'webchat' ? '#10b981' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
+                <input type="radio" name="campMode" value="webchat" ${config.campaignMode !== 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('webchat')" style="accent-color: #10b981; margin-top: 3px;">
+                <div>
+                  <strong style="color: #34d399; font-size: 13.5px; display: block;">🌐 Chatbot no Navegador (Recomendado)</strong>
+                  <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px;">Abre a tela do WhatsApp direto no navegador. Converte mesmo sem WhatsApp conectado e com zero atrito!</span>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(0,0,0,0.25); border: 1px solid ${config.campaignMode === 'whatsapp' ? '#a855f7' : 'rgba(255,255,255,0.1)'}; border-radius: 10px; cursor: pointer;">
+                <input type="radio" name="campMode" value="whatsapp" ${config.campaignMode === 'whatsapp' ? 'checked' : ''} onchange="saveWebChatMode('whatsapp')" style="accent-color: #a855f7; margin-top: 3px;">
+                <div>
+                  <strong style="color: #e2e8f0; font-size: 13.5px; display: block;">📱 WhatsApp Físico (App Externo)</strong>
+                  <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 2px;">Redireciona para o aplicativo WhatsApp do celular (wa.me).</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Card 2: Links de Divulgação -->
+          <div class="card" style="border: 1px solid rgba(255,255,255,0.08);">
+            <div class="card-header" style="padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+                <span>🔗</span> <span>Links de Divulgação & Testes</span>
+              </h3>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+              <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link Direto do Chatbot Web:</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" readonly value="${directChatUrl}" id="link-direct-chat" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #34d399; font-weight: 600;" />
+                <button type="button" class="btn btn-secondary" onclick="copyInputText('link-direct-chat')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="font-size: 11.5px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Link de Campanha (/c/:slug):</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" readonly value="${campaignLinkUrl}" id="link-camp-slug" class="form-input" style="background: rgba(0,0,0,0.4); font-size: 12.5px; color: #cbd5e1;" />
+                <button type="button" class="btn btn-secondary" onclick="copyInputText('link-camp-slug')" style="padding: 0 12px; font-size: 12px;">📋 Copiar</button>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <a href="${directChatUrl}" target="_blank" class="btn btn-primary" style="flex: 1; text-align: center; justify-content: center; background: #8b5cf6; border: none; font-size: 13px; font-weight: 700;">
+                🧪 Testar Simulação Agora
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Personalização da Atendente -->
+        <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.08);">
+          <div class="card-header" style="padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+            <h3 class="card-title" style="font-size: 15px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+              <span>👩‍💼</span> <span>Personalização da Atendente & Oferta</span>
+            </h3>
+          </div>
+
+          <form id="form-webchat-config" onsubmit="event.preventDefault(); saveWebChatFullConfig();">
+            <div style="display: grid; grid-template-columns: 220px 1fr 140px; gap: 16px; margin-bottom: 16px;">
+              <div>
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Nome da Atendente:</label>
+                <input type="text" id="cfg-attendant-name" class="form-input" value="${config.attendantName || 'María'}" required />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">URL da Foto de Perfil da Atendente:</label>
+                <input type="url" id="cfg-attendant-avatar" class="form-input" value="${config.attendantAvatar || ''}" placeholder="https://..." />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Valor Oferta ($):</label>
+                <input type="text" id="cfg-offer-amount" class="form-input" value="${config.offerAmount || '19'}" required />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Mensagem de Boas-Vindas Inicial:</label>
+              <textarea id="cfg-welcome-msg" class="form-input" rows="3" style="width: 100%; resize: vertical;">${config.welcomeMessage || '¡Hola! 👋 Mucho gusto. ¿Cómo te llamas y qué número te gustaría investigar hoy?'}</textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" id="btn-save-webchat-cfg" class="btn btn-primary" style="background: #10b981; border: none; font-weight: 700; padding: 8px 20px;">
+                💾 Salvar Configurações
+              </button>
+            </div>
+          </form>
+        </div>
+      `}
 
       <!-- Modal de Histórico do Chat Web -->
       <div id="modal-webchat-history" class="wa-modal-backdrop" onclick="this.classList.remove('active')">
-        <div style="max-width: 500px; width: 92%; max-height: 80vh; background: #0b141a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
+        <div style="max-width: 500px; width: 92%; max-height: 85vh; background: #0b141a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;" onclick="event.stopPropagation()">
           <div style="background: #202c33; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08);">
-            <h4 style="margin: 0; color: #fff; font-size: 15px;">Histórico da Conversa</h4>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;">
+                👩‍💼
+              </div>
+              <div>
+                <h4 style="margin: 0; color: #fff; font-size: 14px; font-weight: 700;" id="history-modal-title">Conversa do Lead</h4>
+                <div style="font-size: 11px; color: #34d399;" id="history-modal-sub">Online agora</div>
+              </div>
+            </div>
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-webchat-history').classList.remove('active')" style="padding: 2px 8px; font-size: 12px;">✕</button>
           </div>
-          <div id="webchat-history-body" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px;"></div>
+          <div id="webchat-history-body" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background-color: #0b141a; background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 16px 16px;"></div>
         </div>
       </div>
     `;
@@ -6541,6 +6804,82 @@ window.renderFluxoAutomatico = async function() {
     container.innerHTML = '<div style="color: #ef4444; padding: 40px; text-align: center;">Erro ao carregar dados do Fluxo Automático.</div>';
   }
 };
+
+// Renderizador individual do Card de Lead dentro de cada coluna do Kanban
+function renderKanbanLeadCard(s, colKey, timeFn) {
+  const shortId = s.id ? (s.id.length > 18 ? s.id.substring(0, 18) + '...' : s.id) : 'Lead Anônimo';
+  const targetPhone = s.targetPhone ? ('+' + s.targetPhone) : 'Aguardando alvo';
+  const timeAgo = timeFn(s.updatedAt || s.createdAt);
+  const msgCount = s.messages ? s.messages.length : 0;
+  const campaignTag = s.slug || s.utm?.utm_campaign || '';
+  const sourceTag = s.utm?.utm_source || s.utm?.src || '';
+
+  return `
+    <div class="kanban-card" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+      <!-- Topo do Card: ID e Tempo -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; font-family: monospace;" title="${s.id}">
+          ${shortId}
+        </span>
+        <span style="font-size: 10.5px; color: #64748b; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">
+          ${timeAgo}
+        </span>
+      </div>
+
+      <!-- Meio: Alvo e Foto -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+        ${s.photoUrl ? `
+          <img src="${s.photoUrl}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #10b981; flex-shrink: 0;" />
+        ` : `
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(100,116,139,0.2); border: 1px solid rgba(100,116,139,0.4); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+            ${s.targetPhone ? '🔒' : '👤'}
+          </div>
+        `}
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 12.5px; font-weight: 700; color: ${s.targetPhone ? '#38bdf8' : '#64748b'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${targetPhone}
+          </div>
+          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 1px;">
+            ${s.photoUrl ? '🟢 Foto pública extraída' : (s.targetPhone ? '🔒 Perfil com cadeado' : 'Sem número ainda')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Tags de Campanha e Origem -->
+      <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px;">
+        ${campaignTag ? `
+          <span style="font-size: 9.5px; font-weight: 600; color: #a78bfa; background: rgba(167, 139, 250, 0.15); padding: 2px 6px; border-radius: 4px;">
+            🏷️ ${campaignTag}
+          </span>
+        ` : ''}
+        ${sourceTag ? `
+          <span style="font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.15); padding: 2px 6px; border-radius: 4px;">
+            🌐 ${sourceTag}
+          </span>
+        ` : ''}
+        <span style="font-size: 9.5px; font-weight: 600; color: #cbd5e1; background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 4px; margin-left: auto;">
+          💬 ${msgCount} msgs
+        </span>
+      </div>
+
+      <!-- Rodapé com Ações -->
+      <div style="display: flex; gap: 6px; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+        <button type="button" class="btn btn-secondary" onclick="viewWebChatHistory('${s.id}')" style="flex: 1; font-size: 11px; padding: 5px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+          <span>👁️</span> <span>Ver Chat</span>
+        </button>
+        ${colKey !== 'finalizado' ? `
+          <button type="button" class="btn btn-primary" onclick="markWebChatSessionStatus('${s.id}', 'FINALIZADO')" style="font-size: 11px; padding: 5px 8px; background: rgba(16,185,129,0.25); border: 1px solid #10b981; color: #34d399; font-weight: 700;" title="Marcar como Venda Concluída">
+            ✅ Concluir
+          </button>
+        ` : `
+          <span style="font-size: 10px; font-weight: 700; color: #34d399; padding: 4px 6px;">
+            🎉 Aprovado
+          </span>
+        `}
+      </div>
+    </div>
+  `;
+}
 
 window.saveWebChatMode = async function(mode) {
   try {

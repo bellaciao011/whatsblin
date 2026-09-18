@@ -267,8 +267,27 @@
       }
       if (window.fbq) fbq('track', 'InitiateCheckout');
       if (window.ttq) ttq.track('InitiateCheckout');
+
+      // Notifica o backend em tempo real que o lead clicou/abriu o checkout
+      fetch('/api/webchat/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          eventType: 'checkout_click',
+          utm: getAllTrackedParams()
+        })
+      }).catch(err => console.warn('[WebChat] Falha ao registrar evento de checkout:', err));
     } catch(e) {}
   };
+
+  // Garante que qualquer clique em link/botão de checkout seja rastreado
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.wa-btn-checkout, a[href*="checkout"], a[href*="pay"], a[href*="centerpag"]');
+    if (btn) {
+      window.trackCheckoutClick(btn);
+    }
+  });
 
   async function sendMessage() {
     const text = (inputField.value || '').trim();

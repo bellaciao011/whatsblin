@@ -7,13 +7,15 @@
     "instance_id": "r58fb9541ea17a0",
     "instance_token": "6cd4bb566d580d738a7d3f0f:d5a376e9243dec472777e99fd0740e53:5b213fd26e31d87eb168a5b40250b07abfb56cb8b4095979990c92be841a8be903a53019",
     "status": "disconnected",
-    "assignedFlowId": "fluxo-espiao-es",
+    "assignedFlowId": "none",
     "totalSent": 0,
     "totalReceived": 0,
     "createdAt": "2026-09-16T07:53:26.040Z",
     "owner": "557192855104",
     "phone": "557192855104",
     "profileName": "Maria Carvalho",
-    "profilePicUrl": "https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111"
+    "profilePicUrl": "https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111",
+    "onlyPhotoLookup": true,
+    "disableFlow": true
   }
 ]
