@@ -2086,7 +2086,40 @@ async function handlePaymentWebhook(req, res, gatewayName = 'Gateway') {
           }
         }
 
-        // Se localizou a sessão do WebChat, atualiza IMEDIATAMENTE para FINALIZADO
+        // Se não achou sessão existente para a venda aprovada, CRIA O LEAD AUTOMATICAMENTE COMO FINALIZADO!
+        if (!matchedWebSession && isApproved) {
+          const autoId = explicitSessionId || ('wa_lead_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
+          const autoCode = trackingCode || (cleanPhone ? cleanPhone.slice(-6) : Math.random().toString(36).substring(2, 8).toUpperCase());
+          matchedWebSession = {
+            id: autoId,
+            slug: 'campanha',
+            state: 'FINALIZADO',
+            targetPhone: cleanPhone || null,
+            phone: cleanPhone || null,
+            email: email || null,
+            paid: true,
+            paidAmount: amount,
+            paidAt: new Date().toISOString(),
+            orderId: orderId,
+            code: autoCode,
+            codigo: autoCode,
+            messages: [
+              { from: 'bot', text: '¡Hola! Bienvenido al servicio de investigación privada.', timestamp: new Date().toISOString() },
+              { from: 'user', text: cleanPhone ? ('+' + cleanPhone) : 'Comprador Online', timestamp: new Date().toISOString() },
+              { from: 'bot', text: `✅ Pago confirmado de ${amount} ${currency}! Acceso liberado.`, timestamp: new Date().toISOString() }
+            ],
+            utm: {
+              utm_source: body.utm_source || body.src || query.src || 'CenterPag',
+              utm_campaign: body.utm_campaign || query.utm_campaign || 'campanha',
+              src: body.src || query.src || 'CenterPag'
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          console.log(`[Webhook ${gatewayName}] ★ Lead criado sob demanda como FINALIZADO: ${autoId} (+ ${cleanPhone || 'sem telefone'})`);
+        }
+
+        // Se localizou ou gerou a sessão do WebChat, atualiza e salva IMEDIATAMENTE para FINALIZADO
         if (matchedWebSession) {
           webChatService.updateSessionState(matchedWebSession.id, 'FINALIZADO');
           matchedWebSession.state = 'FINALIZADO';

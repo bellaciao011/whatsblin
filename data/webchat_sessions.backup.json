@@ -265,5 +265,99 @@
     },
     "createdAt": "2026-09-17T13:13:32.563Z",
     "updatedAt": "2026-09-17T13:13:32.566Z"
+  },
+  "wa_lead_1789703443582_5ynyb3": {
+    "id": "wa_lead_1789703443582_5ynyb3",
+    "slug": "campanha",
+    "state": "FINALIZADO",
+    "targetPhone": "573188561780",
+    "photoUrl": "/generated/proof_web_573188561780_1789703509766.png",
+    "paid": true,
+    "paidAmount": 19,
+    "paidAt": "2026-09-18T03:51:50.000Z",
+    "code": "561780",
+    "codigo": "561780",
+    "messages": [
+      {
+        "from": "bot",
+        "text": "¡Hola! 👋 Mucho gusto.\n\nSoy Consultora de Investigación y especialista en investigaciones privadas 🔍✨",
+        "timestamp": "2026-09-18T03:50:44.449Z"
+      },
+      {
+        "from": "bot",
+        "text": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+        "timestamp": "2026-09-18T03:50:45.849Z"
+      },
+      {
+        "from": "user",
+        "text": "573188561780",
+        "timestamp": "2026-09-18T03:51:44.982Z"
+      },
+      {
+        "from": "bot",
+        "text": "Espera un momento mientras verificamos en el sistema...",
+        "timestamp": "2026-09-18T03:51:49.766Z"
+      },
+      {
+        "from": "bot",
+        "text": "🔒 Prueba con audio protegido por encriptación vinculada a este número",
+        "mediaType": "image",
+        "mediaUrl": "/generated/proof_web_573188561780_1789703509766.png",
+        "timestamp": "2026-09-18T03:51:49.767Z"
+      },
+      {
+        "from": "bot",
+        "text": "🔒 Tasa de desencriptación: $19 👇\n\nDatos del pago: Pago único y confidencial para desencriptar y liberar todos los audios, fotos y ubicaciones de inmediato.",
+        "checkoutUrl": "https://go.centerpag.com/PPU38CQG5EL?clientIp=186.102.34.44&placement=Instagram_Reels&ad_id=120249401590410685&utm_source=FB&utm_campaign=%7BCTV+01%7D+-+%7B1%2F1%2F1%7D+-+%7B17%2F09%7D+%E2%80%94+C%C3%B3pia%7C120249401590480685&utm_medium=Conjunto+%E2%80%94+C%C3%B3pia%7C120249401590380685&utm_content=Ads%7C120249401590410685&utm_term=Instagram_Reels&fbclid=PAcGRvZgJleHRuA2FlbQEwAGFkaWQBqzYxk99s7XNydGMGYXBwX2lkDzU2NzA2NzM0MzM1MjQyNwABp_ReM4G_qfohG_U89D5-mRigcIwmyayVk9CCJXqWWSJQRLUYYqCI7-NyExH0_aem_pe8s3By7nhTAn1zUCA3Xig&utm_id=120249401590480685&twrclid=92649562292190208&code=561780&codigo=561780&cw_token=cw_sec_561780_2026&view=lead&sck=561780&src=FB&custom_id=wa_lead_1789703443582_5ynyb3&sessionId=wa_lead_1789703443582_5ynyb3",
+        "amount": "19",
+        "timestamp": "2026-09-18T03:51:49.767Z"
+      },
+      {
+        "from": "bot",
+        "text": "¡En cuanto pagues la tasa de desencriptación, envíame el comprobante por aquí para activar tu acceso de inmediato!",
+        "timestamp": "2026-09-18T03:51:49.767Z"
+      }
+    ],
+    "utm": {
+      "slug": "campanha",
+      "placement": "Instagram_Reels",
+      "ad_id": "120249401590410685",
+      "utm_source": "FB",
+      "utm_campaign": "{CTV 01} - {1/1/1} - {17/09} — Cópia|120249401590480685",
+      "utm_medium": "Conjunto — Cópia|120249401590380685",
+      "utm_content": "Ads|120249401590410685",
+      "utm_term": "Instagram_Reels",
+      "fbclid": "PAcGRvZgJleHRuA2FlbQEwAGFkaWQBqzYxk99s7XNydGMGYXBwX2lkDzU2NzA2NzM0MzM1MjQyNwABp_ReM4G_qfohG_U89D5-mRigcIwmyayVk9CCJXqWWSJQRLUYYqCI7-NyExH0_aem_pe8s3By7nhTAn1zUCA3Xig",
+      "utm_id": "120249401590480685",
+      "twrclid": "92649562292190208",
+      "timeZone": "America/Bogota",
+      "clientIp": "186.102.34.44"
+    },
+    "createdAt": "2026-09-18T03:50:44.449Z",
+    "updatedAt": "2026-09-18T03:51:50.000Z"
+  },
+  "wa_lead_1789703260448_3c12sx": {
+    "id": "wa_lead_1789703260448_3c12sx",
+    "slug": "campanha",
+    "state": "OFERTA_ENVIADA",
+    "targetPhone": "558295712397",
+    "code": "712397",
+    "codigo": "712397",
+    "utm": {
+      "slug": "campanha",
+      "placement": "Facebook_Mobile_Feed",
+      "ad_id": "120249401590300685",
+      "utm_source": "FB",
+      "utm_campaign": "{CTV 06} - {1/1/1} - {17/09} — Cópia|120249401590350685",
+      "utm_medium": "Conjunto — Cópia|120249401590400685",
+      "utm_content": "Ads|120249401590300685",
+      "utm_term": "Facebook_Mobile_Feed",
+      "utm_id": "120249401590350685",
+      "twrclid": "92649255369875456",
+      "timeZone": "America/Santo_Domingo",
+      "clientIp": "190.167.206.159"
+    },
+    "createdAt": "2026-09-18T03:48:40.000Z",
+    "updatedAt": "2026-09-18T03:49:42.857Z"
   }
 }
