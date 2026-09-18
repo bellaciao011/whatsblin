@@ -452,7 +452,7 @@ function getWebChatKanbanData(filters = {}) {
   });
 
   const period = filters.period || 'all';
-  const channel = (filters.channel || 'all').toLowerCase();
+  const channel = (filters.channel !== undefined && filters.channel !== null && filters.channel !== '') ? String(filters.channel).toLowerCase() : 'web';
   const campaign = (filters.campaign || 'all').toLowerCase();
   const source = (filters.source || 'all').toLowerCase();
   const search = (filters.search || '').toLowerCase().trim();
@@ -536,10 +536,17 @@ function getWebChatKanbanData(filters = {}) {
     rateFinalConversion: totalVisitors > 0 ? ((totalPaid / totalVisitors) * 100).toFixed(1) : '0.0'
   };
 
+  const channelCounts = {
+    web: allList.filter(s => s.channel === 'web').length,
+    whatsapp: allList.filter(s => s.channel === 'whatsapp').length,
+    all: allList.length
+  };
+
   return {
     success: true,
     metrics,
     columns,
+    channelCounts,
     counts: {
       chegaram: columns.chegaram.length,
       mandaram_mensagem: columns.mandaram_mensagem.length,

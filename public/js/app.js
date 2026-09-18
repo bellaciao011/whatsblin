@@ -6409,7 +6409,7 @@ window.copyProofLink = function(url) {
 // Estado global dos filtros do Kanban do Fluxo Automático
 window.fluxoKanbanFilters = window.fluxoKanbanFilters || {
   period: 'all',
-  channel: 'all',
+  channel: 'web',
   campaign: 'all',
   source: 'all',
   search: ''
@@ -6452,7 +6452,7 @@ window.setFluxoSearchFilter = function(search) {
 };
 
 window.resetFluxoFilters = function() {
-  window.fluxoKanbanFilters = { period: 'all', campaign: 'all', source: 'all', search: '' };
+  window.fluxoKanbanFilters = { period: 'all', channel: 'web', campaign: 'all', source: 'all', search: '' };
   window.renderFluxoAutomatico('kanban');
 };
 
@@ -6501,6 +6501,7 @@ window.renderFluxoAutomatico = async function(forcedTab) {
     window.currentFluxoKanbanData = kanbanData;
     const metrics = kanbanData.metrics || { totalVisitors: 0, totalMessaged: 0, totalReachedCheckout: 0, totalOpenedCheckout: 0, totalPaid: 0, rateMessaged: '0.0', rateReachedCheckout: '0.0', rateOpenedCheckout: '0.0', rateFinalConversion: '0.0' };
     const counts = kanbanData.counts || { chegaram: 0, mandaram_mensagem: 0, foram_checkout: 0, abriram_checkout: 0, finalizado: 0 };
+    const channelCounts = kanbanData.channelCounts || { web: 0, whatsapp: 0, all: 0 };
     const columns = kanbanData.columns || { chegaram: [], mandaram_mensagem: [], foram_checkout: [], abriram_checkout: [], finalizado: [] };
     const campaigns = kanbanData.campaigns || [];
     const sources = kanbanData.sources || [];
@@ -6630,7 +6631,37 @@ window.renderFluxoAutomatico = async function(forcedTab) {
           </div>
         </div>
 
-        <!-- FILTROS DINÂMICOS DO FLUXO AUTOMÁTICO -->
+        <!-- SELETOR PRINCIPAL DE CANAL (CHAT AUTOMÁTICO VS WHATSAPP) -->
+        <div style="margin-bottom: 18px; padding: 14px 18px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.35);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+              <span>🎯</span> <span>Exibir no Kanban:</span>
+            </span>
+            <span style="font-size: 12px; color: #94a3b8;">(Filtre os leads da automação web vs conexões do WhatsApp)</span>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <!-- Opção 1: Apenas Chat Automático (Web) - PADRÃO -->
+            <button type="button" class="btn" onclick="setFluxoChannelFilter('web')" style="font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s ease; ${filters.channel === 'web' ? 'background: linear-gradient(135deg, #0284c7, #0369a1); border: 1px solid #38bdf8; color: #fff; box-shadow: 0 0 14px rgba(56,189,248,0.45);' : 'background: rgba(30,41,59,0.7); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8;'}">
+              <span>🌐</span> <span>Apenas Chat Automático (Web)</span>
+              <span class="badge" style="background: ${filters.channel === 'web' ? '#082f49' : 'rgba(255,255,255,0.1)'}; color: ${filters.channel === 'web' ? '#38bdf8' : '#cbd5e1'}; font-size: 11px; padding: 2px 7px; font-weight: 800;">${channelCounts.web || 0}</span>
+            </button>
+
+            <!-- Opção 2: Apenas WhatsApp (Chips) -->
+            <button type="button" class="btn" onclick="setFluxoChannelFilter('whatsapp')" style="font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s ease; ${filters.channel === 'whatsapp' ? 'background: linear-gradient(135deg, #10b981, #059669); border: 1px solid #34d399; color: #fff; box-shadow: 0 0 14px rgba(16,185,129,0.45);' : 'background: rgba(30,41,59,0.7); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8;'}">
+              <span>📱</span> <span>Apenas Conexões WhatsApp</span>
+              <span class="badge" style="background: ${filters.channel === 'whatsapp' ? '#064e3b' : 'rgba(255,255,255,0.1)'}; color: ${filters.channel === 'whatsapp' ? '#34d399' : '#cbd5e1'}; font-size: 11px; padding: 2px 7px; font-weight: 800;">${channelCounts.whatsapp || 0}</span>
+            </button>
+
+            <!-- Opção 3: Todos Misturados -->
+            <button type="button" class="btn" onclick="setFluxoChannelFilter('all')" style="font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s ease; ${filters.channel === 'all' ? 'background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: 1px solid #c084fc; color: #fff; box-shadow: 0 0 14px rgba(139,92,246,0.45);' : 'background: rgba(30,41,59,0.7); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8;'}">
+              <span>🌐📱</span> <span>Todos Misturados</span>
+              <span class="badge" style="background: ${filters.channel === 'all' ? '#2e1065' : 'rgba(255,255,255,0.1)'}; color: ${filters.channel === 'all' ? '#c084fc' : '#cbd5e1'}; font-size: 11px; padding: 2px 7px; font-weight: 800;">${channelCounts.all || 0}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTROS SECUNDÁRIOS (PERÍODO, CAMPANHA, ORIGEM E BUSCA) -->
         <div class="card" style="margin-bottom: 20px; padding: 14px 18px; border: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.6);">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <!-- Filtro de Período -->
@@ -6645,14 +6676,7 @@ window.renderFluxoAutomatico = async function(forcedTab) {
 
             <!-- Filtros de Canal, Campanha, Origem e Busca -->
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
-              <!-- Dropdown de Canal (Web vs WhatsApp) -->
-              <div style="min-width: 145px;">
-                <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoChannelFilter(this.value)">
-                  <option value="all" ${filters.channel === 'all' ? 'selected' : ''}>🌐📱 Todos os Canais</option>
-                  <option value="web" ${filters.channel === 'web' ? 'selected' : ''}>🌐 Chatbot Web</option>
-                  <option value="whatsapp" ${filters.channel === 'whatsapp' ? 'selected' : ''}>📱 WhatsApp</option>
-                </select>
-              </div>
+              
               <!-- Dropdown de Campanhas -->
               <div style="min-width: 140px;">
                 <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoCampaignFilter(this.value)">
