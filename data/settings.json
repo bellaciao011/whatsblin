@@ -22,10 +22,11 @@
     "adminToken": "dqg32oldH10iBvp3AQ3ofUiZ1Kifz5MK5Ca0q6v3kdRyQxYZp9"
   },
   "webchat": {
-    "attendantName": "María",
-    "welcomeMessage": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨\n\nPor favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
-    "welcomeMsg1": "¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨",
-    "welcomeMsg2": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲"
+    "attendantName": "Consultora de Investigación",
+    "welcomeMessage": "¡Hola! 👋 Mucho gusto.\n\nSoy Consultora de Investigación y especialista en investigaciones privadas 🔍✨\n\nPor favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+    "welcomeMsg1": "¡Hola! 👋 Mucho gusto.\n\nSoy Consultora de Investigación y especialista en investigaciones privadas 🔍✨",
+    "welcomeMsg2": "Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲",
+    "attendantAvatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"
   },
   "disableWhatsAppFlow": true
 }

@@ -6870,7 +6870,7 @@ window.renderFluxoAutomatico = async function(forcedTab) {
             <div style="display: grid; grid-template-columns: 220px 1fr 140px; gap: 16px; margin-bottom: 16px;">
               <div>
                 <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Nome da Atendente:</label>
-                <input type="text" id="cfg-attendant-name" class="form-input" value="${config.attendantName || 'María'}" required />
+                <input type="text" id="cfg-attendant-name" class="form-input" value="${config.attendantName || 'Consultora de Investigação'}" required />
               </div>
               <div>
                 <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">URL da Foto de Perfil da Atendente:</label>
@@ -7111,7 +7111,7 @@ window.viewWebChatHistory = async function(sessionId) {
     body.innerHTML = messagesList.map(m => {
       const isLead = m.from === 'user' || m.from === 'lead' || m.from === 'client' || m.fromMe === false;
       const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-      const senderLabel = isLead ? '👤 Lead' : '👩‍💼 Atendente / Robô';
+      const senderLabel = isLead ? '👤 Lead' : '🛡️ Consultora de Investigação (Privado)';
 
       const textFormatted = (m.text || '')
         .replace(/&/g, '&amp;')

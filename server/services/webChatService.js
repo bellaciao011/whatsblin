@@ -69,7 +69,7 @@ function saveSessions(sessions) {
 /**
  * Retorna as configurações ativas da atendente e do webchat
  */
-const DEFAULT_WELCOME_1 = '¡Hola! 👋 Mucho gusto.\n\nMe llamo María y soy especialista en investigación de relaciones 🔍✨';
+const DEFAULT_WELCOME_1 = '¡Hola! 👋 Mucho gusto.\n\nSoy Consultora de Investigación y especialista en investigaciones privadas 🔍✨';
 const DEFAULT_WELCOME_2 = 'Por favor, envíame a continuación el número que deseas investigar hoy con el código de su país (código de área / prefijo) 👇\n\n(Ejemplo: +507 6157-8213 o +52 686 193 2796) 📲';
 
 function getWebChatConfig() {
@@ -78,8 +78,8 @@ function getWebChatConfig() {
   const msg1 = webchat.welcomeMsg1 || DEFAULT_WELCOME_1;
   const msg2 = webchat.welcomeMsg2 || DEFAULT_WELCOME_2;
   return {
-    attendantName: webchat.attendantName || 'María',
-    attendantAvatar: webchat.attendantAvatar || 'https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111',
+    attendantName: webchat.attendantName || 'Consultora de Investigación',
+    attendantAvatar: webchat.attendantAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     welcomeMessages: [msg1, msg2],
     welcomeMessage: msg1 + '\n\n' + msg2,
     offerAmount: webchat.offerAmount || '19',
