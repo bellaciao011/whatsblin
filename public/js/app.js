@@ -6334,6 +6334,7 @@ window.copyProofLink = function(url) {
 // Estado global dos filtros do Kanban do Fluxo Automático
 window.fluxoKanbanFilters = window.fluxoKanbanFilters || {
   period: 'all',
+  channel: 'all',
   campaign: 'all',
   source: 'all',
   search: ''
@@ -6348,6 +6349,11 @@ window.renderKanbanFluxo = function() {
 window.switchFluxoAutoTab = function(tab) {
   window.fluxoAutoTab = tab;
   window.renderFluxoAutomatico(tab);
+};
+
+window.setFluxoChannelFilter = function(channel) {
+  window.fluxoKanbanFilters.channel = channel;
+  window.renderFluxoAutomatico('kanban');
 };
 
 window.setFluxoPeriodFilter = function(period) {
@@ -6404,6 +6410,7 @@ window.renderFluxoAutomatico = async function(forcedTab) {
     const filters = window.fluxoKanbanFilters;
     const queryStr = new URLSearchParams({
       period: filters.period || 'all',
+      channel: filters.channel || 'all',
       campaign: filters.campaign || 'all',
       source: filters.source || 'all',
       search: filters.search || ''
@@ -6560,8 +6567,16 @@ window.renderFluxoAutomatico = async function(forcedTab) {
               <button type="button" class="btn ${filters.period === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="setFluxoPeriodFilter('all')" style="padding: 5px 10px; font-size: 12px; ${filters.period === 'all' ? 'background: #38bdf8; color: #020617; font-weight: 700;' : ''}">Todos</button>
             </div>
 
-            <!-- Filtros de Campanha, Origem e Busca -->
+            <!-- Filtros de Canal, Campanha, Origem e Busca -->
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+              <!-- Dropdown de Canal (Web vs WhatsApp) -->
+              <div style="min-width: 145px;">
+                <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoChannelFilter(this.value)">
+                  <option value="all" ${filters.channel === 'all' ? 'selected' : ''}>🌐📱 Todos os Canais</option>
+                  <option value="web" ${filters.channel === 'web' ? 'selected' : ''}>🌐 Chatbot Web</option>
+                  <option value="whatsapp" ${filters.channel === 'whatsapp' ? 'selected' : ''}>📱 WhatsApp</option>
+                </select>
+              </div>
               <!-- Dropdown de Campanhas -->
               <div style="min-width: 140px;">
                 <select class="form-input" style="font-size: 12px; padding: 6px 10px;" onchange="setFluxoCampaignFilter(this.value)">
@@ -6818,11 +6833,16 @@ function renderKanbanLeadCard(s, colKey, timeFn) {
 
   return `
     <div class="kanban-card" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-      <!-- Topo do Card: ID e Tempo -->
+      <!-- Topo do Card: ID, Canal e Tempo -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; font-family: monospace;" title="${s.id}">
-          ${shortId}
-        </span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="badge" style="background: ${s.channel === 'whatsapp' ? 'rgba(37,211,102,0.15)' : 'rgba(56,189,248,0.15)'}; color: ${s.channel === 'whatsapp' ? '#25d366' : '#38bdf8'}; font-size: 9.5px; padding: 2px 5px; border-radius: 4px; font-weight: 700;">
+            ${s.channel === 'whatsapp' ? '📱 WhatsApp' : '🌐 WebChat'}
+          </span>
+          <span style="font-size: 11px; font-weight: 700; color: #cbd5e1; font-family: monospace;" title="${s.id}">
+            ${s.leadPhone ? '+' + s.leadPhone : shortId}
+          </span>
+        </div>
         <span style="font-size: 10.5px; color: #64748b; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">
           ${timeAgo}
         </span>
@@ -6940,12 +6960,25 @@ window.viewWebChatHistory = async function(sessionId) {
   modal.classList.add('active');
 
   try {
-    const res = await fetch(`/api/webchat/sessions?limit=100`);
-    const data = await res.json();
-    const session = (data.sessions || []).find(s => s.id === sessionId);
+    let messages = [];
+    if (sessionId.startsWith('wa_')) {
+      const phone = sessionId.replace('wa_', '');
+      const res = await fetch(`/api/chats/${phone}`);
+      const chatData = await res.json();
+      messages = chatData?.messages || [];
+      const titleEl = document.getElementById('history-modal-title');
+      if (titleEl) titleEl.textContent = `📱 WhatsApp: +${phone}`;
+    } else {
+      const res = await fetch(`/api/webchat/sessions?limit=200`);
+      const data = await res.json();
+      const session = (data.sessions || []).find(s => s.id === sessionId);
+      messages = session?.messages || [];
+      const titleEl = document.getElementById('history-modal-title');
+      if (titleEl) titleEl.textContent = `🌐 WebChat: ${session?.targetPhone ? '+' + session.targetPhone : session?.id}`;
+    }
 
-    if (!session || !session.messages || session.messages.length === 0) {
-      body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma mensagem registrada nesta sessão.</div>';
+    if (!messages || messages.length === 0) {
+      body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma mensagem registrada nesta conversa.</div>';
       return;
     }
 

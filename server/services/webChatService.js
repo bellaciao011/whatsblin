@@ -44,6 +44,9 @@ function buildDirectWebCheckoutUrl(baseUrl, incomingParams = {}) {
 
 function loadSessions() {
   try {
+    if (db.getWebChatSessions) {
+      return db.getWebChatSessions();
+    }
     if (fs.existsSync(SESSIONS_FILE)) {
       return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
     }
@@ -53,6 +56,9 @@ function loadSessions() {
 
 function saveSessions(sessions) {
   try {
+    if (db.saveWebChatSessions) {
+      db.saveWebChatSessions(sessions);
+    }
     fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
     fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf8');
   } catch (e) {
@@ -367,8 +373,66 @@ function registerEvent(sessionId, eventType, eventData = {}) {
  * Retorna dados estruturados e métricas para o Kanban dedicado do Fluxo Automático
  */
 function getWebChatKanbanData(filters = {}) {
+  // 1. Carrega sessões do Chatbot Web
   const sessions = loadSessions();
-  const allList = Object.values(sessions).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+  const webList = Object.values(sessions).map(s => ({
+    ...s,
+    channel: 'web',
+    channelLabel: '🌐 WebChat',
+    leadIdentifier: s.id,
+    displayPhone: s.targetPhone ? ('+' + s.targetPhone) : (s.phone ? '+' + s.phone : 'Sem número'),
+    sortTime: new Date(s.updatedAt || s.createdAt || 0).getTime()
+  }));
+
+  // 2. Carrega conversas do WhatsApp que passaram pelo fluxo de automação
+  const chats = db.getChats ? db.getChats() : {};
+  const waList = Object.values(chats).map(c => {
+    const phone = c.leadPhone || c.phone || '';
+    const targetPhone = c.variables?.alvo || c.variables?.targetPhone || c.targetPhone || '';
+    const photoUrl = c.variables?.photoUrl || c.senderPhoto || c.photoUrl || null;
+    const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+    const timeIso = c.lastMessageTime || (lastMsg?.timestamp) || c.criado_em || c.createdAt || new Date().toISOString();
+
+    // Mapeamento de estado para as 5 colunas do Funil
+    let state = 'CHEGARAM';
+    const cState = (c.state || '').toUpperCase();
+    if (cState === 'FINALIZADO' || cState === 'PAGO' || c.orderStatus === 'paid') {
+      state = 'FINALIZADO';
+    } else if (c.checkoutOpened || cState === 'CHECKOUT_ABERTO') {
+      state = 'CHECKOUT_ABERTO';
+    } else if (cState === 'OFERTA_ENVIADA' || cState === 'PROPOSTA_ENVIADA' || cState === 'NEGOCIACAO' || c.variables?.checkoutUrl) {
+      state = 'OFERTA_ENVIADA';
+    } else if (cState === 'ANALISANDO' || targetPhone || (c.messages && c.messages.length >= 2)) {
+      state = 'ANALISANDO';
+    } else {
+      state = 'INITIAL';
+    }
+
+    return {
+      id: `wa_${phone}`,
+      channel: 'whatsapp',
+      channelLabel: '📱 WhatsApp',
+      leadIdentifier: `Lead +${phone}`,
+      leadPhone: phone,
+      targetPhone: targetPhone,
+      photoUrl: photoUrl,
+      state: state,
+      messages: c.messages || [],
+      slug: c.variables?.slug || c.assignedFlowId || 'fluxo-espiao',
+      utm: {
+        utm_source: 'whatsapp',
+        utm_campaign: c.assignedFlowId || 'fluxo-espiao-es',
+        src: 'whatsapp'
+      },
+      createdAt: c.criado_em || c.createdAt || timeIso,
+      updatedAt: timeIso,
+      isWhatsApp: true,
+      sortTime: new Date(timeIso).getTime()
+    };
+  });
+
+  // Lista unificada com ordenação cronológica (mais recentes primeiro)
+  const allList = [...webList, ...waList].sort((a, b) => b.sortTime - a.sortTime);
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -388,12 +452,16 @@ function getWebChatKanbanData(filters = {}) {
   });
 
   const period = filters.period || 'all';
+  const channel = (filters.channel || 'all').toLowerCase();
   const campaign = (filters.campaign || 'all').toLowerCase();
   const source = (filters.source || 'all').toLowerCase();
   const search = (filters.search || '').toLowerCase().trim();
 
   const filtered = allList.filter(s => {
-    const timeMs = new Date(s.createdAt || s.updatedAt || 0).getTime();
+    const timeMs = s.sortTime || new Date(s.createdAt || s.updatedAt || 0).getTime();
+
+    // Filtro de Canal (Web vs WhatsApp vs Todos)
+    if (channel !== 'all' && s.channel !== channel) return false;
 
     // Filtro de período
     if (period === 'today' && timeMs < startOfToday) return false;
@@ -418,14 +486,15 @@ function getWebChatKanbanData(filters = {}) {
     if (search) {
       const matchId = (s.id || '').toLowerCase().includes(search);
       const matchPhone = (s.targetPhone || '').toLowerCase().includes(search);
+      const matchLeadPhone = (s.leadPhone || '').toLowerCase().includes(search);
       const matchSlug = (s.slug || '').toLowerCase().includes(search);
-      if (!matchId && !matchPhone && !matchSlug) return false;
+      if (!matchId && !matchPhone && !matchLeadPhone && !matchSlug) return false;
     }
 
     return true;
   });
 
-  // Distribui as sessões nas 5 colunas do funil do Chatbot Web
+  // Distribui os leads nas 5 colunas do funil
   const columns = {
     chegaram: [],
     mandaram_mensagem: [],
@@ -484,10 +553,6 @@ function getWebChatKanbanData(filters = {}) {
   };
 }
 
-
-/**
- * Atualiza manualmente o estado de uma sessão (ex: via Kanban para 'FINALIZADO')
- */
 function updateSessionState(sessionId, newState) {
   const sessions = loadSessions();
   const session = sessions[sessionId];

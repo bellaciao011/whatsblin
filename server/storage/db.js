@@ -35,7 +35,32 @@ function readJson(filename, defaultValue) {
     }
 
     const data = fs.readFileSync(fullPath, 'utf8');
-    const parsed = JSON.parse(data);
+    let parsed = JSON.parse(data);
+
+    // Proteção de Persistência Permanente: se houver arquivo de backup com mais dados, mescla para nunca perder leads
+    if (filename === 'chats.json' || filename === 'webchat_sessions.json') {
+      try {
+        const backupName = filename.replace('.json', '.backup.json');
+        const backupPath = path.join(DATA_DIR, backupName);
+        const fallbackBackupPath = path.join(DEFAULT_DATA_DIR, backupName);
+        const bPath = fs.existsSync(backupPath) ? backupPath : (fs.existsSync(fallbackBackupPath) ? fallbackBackupPath : null);
+        if (bPath) {
+          const backupData = JSON.parse(fs.readFileSync(bPath, 'utf8'));
+          if (backupData && typeof backupData === 'object' && !Array.isArray(backupData)) {
+            let merged = false;
+            Object.keys(backupData).forEach(k => {
+              if (!parsed[k]) {
+                parsed[k] = backupData[k];
+                merged = true;
+              }
+            });
+            if (merged) {
+              writeJson(filename, parsed);
+            }
+          }
+        }
+      } catch (bkErr) {}
+    }
 
     // Se for array vazio e tivermos dados semeados no DEFAULT_DATA_DIR (ex: dominios_customizados), mescla os dados
     if (Array.isArray(parsed) && parsed.length === 0 && DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(fallbackPath)) {
@@ -67,6 +92,8 @@ function writeJson(filename, data) {
 }
 
 module.exports = {
+  getWebChatSessions: () => readJson('webchat_sessions.json', {}),
+  saveWebChatSessions: (data) => writeJson('webchat_sessions.json', data),
   getInstances: () => readJson('instances.json', []),
   saveInstances: (data) => writeJson('instances.json', data),
   getInstance: (id) => {
