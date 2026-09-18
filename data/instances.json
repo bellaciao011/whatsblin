@@ -17,5 +17,23 @@
     "profilePicUrl": "https://pps.whatsapp.net/v/t61.24694-24/813733428_1659309575529240_7059521085506520943_n.jpg?ccb=11-4&oh=01_Q5Aa5gF-J4FlH_Qp6Hw86K6kJbV6zf-_6llpJ4Uj1LmFt9T_IA&oe=6AB8CB65&_nc_sid=5e03e0&_nc_cat=111",
     "onlyPhotoLookup": true,
     "disableFlow": true
+  },
+  {
+    "id": "uaz_r790d454832289b",
+    "name": "CONSULTA FOTOS",
+    "tipo": "uazapi",
+    "url_servidor": "https://whatsblin.uazapi.com",
+    "instance_id": "r790d454832289b",
+    "instance_token": "e83de1f62ea8b642d651f0a3:31d8d75a1f5498daa0c604df4d5cfc8e:860527aef6b7921abb1b754a2a9cbdc5d028a26e19c6fc1388505554c55a635bd22fad79",
+    "phoneNumber": "",
+    "numero_conectado": "",
+    "status": "connecting",
+    "assignedFlowId": "none",
+    "totalSent": 0,
+    "totalReceived": 0,
+    "criado_em": "2026-09-18T01:48:11.255Z",
+    "createdAt": "2026-09-18T01:48:11.256Z",
+    "onlyPhotoLookup": true,
+    "disableFlow": true
   }
 ]

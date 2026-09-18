@@ -13,7 +13,7 @@ const cryptoService = require('../services/cryptoService');
 
 // Credenciais permanentes padrão do servidor uazapi
 const DEFAULT_UAZAPI_SERVER = 'https://whatsblin.uazapi.com';
-const DEFAULT_UAZAPI_ADMIN_TOKEN = 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
+const DEFAULT_UAZAPI_ADMIN_TOKEN = 'dqg32oldH10iBvp3AQ3ofUiZ1Kifz5MK5Ca0q6v3kdRyQxYZp9';
 
 /**
  * =========================================================================
@@ -736,7 +736,8 @@ router.post('/uazapi/init-connect', async (req, res) => {
     const settings = db.getSettings() || {};
     const cleanServerUrl = uazapiService.normalizeServerUrl(serverUrl || settings.uazapi?.serverUrl || settings.uazapiServerUrl || DEFAULT_UAZAPI_SERVER);
     const cleanPhone = phone ? String(phone).replace(/\D/g, '') : null;
-    const adminToken = (inputAdminToken && String(inputAdminToken).trim()) || settings.uazapi?.adminToken || settings.uazapiAdminToken || process.env.UAZAPI_ADMIN_TOKEN || DEFAULT_UAZAPI_ADMIN_TOKEN;
+    const settingsMaster = settings.uazapi?.adminToken || settings.uazapiAdminToken || DEFAULT_UAZAPI_ADMIN_TOKEN;
+    const adminToken = (inputAdminToken && !inputAdminToken.startsWith('Wx0b') && String(inputAdminToken).trim()) ? String(inputAdminToken).trim() : settingsMaster;
 
     let instanceToken = '';
     let instanceId = '';

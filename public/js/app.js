@@ -3810,11 +3810,12 @@ async function handleSaveUazapi() {
   }
 
   const serverUrl = 'https://whatsblin.uazapi.com';
-  const adminToken = 'Wx0bdo99r3VtcDwC8ulQezVLNDY7rcFOzSWgyS7Q9vjWwKKMJp';
+  const adminToken = 'dqg32oldH10iBvp3AQ3ofUiZ1Kifz5MK5Ca0q6v3kdRyQxYZp9';
   const connectType = document.querySelector('input[name="uazapi-connect-type"]:checked')?.value || 'qr';
   const instanceKey = document.getElementById('uazapi-key')?.value.trim() || '';
   const phone = connectType === 'phone' ? document.getElementById('uazapi-phone-input')?.value.trim() : '';
-  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'fluxo-espiao-es';
+  const assignedFlowId = document.getElementById('conn-flow-id')?.value || 'none';
+  const onlyPhotoLookup = (assignedFlowId === 'none');
 
   if (connectType === 'phone' && !phone) {
     showToast('Informe o número de telefone para pareamento com DDI e DDD', 'error');
@@ -3863,7 +3864,8 @@ async function handleSaveUazapi() {
         adminToken,
         instanceKey,
         phone,
-        assignedFlowId
+        assignedFlowId,
+        onlyPhotoLookup
       })
     });
 
