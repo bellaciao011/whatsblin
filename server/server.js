@@ -93,7 +93,7 @@ app.use('/js', express.static(path.join(__dirname, '../public/js')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 app.use('/webhook', webhookRoutes);
 
-// Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay)
+// Webhook Universal de Pagamentos (CenterPag, Kirvano, Kiwify, PerfectPay) v2.1
 // 1. Webhook Específico de Checkout Aberto / Abandono de Carrinho
 // NUNCA dispara evento de venda paga (Purchase) no Facebook! Apenas registra status CHECKOUT_ABERTO.
 app.all([
