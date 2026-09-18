@@ -6900,6 +6900,8 @@ window.renderFluxoAutomatico = async function(forcedTab) {
 
 // Renderizador individual do Card de Lead dentro de cada coluna do Kanban
 function renderKanbanLeadCard(s, colKey, timeFn) {
+  if (!window.fluxoKanbanCardsMap) window.fluxoKanbanCardsMap = new Map();
+  if (s && s.id) window.fluxoKanbanCardsMap.set(s.id, s);
   const shortId = s.id ? (s.id.length > 18 ? s.id.substring(0, 18) + '...' : s.id) : 'Lead Anônimo';
   const country = getLeadCountryInfo(s);
   const timeAgo = timeFn(s.updatedAt || s.createdAt);
@@ -7036,34 +7038,40 @@ window.viewWebChatHistory = async function(sessionId) {
   const subEl = document.getElementById('history-modal-sub');
   if (!modal || !body) return;
 
-  // Busca dados do card armazenados em cache no Kanban
-  let leadCard = null;
-  if (window.currentFluxoKanbanData && window.currentFluxoKanbanData.columns) {
+  // 1. Busca os dados do lead diretamente no mapa do Kanban ou no cache global
+  let leadCard = (window.fluxoKanbanCardsMap && window.fluxoKanbanCardsMap.get(sessionId)) || null;
+  if (!leadCard && window.currentFluxoKanbanData && window.currentFluxoKanbanData.columns) {
     for (const col of Object.values(window.currentFluxoKanbanData.columns)) {
       const found = (col || []).find(item => item.id === sessionId);
       if (found) { leadCard = found; break; }
     }
   }
 
-  const isWa = String(sessionId).startsWith('wa_');
-  const cleanPhone = String(leadCard?.leadPhone || (isWa ? sessionId.replace('wa_', '') : '')).replace(/\D/g, '');
-  const targetPhone = String(leadCard?.targetPhone || '').replace(/\D/g, '');
-  const displayPhone = cleanPhone ? ('+' + cleanPhone) : (targetPhone ? ('+' + targetPhone) : (leadCard?.id || sessionId));
-  
-  const country = typeof getLeadCountryInfo === 'function' && leadCard 
-    ? getLeadCountryInfo(leadCard) 
+  // 2. Identificação precisa do canal: WebChat vs WhatsApp
+  const isWeb = (leadCard && leadCard.channel === 'web') ||
+                String(sessionId).startsWith('wa_lead_') ||
+                String(sessionId).startsWith('lead_') ||
+                String(sessionId).startsWith('test_') ||
+                (leadCard && !leadCard.isWhatsApp && !leadCard.leadPhone);
+
+  const cleanPhone = String(leadCard?.leadPhone || (!isWeb ? String(sessionId).replace(/^wa_/, '') : '')).replace(/\D/g, '');
+  const targetPhone = String(leadCard?.targetPhone || leadCard?.phone || '').replace(/\D/g, '');
+  const displayPhone = targetPhone ? ('+' + targetPhone) : (cleanPhone ? ('+' + cleanPhone) : (leadCard?.id || sessionId));
+
+  const country = typeof getLeadCountryInfo === 'function' && leadCard
+    ? getLeadCountryInfo(leadCard)
     : (cleanPhone ? (typeof getCountryByPhone === 'function' ? getCountryByPhone(cleanPhone) : { flag: '🌐', name: 'Global' }) : { flag: '🌐', name: 'Global' });
 
   if (titleEl) {
-    titleEl.innerHTML = `<span style="margin-right: 6px;">${country.flag}</span> ${isWa ? 'WhatsApp' : 'WebChat'}: ${displayPhone}`;
+    titleEl.innerHTML = `<span style="margin-right: 6px;">${country.flag}</span> ${isWeb ? '🌐 WebChat' : '📱 WhatsApp'}: <strong>${displayPhone}</strong>`;
   }
   if (subEl) {
     const campName = leadCard?.utm?.utm_campaign || leadCard?.slug || 'campanha';
-    const srcName = leadCard?.utm?.utm_source || leadCard?.utm?.src || (isWa ? 'whatsapp' : 'web');
-    subEl.innerHTML = `<span style="color: #c084fc;">🎯 ${campName}</span> • <span style="color: #34d399;">🌐 ${srcName}</span>`;
+    const srcName = leadCard?.utm?.utm_source || leadCard?.utm?.src || (isWeb ? 'web' : 'whatsapp');
+    subEl.innerHTML = `<span style="color: #c084fc; font-weight: 600;">🎯 ${campName}</span> • <span style="color: #34d399; font-weight: 600;">Origem: ${srcName}</span>`;
   }
 
-  // Função auxiliar para formatar e renderizar balões de mensagem
+  // Função auxiliar de renderização dos balões
   const renderMessages = (messagesList) => {
     if (!messagesList || messagesList.length === 0) {
       body.innerHTML = `
@@ -7080,7 +7088,7 @@ window.viewWebChatHistory = async function(sessionId) {
       const isLead = m.from === 'user' || m.from === 'lead' || m.from === 'client' || m.fromMe === false;
       const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
       const senderLabel = isLead ? '👤 Lead' : '👩‍💼 Atendente / Robô';
-      
+
       const textFormatted = (m.text || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -7120,59 +7128,67 @@ window.viewWebChatHistory = async function(sessionId) {
     setTimeout(() => { body.scrollTop = body.scrollHeight; }, 50);
   };
 
-  // Se já temos mensagens em memória no card, renderiza imediatamente para resposta instantânea!
-  if (leadCard && Array.isArray(leadCard.messages) && leadCard.messages.length > 0) {
-    renderMessages(leadCard.messages);
+  // Se já temos mensagens em memória no card, renderiza imediatamente!
+  let currentMessages = (leadCard && Array.isArray(leadCard.messages) && leadCard.messages.length > 0) ? leadCard.messages : null;
+  if (currentMessages) {
+    renderMessages(currentMessages);
   } else {
     body.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 30px;"><div class="spinner" style="width: 20px; height: 20px; margin: 0 auto 10px auto;"></div>Carregando histórico...</div>';
   }
-  
   modal.classList.add('active');
 
-  // Busca mensagens atualizadas da API
+  // Sincroniza em segundo plano com a API
   try {
-    let freshMessages = [];
-    if (isWa) {
-      const fetchPhone = cleanPhone || sessionId.replace('wa_', '');
-      const res = await fetch(`/api/chats/${fetchPhone}`);
-      if (res.ok) {
-        const chatData = await res.json();
-        freshMessages = chatData?.messages || [];
-      }
-    } else {
-      // Tenta rota direta da sessão
-      let sessionData = null;
+    let freshMessages = null;
+
+    if (isWeb) {
       try {
-        const directRes = await fetch(`/api/webchat/sessions/${encodeURIComponent(sessionId)}`);
-        if (directRes.ok) {
-          const directJson = await directRes.json();
-          sessionData = directJson.session;
+        const res = await fetch(`/api/webchat/sessions/${encodeURIComponent(sessionId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.session?.messages && json.session.messages.length > 0) {
+            freshMessages = json.session.messages;
+          }
         }
       } catch (_) {}
 
-      // Fallback para lista geral de sessões
-      if (!sessionData) {
-        const res = await fetch(`/api/webchat/sessions?limit=500`);
-        if (res.ok) {
-          const data = await res.json();
-          sessionData = (data.sessions || []).find(s => s.id === sessionId);
-        }
+      if (!freshMessages) {
+        try {
+          const resAll = await fetch('/api/webchat/sessions?limit=500');
+          if (resAll.ok) {
+            const allJson = await resAll.json();
+            const found = (allJson.sessions || []).find(s => s.id === sessionId);
+            if (found?.messages && found.messages.length > 0) {
+              freshMessages = found.messages;
+            }
+          }
+        } catch (_) {}
       }
-
-      freshMessages = sessionData?.messages || [];
+    } else {
+      const fetchPhone = cleanPhone || String(sessionId).replace(/^wa_/, '');
+      if (fetchPhone) {
+        try {
+          const res = await fetch(`/api/chats/${fetchPhone}`);
+          if (res.ok) {
+            const chatData = await res.json();
+            if (chatData?.messages && chatData.messages.length > 0) {
+              freshMessages = chatData.messages;
+            }
+          }
+        } catch (_) {}
+      }
     }
 
-    // Se encontrou mensagens atualizadas ou se a lista retornou, re-renderiza
     if (freshMessages && freshMessages.length > 0) {
-      renderMessages(freshMessages);
-    } else if (!leadCard || !leadCard.messages || leadCard.messages.length === 0) {
+      currentMessages = freshMessages;
+      renderMessages(currentMessages);
+    } else if (!currentMessages || currentMessages.length === 0) {
       renderMessages([]);
     }
-  } catch (e) {
-    console.error('[WebChat History Error]', e);
-    // Se deu erro mas já tinha renderizado do cache, não quebra a tela
-    if (!leadCard || !leadCard.messages || leadCard.messages.length === 0) {
-      body.innerHTML = '<div style="color: #ef4444; padding: 25px; text-align: center;">Erro ao carregar histórico: ' + e.message + '</div>';
+  } catch (err) {
+    console.warn('[History Sync Warning]', err);
+    if (!currentMessages || currentMessages.length === 0) {
+      body.innerHTML = '<div style="color: #ef4444; padding: 25px; text-align: center;">Erro ao carregar histórico: ' + err.message + '</div>';
     }
   }
 };
