@@ -58,3 +58,12 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
+
+// Permite exibição de notificações disparadas diretamente pelo client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const title = event.data.title || 'WhatsHub Pro';
+    const options = event.data.options || {};
+    self.registration.showNotification(title, options);
+  }
+});

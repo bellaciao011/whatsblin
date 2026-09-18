@@ -1,3 +1,52 @@
+
+/**
+ * Detecta bandeira e país a partir do número de telefone com DDI
+ */
+function getCountryByPhone(phone) {
+  if (!phone) return { flag: '🌐', name: 'Internacional', code: 'INT' };
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.startsWith('55')) return { flag: '🇧🇷', name: 'Brasil', code: 'BR' };
+  if (clean.startsWith('34')) return { flag: '🇪🇸', name: 'Espanha', code: 'ES' };
+  if (clean.startsWith('507')) return { flag: '🇵🇦', name: 'Panamá', code: 'PA' };
+  if (clean.startsWith('52')) return { flag: '🇲🇽', name: 'México', code: 'MX' };
+  if (clean.startsWith('57')) return { flag: '🇨🇴', name: 'Colômbia', code: 'CO' };
+  if (clean.startsWith('54')) return { flag: '🇦🇷', name: 'Argentina', code: 'AR' };
+  if (clean.startsWith('56')) return { flag: '🇨🇱', name: 'Chile', code: 'CL' };
+  if (clean.startsWith('51')) return { flag: '🇵🇪', name: 'Peru', code: 'PE' };
+  if (clean.startsWith('593')) return { flag: '🇪🇨', name: 'Equador', code: 'EC' };
+  if (clean.startsWith('502')) return { flag: '🇬🇹', name: 'Guatemala', code: 'GT' };
+  if (clean.startsWith('504')) return { flag: '🇭🇳', name: 'Honduras', code: 'HN' };
+  if (clean.startsWith('503')) return { flag: '🇸🇻', name: 'El Salvador', code: 'SV' };
+  if (clean.startsWith('505')) return { flag: '🇳🇮', name: 'Nicarágua', code: 'NI' };
+  if (clean.startsWith('506')) return { flag: '🇨🇷', name: 'Costa Rica', code: 'CR' };
+  if (clean.startsWith('591')) return { flag: '🇧🇴', name: 'Bolívia', code: 'BO' };
+  if (clean.startsWith('595')) return { flag: '🇵🇾', name: 'Paraguai', code: 'PY' };
+  if (clean.startsWith('598')) return { flag: '🇺🇾', name: 'Uruguai', code: 'UY' };
+  if (clean.startsWith('58')) return { flag: '🇻🇪', name: 'Venezuela', code: 'VE' };
+  if (clean.startsWith('1')) return { flag: '🇺🇸', name: 'EUA/Canadá', code: 'US' };
+  if (clean.startsWith('44')) return { flag: '🇬🇧', name: 'Reino Unido', code: 'GB' };
+  if (clean.startsWith('351')) return { flag: '🇵🇹', name: 'Portugal', code: 'PT' };
+  if (clean.startsWith('33')) return { flag: '🇫🇷', name: 'França', code: 'FR' };
+  if (clean.startsWith('49')) return { flag: '🇩🇪', name: 'Alemanha', code: 'DE' };
+  if (clean.startsWith('39')) return { flag: '🇮🇹', name: 'Itália', code: 'IT' };
+  return { flag: '🌍', name: 'Internacional', code: 'INT' };
+}
+
+function getLeadCountryInfo(s) {
+  if (s.targetPhone) return getCountryByPhone(s.targetPhone);
+  if (s.leadPhone) return getCountryByPhone(s.leadPhone);
+  if (s.country) {
+    const c = String(s.country).toUpperCase();
+    if (c === 'ES') return { flag: '🇪🇸', name: 'Espanha', code: 'ES' };
+    if (c === 'PA') return { flag: '🇵🇦', name: 'Panamá', code: 'PA' };
+    if (c === 'BR') return { flag: '🇧🇷', name: 'Brasil', code: 'BR' };
+    if (c === 'MX') return { flag: '🇲🇽', name: 'México', code: 'MX' };
+    if (c === 'CO') return { flag: '🇨🇴', name: 'Colômbia', code: 'CO' };
+    if (c === 'US') return { flag: '🇺🇸', name: 'EUA', code: 'US' };
+  }
+  return { flag: '🌐', name: 'Visitante', code: 'WEB' };
+}
+
 // WhatsHub Pro - Frontend Application State & Router
 // Interceptor global para redirecionar se a sessão expirar (401)
 const originalFetch = window.fetch;
@@ -145,9 +194,12 @@ async function requestNotificationPermission() {
     return false;
   }
   if (Notification.permission === 'granted') {
-    showToast('🔔 Notificações no celular já estão ATIVAS!', 'success');
-    playSaleSound();
+    getAudioContext();
+    playLeadSound();
+    showToast('🔔 Notificações no celular ATIVAS! Enviando alerta de teste...', 'success');
+    showPushNotification('🔔 Notificações Ativas no Celular! 🎯', 'Você receberá alertas sonoros e notificações sempre que um novo lead entrar ou avançar no funil!');
     updateNotificationButton();
+    fetch('/api/notifications/test', { method: 'POST' }).catch(() => {});
     return true;
   }
   try {
@@ -186,23 +238,46 @@ function updateNotificationButton() {
 }
 
 function showPushNotification(title, body) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    console.log('[Push] Notificação não exibida: permissão não concedida.');
+    return;
+  }
+
+  const notifOptions = {
+    body: body || 'Nova atualização no sistema WhatsHub',
+    icon: '/assets/icon-192.png',
+    badge: '/assets/icon-192.png',
+    vibrate: title.includes('VENDA') ? [300, 100, 300, 100, 300] : [250, 120, 250],
+    tag: 'whatshub-' + Date.now(),
+    renotify: true,
+    requireInteraction: true
+  };
+
   try {
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    // 1. Prioridade absoluta para ServiceWorker (obrigatório em Android Chrome e iOS PWA)
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
-        reg.showNotification(title, {
-          body,
-          icon: '/assets/icon-192.png',
-          badge: '/assets/icon-192.png',
-          vibrate: title.includes('VENDA') ? [300, 100, 300, 100, 300] : [200, 100, 200],
-          tag: 'whatshub-' + Date.now()
+        if (reg && reg.showNotification) {
+          reg.showNotification(title, notifOptions).catch(swErr => {
+            console.warn('[SW Notification Err]', swErr);
+            try { new Notification(title, notifOptions); } catch(_) {}
+          });
+        }
+      }).catch(() => {
+        try { new Notification(title, notifOptions); } catch(_) {}
+      });
+
+      // Tenta também via postMessage para o ServiceWorker ativo
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title: title,
+          options: notifOptions
         });
-      });
+      }
     } else {
-      new Notification(title, {
-        body,
-        icon: '/assets/icon-192.png'
-      });
+      // 2. Fallback para desktop
+      try { new Notification(title, notifOptions); } catch(e) {}
     }
   } catch (e) {
     console.warn('[Push Notification Error]', e);
@@ -6825,22 +6900,27 @@ window.renderFluxoAutomatico = async function(forcedTab) {
 // Renderizador individual do Card de Lead dentro de cada coluna do Kanban
 function renderKanbanLeadCard(s, colKey, timeFn) {
   const shortId = s.id ? (s.id.length > 18 ? s.id.substring(0, 18) + '...' : s.id) : 'Lead Anônimo';
-  const targetPhone = s.targetPhone ? ('+' + s.targetPhone) : 'Aguardando alvo';
+  const country = getLeadCountryInfo(s);
   const timeAgo = timeFn(s.updatedAt || s.createdAt);
   const msgCount = s.messages ? s.messages.length : 0;
-  const campaignTag = s.slug || s.utm?.utm_campaign || '';
-  const sourceTag = s.utm?.utm_source || s.utm?.src || '';
+  
+  // UTMs e Campanha com fallback inteligente
+  const utmCampaign = s.slug || s.utm?.utm_campaign || 'campanha';
+  const utmSource = s.utm?.utm_source || s.utm?.src || (s.channel === 'whatsapp' ? 'whatsapp' : 'direto');
+  const utmContent = s.utm?.utm_content || s.utm?.utm_term || '';
+
+  const displayPhone = s.targetPhone ? ('+' + s.targetPhone) : (s.leadPhone ? ('+' + s.leadPhone) : 'Aguardando alvo');
 
   return `
     <div class="kanban-card" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-      <!-- Topo do Card: ID, Canal e Tempo -->
+      <!-- Topo do Card: Canal, ID e Tempo -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span class="badge" style="background: ${s.channel === 'whatsapp' ? 'rgba(37,211,102,0.15)' : 'rgba(56,189,248,0.15)'}; color: ${s.channel === 'whatsapp' ? '#25d366' : '#38bdf8'}; font-size: 9.5px; padding: 2px 5px; border-radius: 4px; font-weight: 700;">
+          <span class="badge" style="background: ${s.channel === 'whatsapp' ? 'rgba(37,211,102,0.18)' : 'rgba(56,189,248,0.18)'}; color: ${s.channel === 'whatsapp' ? '#25d366' : '#38bdf8'}; font-size: 9.5px; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
             ${s.channel === 'whatsapp' ? '📱 WhatsApp' : '🌐 WebChat'}
           </span>
           <span style="font-size: 11px; font-weight: 700; color: #cbd5e1; font-family: monospace;" title="${s.id}">
-            ${s.leadPhone ? '+' + s.leadPhone : shortId}
+            ${shortId}
           </span>
         </div>
         <span style="font-size: 10.5px; color: #64748b; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">
@@ -6848,46 +6928,60 @@ function renderKanbanLeadCard(s, colKey, timeFn) {
         </span>
       </div>
 
-      <!-- Meio: Alvo e Foto -->
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
-        ${s.photoUrl ? `
-          <img src="${s.photoUrl}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #10b981; flex-shrink: 0;" />
-        ` : `
-          <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(100,116,139,0.2); border: 1px solid rgba(100,116,139,0.4); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
-            ${s.targetPhone ? '🔒' : '👤'}
-          </div>
-        `}
+      <!-- Meio: Bandeira do País, Alvo e Foto -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.28); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+        <div style="position: relative;">
+          ${s.photoUrl ? `
+            <img src="${s.photoUrl}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #10b981; flex-shrink: 0;" />
+          ` : `
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(100,116,139,0.2); border: 1px solid rgba(100,116,139,0.4); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">
+              ${s.targetPhone ? '🔒' : '👤'}
+            </div>
+          `}
+          <span style="position: absolute; bottom: -4px; right: -4px; font-size: 13px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));" title="${country.name}">
+            ${country.flag}
+          </span>
+        </div>
         <div style="flex: 1; min-width: 0;">
-          <div style="font-size: 12.5px; font-weight: 700; color: ${s.targetPhone ? '#38bdf8' : '#64748b'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${targetPhone}
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <span style="font-size: 14px;" title="${country.name}">${country.flag}</span>
+            <strong style="font-size: 12.5px; color: ${(s.targetPhone || s.leadPhone) ? '#38bdf8' : '#64748b'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${displayPhone}
+            </strong>
           </div>
-          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 1px;">
-            ${s.photoUrl ? '🟢 Foto pública extraída' : (s.targetPhone ? '🔒 Perfil com cadeado' : 'Sem número ainda')}
+          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 2px;">
+            ${country.name} • ${s.photoUrl ? '🟢 Foto pública' : ((s.targetPhone || s.leadPhone) ? '🔒 Cadeado' : 'Visitante')}
           </div>
         </div>
       </div>
 
-      <!-- Tags de Campanha e Origem -->
-      <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px;">
-        ${campaignTag ? `
-          <span style="font-size: 9.5px; font-weight: 600; color: #a78bfa; background: rgba(167, 139, 250, 0.15); padding: 2px 6px; border-radius: 4px;">
-            🏷️ ${campaignTag}
+      <!-- Caixa de Destaque Visual das UTMs e Campanha -->
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(167, 139, 250, 0.25); border-radius: 7px; padding: 7px 9px; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-size: 10px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+            <span>🎯</span> <span>Campanha:</span>
           </span>
-        ` : ''}
-        ${sourceTag ? `
-          <span style="font-size: 9.5px; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.15); padding: 2px 6px; border-radius: 4px;">
-            🌐 ${sourceTag}
+          <strong style="font-size: 11px; color: #f8fafc; font-family: monospace; background: rgba(167, 139, 250, 0.2); padding: 1px 6px; border-radius: 4px;" title="UTM Campaign / Slug">
+            ${utmCampaign}
+          </strong>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: #94a3b8;">
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span>🌐</span> <span>Origem (Src):</span>
           </span>
+          <span style="color: #34d399; font-weight: 700;">${utmSource}</span>
+        </div>
+        ${utmContent ? `
+          <div style="font-size: 9.5px; color: #64748b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            Anúncio: ${utmContent}
+          </div>
         ` : ''}
-        <span style="font-size: 9.5px; font-weight: 600; color: #cbd5e1; background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 4px; margin-left: auto;">
-          💬 ${msgCount} msgs
-        </span>
       </div>
 
-      <!-- Rodapé com Ações -->
+      <!-- Rodapé com Contador de Mensagens e Ações -->
       <div style="display: flex; gap: 6px; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
         <button type="button" class="btn btn-secondary" onclick="viewWebChatHistory('${s.id}')" style="flex: 1; font-size: 11px; padding: 5px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-          <span>👁️</span> <span>Ver Chat</span>
+          <span>👁️</span> <span>Ver Chat (${msgCount})</span>
         </button>
         ${colKey !== 'finalizado' ? `
           <button type="button" class="btn btn-primary" onclick="markWebChatSessionStatus('${s.id}', 'FINALIZADO')" style="font-size: 11px; padding: 5px 8px; background: rgba(16,185,129,0.25); border: 1px solid #10b981; color: #34d399; font-weight: 700;" title="Marcar como Venda Concluída">
@@ -6902,23 +6996,6 @@ function renderKanbanLeadCard(s, colKey, timeFn) {
     </div>
   `;
 }
-
-window.saveWebChatMode = async function(mode) {
-  try {
-    const res = await fetch('/api/webchat/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignMode: mode })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`✓ Modo de campanha alterado para: ${mode === 'webchat' ? 'Chatbot no Navegador' : 'WhatsApp Físico'}`, 'success');
-      renderFluxoAutomatico();
-    }
-  } catch (e) {
-    showToast('Erro ao salvar modo: ' + e.message, 'error');
-  }
-};
 
 window.saveWebChatFullConfig = async function() {
   const name = document.getElementById('cfg-attendant-name')?.value;
@@ -7015,3 +7092,43 @@ window.copyInputText = function(elementId) {
     }
   }
 };
+
+// Background Poller para garantir recebimento de alertas de novos leads no celular
+window._lastNotifiedLeadTime = Date.now();
+
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/notifications/latest');
+    const data = await res.json();
+    if (data.success && data.latestTime && data.latestTime > window._lastNotifiedLeadTime) {
+      window._lastNotifiedLeadTime = data.latestTime;
+      const lead = data.latestLead || {};
+      const flagInfo = getCountryByPhone(lead.phone);
+      const title = lead.type === 'web' ? '🌐 Novo Lead no Chatbot!' : '📱 Novo Lead no WhatsApp!';
+      const body = `${flagInfo.flag} Alvo: ${lead.phone ? '+' + lead.phone : 'Novo Lead'} | Campanha: ${lead.campaign || 'Geral'}`;
+
+      playLeadSound();
+      showPushNotification(title, body);
+      showToast(`🎯 ${title}: ${body}`, 'success');
+      updateBadges();
+
+      if (state.currentView === 'fluxo-automatico' || state.currentView === 'kanban-fluxo') {
+        renderFluxoAutomatico();
+      }
+    }
+  } catch(e) {}
+}, 9000);
+
+// Ao desbloquear o celular ou retornar à aba, verifica imediatamente
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    getAudioContext();
+    fetch('/api/notifications/latest').then(r => r.json()).then(data => {
+      if (data.success && data.latestTime && data.latestTime > window._lastNotifiedLeadTime) {
+        window._lastNotifiedLeadTime = data.latestTime;
+        playLeadSound();
+        showPushNotification('🎯 Novos Leads Recebidos!', 'Há novas interações aguardando no seu painel!');
+      }
+    }).catch(() => {});
+  }
+});

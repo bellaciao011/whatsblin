@@ -3067,4 +3067,68 @@ router.patch('/webchat/sessions/:id/status', (req, res) => {
   }
 });
 
+
+// Endpoint para consultar a atividade mais recente para polling mobile de fundo
+router.get('/notifications/latest', (req, res) => {
+  try {
+    const chats = db.getChats ? db.getChats() : {};
+    const sessions = db.getWebChatSessions ? db.getWebChatSessions() : {};
+
+    let latestTime = 0;
+    let latestLead = null;
+
+    Object.values(sessions).forEach(s => {
+      const t = new Date(s.updatedAt || s.createdAt || 0).getTime();
+      if (t > latestTime) {
+        latestTime = t;
+        latestLead = {
+          type: 'web',
+          id: s.id,
+          phone: s.targetPhone || s.phone || '',
+          campaign: s.slug || s.utm?.utm_campaign || 'WebChat',
+          text: s.targetPhone ? `Alvo: +${s.targetPhone}` : 'Novo visitante no simulador',
+          time: s.updatedAt || s.createdAt
+        };
+      }
+    });
+
+    Object.values(chats).forEach(c => {
+      const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+      const t = new Date(c.lastMessageTime || lastMsg?.timestamp || c.createdAt || c.criado_em || 0).getTime();
+      if (t > latestTime) {
+        latestTime = t;
+        latestLead = {
+          type: 'whatsapp',
+          id: c.leadPhone,
+          phone: c.leadPhone,
+          campaign: c.assignedFlowId || 'WhatsApp',
+          text: lastMsg?.text || 'Nova mensagem no WhatsApp',
+          time: c.lastMessageTime || lastMsg?.timestamp
+        };
+      }
+    });
+
+    res.json({ success: true, latestTime, latestLead });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint para testar disparo de notificação no celular
+router.post('/notifications/test', (req, res) => {
+  try {
+    eventBus.emit('new_lead', {
+      phone: '5571999999999',
+      codigo: 'TESTE-CELULAR',
+      campaign: 'Teste de Notificação',
+      source: 'Painel WhatsHub',
+      text: '🔔 Teste de Notificação Mobile funcionando 100%!',
+      timestamp: new Date().toISOString()
+    });
+    res.json({ success: true, message: 'Alerta de teste emitido com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
